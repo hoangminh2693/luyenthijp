@@ -1,22 +1,17 @@
 import { useParams, Navigate } from 'react-router-dom';
-import { getSubjectBySlug, getLevelBySlug, getSectionBySlug, getExamsBySection } from '@/data/quizData';
-import { ExamCard } from '@/components/ui/ExamCard';
+import { getSubjectBySlug, getLevelBySlug, getSectionsByLevel } from '@/data/quizData';
+import { SectionCard } from '@/components/ui/SectionCard';
 import { Breadcrumb } from '@/components/layout/Header';
 
 /**
- * ExamsPage - Trang danh sách đề thi theo phần
+ * SectionsPage - Trang danh sách phần theo cấp độ
  */
-const ExamsPage = () => {
-  const { subjectSlug, levelSlug, sectionSlug } = useParams<{ 
-    subjectSlug: string; 
-    levelSlug: string;
-    sectionSlug: string;
-  }>();
+const SectionsPage = () => {
+  const { subjectSlug, levelSlug } = useParams<{ subjectSlug: string; levelSlug: string }>();
   
-  // Lấy thông tin môn học, cấp độ và phần
+  // Lấy thông tin môn học và cấp độ
   const subject = subjectSlug ? getSubjectBySlug(subjectSlug) : undefined;
   const level = subject && levelSlug ? getLevelBySlug(subject.id, levelSlug) : undefined;
-  const section = level && sectionSlug ? getSectionBySlug(level.id, sectionSlug) : undefined;
   
   // Nếu không tìm thấy, chuyển về trang trước
   if (!subject) {
@@ -26,13 +21,9 @@ const ExamsPage = () => {
   if (!level) {
     return <Navigate to={`/subjects/${subjectSlug}`} replace />;
   }
-  
-  if (!section) {
-    return <Navigate to={`/subjects/${subjectSlug}/${levelSlug}`} replace />;
-  }
 
-  // Lấy danh sách đề thi của phần
-  const exams = getExamsBySection(section.id);
+  // Lấy danh sách phần của cấp độ
+  const sections = getSectionsByLevel(level.id);
 
   return (
     <div className="min-h-screen bg-background">
@@ -43,8 +34,7 @@ const ExamsPage = () => {
             items={[
               { label: 'Chọn môn học', href: '/subjects' },
               { label: subject.name, href: `/subjects/${subject.slug}` },
-              { label: level.name, href: `/subjects/${subject.slug}/${level.slug}` },
-              { label: section.name },
+              { label: level.name },
             ]}
           />
         </div>
@@ -52,14 +42,14 @@ const ExamsPage = () => {
         {/* Header */}
         <div className="mb-8 flex items-center gap-4">
           <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10 text-4xl">
-            {section.icon}
+            {subject.icon}
           </div>
           <div>
             <h1 className="mb-1 text-3xl font-bold text-foreground">
-              {section.name}
+              {subject.name} - {level.name}
             </h1>
             <p className="text-muted-foreground">
-              {subject.name} - {level.name} | {section.description}
+              {level.description}
             </p>
           </div>
         </div>
@@ -67,22 +57,28 @@ const ExamsPage = () => {
         {/* Section title */}
         <div className="mb-6">
           <h2 className="text-xl font-semibold text-foreground">
-            Danh sách đề thi ({exams.length} đề)
+            Chọn phần luyện tập ({sections.length} phần)
           </h2>
         </div>
 
-        {/* Exams Grid */}
+        {/* Sections Grid */}
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {exams.map((exam, index) => (
-            <ExamCard key={exam.id} exam={exam} index={index} />
+          {sections.map((section, index) => (
+            <SectionCard 
+              key={section.id} 
+              section={section} 
+              subjectSlug={subject.slug}
+              levelSlug={level.slug}
+              index={index} 
+            />
           ))}
         </div>
 
         {/* Empty state */}
-        {exams.length === 0 && (
+        {sections.length === 0 && (
           <div className="rounded-xl border border-border bg-card p-12 text-center">
             <p className="text-muted-foreground">
-              Chưa có đề thi nào cho phần {section.name}. Vui lòng quay lại sau.
+              Chưa có phần nào cho cấp độ {level.name}. Vui lòng quay lại sau.
             </p>
           </div>
         )}
@@ -91,4 +87,4 @@ const ExamsPage = () => {
   );
 };
 
-export default ExamsPage;
+export default SectionsPage;

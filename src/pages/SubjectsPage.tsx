@@ -20,7 +20,7 @@ const SubjectsPage = () => {
             Chọn môn học
           </h1>
           <p className="text-muted-foreground">
-            Chọn môn học bạn muốn luyện tập để xem danh sách các đề thi
+            Chọn môn học bạn muốn luyện tập để xem danh sách các cấp độ
           </p>
         </div>
 
