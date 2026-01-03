@@ -10,7 +10,9 @@ import {
   getExamById,
   getQuestionsByExam,
   calculateResult,
-  subjects,
+  getSectionById,
+  getLevelById,
+  getSubjectById,
   type QuizResult,
 } from '@/data/quizData';
 
@@ -29,7 +31,9 @@ const QuizPage = () => {
   // Lấy thông tin đề thi và câu hỏi
   const exam = examId ? getExamById(examId) : undefined;
   const questions = examId ? getQuestionsByExam(examId) : [];
-  const subject = exam ? subjects.find((s) => s.id === exam.subjectId) : undefined;
+  const section = exam ? getSectionById(exam.sectionId) : undefined;
+  const level = section ? getLevelById(section.levelId) : undefined;
+  const subject = level ? getSubjectById(level.subjectId) : undefined;
 
   // Scroll to top khi component mount
   useEffect(() => {
@@ -37,7 +41,7 @@ const QuizPage = () => {
   }, [examId]);
 
   // Nếu không tìm thấy đề thi
-  if (!exam || !subject) {
+  if (!exam || !section || !level || !subject) {
     return <Navigate to="/subjects" replace />;
   }
 
@@ -77,6 +81,7 @@ const QuizPage = () => {
 
   const answeredCount = Object.keys(answers).length;
   const questionIds = questions.map((q) => q.id);
+  const backUrl = `/subjects/${subject.slug}/${level.slug}/${section.slug}`;
 
   return (
     <div className="min-h-screen bg-background pb-8">
@@ -87,6 +92,8 @@ const QuizPage = () => {
             items={[
               { label: 'Chọn môn học', href: '/subjects' },
               { label: subject.name, href: `/subjects/${subject.slug}` },
+              { label: level.name, href: `/subjects/${subject.slug}/${level.slug}` },
+              { label: section.name, href: backUrl },
               { label: exam.name },
             ]}
           />
@@ -96,7 +103,7 @@ const QuizPage = () => {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <Link
-              to={`/subjects/${subject.slug}`}
+              to={backUrl}
               className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />

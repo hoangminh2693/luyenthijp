@@ -18,13 +18,8 @@ export function ExamCard({ exam, index = 0 }: ExamCardProps) {
       style={{ animationDelay: `${index * 0.1}s` }}
     >
       <div className="relative overflow-hidden rounded-xl border border-border bg-card p-6 shadow-card transition-all duration-300 hover:border-primary/30 hover:shadow-card-hover hover:-translate-y-1">
-        {/* Year badge */}
-        <div className="absolute right-4 top-4 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-          {exam.year}
-        </div>
-
         {/* Content */}
-        <h3 className="mb-2 pr-16 text-lg font-bold text-foreground group-hover:text-primary transition-colors">
+        <h3 className="mb-2 text-lg font-bold text-foreground group-hover:text-primary transition-colors">
           {exam.name}
         </h3>
         <p className="mb-4 text-sm text-muted-foreground line-clamp-2">

@@ -1,46 +1,48 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Layers } from 'lucide-react';
-import { getLevelsBySubject, type Subject } from '@/data/quizData';
+import { ArrowRight, FileText } from 'lucide-react';
+import { getExamsBySection, type Section } from '@/data/quizData';
 
 /**
- * SubjectCard Component - Thẻ hiển thị thông tin môn học
+ * SectionCard Component - Thẻ hiển thị thông tin phần
  */
-interface SubjectCardProps {
-  subject: Subject;
+interface SectionCardProps {
+  section: Section;
+  subjectSlug: string;
+  levelSlug: string;
   index?: number;
 }
 
-export function SubjectCard({ subject, index = 0 }: SubjectCardProps) {
-  const levels = getLevelsBySubject(subject.id);
+export function SectionCard({ section, subjectSlug, levelSlug, index = 0 }: SectionCardProps) {
+  const exams = getExamsBySection(section.id);
   
   return (
     <Link
-      to={`/subjects/${subject.slug}`}
+      to={`/subjects/${subjectSlug}/${levelSlug}/${section.slug}`}
       className="group block animate-fade-in-up opacity-0"
       style={{ animationDelay: `${index * 0.1}s` }}
     >
       <div className="relative overflow-hidden rounded-xl border border-border bg-card p-6 shadow-card transition-all duration-300 hover:border-primary/30 hover:shadow-card-hover hover:-translate-y-1">
         {/* Icon */}
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-3xl">
-          {subject.icon}
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-2xl">
+          {section.icon}
         </div>
 
         {/* Content */}
-        <h3 className="mb-2 text-xl font-bold text-foreground group-hover:text-primary transition-colors">
-          {subject.name}
+        <h3 className="mb-1 text-lg font-bold text-foreground group-hover:text-primary transition-colors">
+          {section.name}
         </h3>
-        <p className="mb-4 text-sm text-muted-foreground line-clamp-2">
-          {subject.description}
+        <p className="mb-4 text-sm text-muted-foreground">
+          {section.description}
         </p>
 
         {/* Footer */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Layers className="h-4 w-4" />
-            <span>{levels.length} cấp độ</span>
+            <FileText className="h-4 w-4" />
+            <span>{exams.length} đề thi</span>
           </div>
           <div className="flex items-center gap-1 text-sm font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
-            Xem cấp độ
+            Xem đề
             <ArrowRight className="h-4 w-4" />
           </div>
         </div>
