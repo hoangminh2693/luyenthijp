@@ -1,7 +1,9 @@
-import { useParams, Navigate } from 'react-router-dom';
-import { getSubjectBySlug, getLevelBySlug, getSectionBySlug, getExamsBySection } from '@/data/quizData';
+import { useParams, Navigate, Link } from 'react-router-dom';
+import { Play } from 'lucide-react';
+import { getSubjectBySlug, getLevelBySlug, getSectionBySlug, getExamsBySection, getQuestionsBySection } from '@/data/quizData';
 import { ExamCard } from '@/components/ui/ExamCard';
 import { Breadcrumb } from '@/components/layout/Header';
+import { Button } from '@/components/ui/button';
 
 /**
  * ExamsPage - Trang danh sách đề thi theo phần
@@ -33,6 +35,7 @@ const ExamsPage = () => {
 
   // Lấy danh sách đề thi của phần
   const exams = getExamsBySection(section.id);
+  const totalQuestions = getQuestionsBySection(section.id).length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -50,18 +53,28 @@ const ExamsPage = () => {
         </div>
 
         {/* Header */}
-        <div className="mb-8 flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10 text-4xl">
-            {section.icon}
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10 text-4xl">
+              {section.icon}
+            </div>
+            <div>
+              <h1 className="mb-1 text-3xl font-bold text-foreground">
+                {section.name}
+              </h1>
+              <p className="text-muted-foreground">
+                {subject.name} - {level.name} | {totalQuestions} câu hỏi
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="mb-1 text-3xl font-bold text-foreground">
-              {section.name}
-            </h1>
-            <p className="text-muted-foreground">
-              {subject.name} - {level.name} | {section.description}
-            </p>
-          </div>
+          
+          {/* Start quiz button */}
+          <Link to={`/start/${subject.slug}/${level.slug}/${section.slug}`}>
+            <Button size="lg" className="gap-2">
+              <Play className="h-5 w-5" />
+              Làm bài ngay
+            </Button>
+          </Link>
         </div>
 
         {/* Section title */}
@@ -69,6 +82,9 @@ const ExamsPage = () => {
           <h2 className="text-xl font-semibold text-foreground">
             Danh sách đề thi ({exams.length} đề)
           </h2>
+          <p className="text-sm text-muted-foreground">
+            Hoặc chọn một đề thi cụ thể để luyện tập
+          </p>
         </div>
 
         {/* Exams Grid */}
