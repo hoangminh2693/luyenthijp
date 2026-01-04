@@ -1,5 +1,15 @@
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, Home, ChevronRight, Upload } from 'lucide-react';
+import { BookOpen, Home, ChevronRight, Upload, LogIn, LogOut, User } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 /**
  * Header Component - Thanh điều hướng chính của ứng dụng
@@ -8,6 +18,21 @@ import { BookOpen, Home, ChevronRight, Upload } from 'lucide-react';
 export function Header() {
   const location = useLocation();
   const isHome = location.pathname === '/';
+  const { user, profile, isAdmin, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return 'U';
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
@@ -49,17 +74,71 @@ export function Header() {
             <BookOpen className="h-4 w-4" />
             <span className="hidden sm:inline">Chọn môn học</span>
           </Link>
-          <Link
-            to="/import"
-            className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-              location.pathname === '/import'
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-            }`}
-          >
-            <Upload className="h-4 w-4" />
-            <span className="hidden sm:inline">Import</span>
-          </Link>
+          {isAdmin && (
+            <Link
+              to="/import"
+              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                location.pathname === '/import'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+              }`}
+            >
+              <Upload className="h-4 w-4" />
+              <span className="hidden sm:inline">Import</span>
+            </Link>
+          )}
+
+          {/* Auth */}
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+                  <Avatar className="h-9 w-9">
+                    <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || 'User'} />
+                    <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                      {getInitials(profile?.display_name || user.email)}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <div className="flex items-center gap-2 p-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={profile?.avatar_url || undefined} />
+                    <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                      {getInitials(profile?.display_name || user.email)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">
+                      {profile?.display_name || 'Người dùng'}
+                    </span>
+                    <span className="text-xs text-muted-foreground truncate max-w-[150px]">
+                      {user.email}
+                    </span>
+                  </div>
+                </div>
+                <DropdownMenuSeparator />
+                {isAdmin && (
+                  <DropdownMenuItem className="gap-2 text-primary">
+                    <User className="h-4 w-4" />
+                    Admin
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={handleSignOut} className="gap-2 text-destructive">
+                  <LogOut className="h-4 w-4" />
+                  Đăng xuất
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Link to="/auth">
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <LogIn className="h-4 w-4" />
+                <span className="hidden sm:inline">Đăng nhập</span>
+              </Button>
+            </Link>
+          )}
         </nav>
       </div>
     </header>

@@ -1,12 +1,18 @@
 /**
  * ImportQuestionsPage - Trang import câu hỏi từ file Excel/CSV
+ * Hỗ trợ tạo môn học, cấp độ, phần mới và import câu hỏi
  */
 import { useState, useCallback, useEffect } from 'react';
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download, LogIn, Shield } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/layout/Header';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { SubjectManager } from '@/components/admin/SubjectManager';
+import { LevelManager } from '@/components/admin/LevelManager';
+import { SectionManager } from '@/components/admin/SectionManager';
 
 interface ParsedQuestion {
   content: string;
@@ -24,70 +30,109 @@ interface ImportResult {
   errors: string[];
 }
 
-interface SectionOption {
+interface Subject {
   id: string;
   name: string;
-  level_name: string;
-  subject_name: string;
+  slug: string;
+  description: string | null;
+  has_levels: boolean;
+}
+
+interface Level {
+  id: string;
+  name: string;
+  slug: string;
+  subject_id: string | null;
+  description: string | null;
+}
+
+interface Section {
+  id: string;
+  name: string;
+  slug: string;
+  level_id: string;
+  description: string | null;
 }
 
 const ImportQuestionsPage = () => {
+  const { user, isAdmin, isLoading: authLoading } = useAuth();
+
   const [file, setFile] = useState<File | null>(null);
   const [parsedQuestions, setParsedQuestions] = useState<ParsedQuestion[]>([]);
-  const [selectedSectionId, setSelectedSectionId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const [sections, setSections] = useState<SectionOption[]>([]);
-  const [loadingSections, setLoadingSections] = useState(true);
 
-  // Tải danh sách sections từ database
+  // Data from database
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [levels, setLevels] = useState<Level[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  // Selected values
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+  const [selectedLevelId, setSelectedLevelId] = useState<string>('');
+  const [selectedSectionId, setSelectedSectionId] = useState<string>('');
+
+  // Get selected subject
+  const selectedSubject = subjects.find(s => s.id === selectedSubjectId);
+  const subjectHasLevels = selectedSubject?.has_levels ?? true;
+
+  // Tải dữ liệu từ database
   useEffect(() => {
-    const loadSections = async () => {
+    const loadData = async () => {
       try {
-        const { data, error } = await supabase
-          .from('sections')
-          .select(`
-            id,
-            name,
-            levels!inner (
-              name,
-              subjects!inner (
-                name
-              )
-            )
-          `);
+        const [subjectsRes, levelsRes, sectionsRes] = await Promise.all([
+          supabase.from('subjects').select('*').order('name'),
+          supabase.from('levels').select('*').order('order_index'),
+          supabase.from('sections').select('*').order('order_index'),
+        ]);
 
-        if (error) throw error;
+        if (subjectsRes.error) throw subjectsRes.error;
+        if (levelsRes.error) throw levelsRes.error;
+        if (sectionsRes.error) throw sectionsRes.error;
 
-        const formattedSections = data?.map((s: any) => ({
-          id: s.id,
-          name: s.name,
-          level_name: s.levels?.name || '',
-          subject_name: s.levels?.subjects?.name || '',
-        })) || [];
-
-        setSections(formattedSections);
+        setSubjects(subjectsRes.data || []);
+        setLevels(levelsRes.data || []);
+        setSections(sectionsRes.data || []);
       } catch (err) {
-        console.error('Error loading sections:', err);
+        console.error('Error loading data:', err);
+        toast.error('Lỗi khi tải dữ liệu');
       } finally {
-        setLoadingSections(false);
+        setLoadingData(false);
       }
     };
 
-    loadSections();
-  });
+    loadData();
+  }, []);
+
+  // Reset selections when parent changes
+  useEffect(() => {
+    setSelectedLevelId('');
+    setSelectedSectionId('');
+  }, [selectedSubjectId]);
+
+  useEffect(() => {
+    setSelectedSectionId('');
+  }, [selectedLevelId]);
+
+  // Filter levels and sections based on selection
+  const filteredLevels = levels.filter(l => l.subject_id === selectedSubjectId);
+  const filteredSections = subjectHasLevels
+    ? sections.filter(s => s.level_id === selectedLevelId)
+    : sections.filter(s => {
+        const level = levels.find(l => l.id === s.level_id);
+        return level?.subject_id === selectedSubjectId;
+      });
 
   // Parse CSV file
   const parseCSV = useCallback((text: string): ParsedQuestion[] => {
     const lines = text.trim().split('\n');
     if (lines.length < 2) return [];
 
-    // Skip header row
     const dataLines = lines.slice(1);
     const questions: ParsedQuestion[] = [];
 
-    dataLines.forEach((line, index) => {
-      // Handle CSV with quoted fields
+    dataLines.forEach((line) => {
       const values: string[] = [];
       let current = '';
       let inQuotes = false;
@@ -161,7 +206,7 @@ const ImportQuestionsPage = () => {
     try {
       for (let i = 0; i < parsedQuestions.length; i++) {
         const q = parsedQuestions[i];
-        
+
         const { error } = await supabase
           .from('questions')
           .insert({
@@ -184,7 +229,7 @@ const ImportQuestionsPage = () => {
       }
 
       setImportResult(result);
-      
+
       if (result.success > 0) {
         toast.success(`Đã import ${result.success} câu hỏi thành công`);
       }
@@ -214,6 +259,58 @@ const ImportQuestionsPage = () => {
     link.click();
     URL.revokeObjectURL(url);
   }, []);
+
+  // Loading state
+  if (authLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="text-muted-foreground">Đang tải...</div>
+      </div>
+    );
+  }
+
+  // Not logged in
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container py-8">
+          <div className="mx-auto max-w-md text-center">
+            <LogIn className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+            <h1 className="mb-2 text-2xl font-bold text-foreground">Yêu cầu đăng nhập</h1>
+            <p className="mb-6 text-muted-foreground">
+              Bạn cần đăng nhập với tài khoản admin để import câu hỏi
+            </p>
+            <Link to="/auth">
+              <Button className="gap-2">
+                <LogIn className="h-4 w-4" />
+                Đăng nhập
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Not admin
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container py-8">
+          <div className="mx-auto max-w-md text-center">
+            <Shield className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+            <h1 className="mb-2 text-2xl font-bold text-foreground">Không có quyền truy cập</h1>
+            <p className="mb-6 text-muted-foreground">
+              Chỉ admin mới có thể import câu hỏi. Liên hệ quản trị viên để được cấp quyền.
+            </p>
+            <Link to="/">
+              <Button variant="outline">Về trang chủ</Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -250,61 +347,131 @@ const ImportQuestionsPage = () => {
             </Button>
           </div>
 
-          {/* Select section */}
+          {/* Select subject */}
           <div className="mb-6 rounded-xl border border-border bg-card p-6">
-            <h2 className="mb-3 font-semibold text-foreground">2. Chọn phần để import</h2>
-            <select
-              value={selectedSectionId}
-              onChange={(e) => setSelectedSectionId(e.target.value)}
-              className="w-full rounded-lg border border-border bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              disabled={loadingSections}
-            >
-              <option value="">-- Chọn phần --</option>
-              {sections.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.subject_name} / {s.level_name} / {s.name}
-                </option>
-              ))}
-            </select>
-            {sections.length === 0 && !loadingSections && (
-              <p className="mt-2 text-sm text-muted-foreground">
-                Chưa có phần nào trong database. Vui lòng thêm dữ liệu môn học, cấp độ và phần trước.
-              </p>
-            )}
+            <h2 className="mb-3 font-semibold text-foreground">2. Chọn môn học</h2>
+            <div className="mb-4">
+              <select
+                value={selectedSubjectId}
+                onChange={(e) => setSelectedSubjectId(e.target.value)}
+                className="w-full rounded-lg border border-border bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                disabled={loadingData}
+              >
+                <option value="">-- Chọn môn học --</option>
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} {!s.has_levels && '(không có cấp độ)'}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <SubjectManager
+              subjects={subjects}
+              onSubjectCreated={(subject) => {
+                setSubjects([...subjects, subject]);
+                setSelectedSubjectId(subject.id);
+              }}
+            />
           </div>
+
+          {/* Select level (if subject has levels) */}
+          {selectedSubjectId && subjectHasLevels && (
+            <div className="mb-6 rounded-xl border border-border bg-card p-6">
+              <h2 className="mb-3 font-semibold text-foreground">3. Chọn cấp độ</h2>
+              <div className="mb-4">
+                <select
+                  value={selectedLevelId}
+                  onChange={(e) => setSelectedLevelId(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="">-- Chọn cấp độ --</option>
+                  {filteredLevels.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <LevelManager
+                subjectId={selectedSubjectId}
+                levels={levels}
+                onLevelCreated={(level) => {
+                  setLevels([...levels, level]);
+                  setSelectedLevelId(level.id);
+                }}
+              />
+            </div>
+          )}
+
+          {/* Select section */}
+          {((selectedSubjectId && !subjectHasLevels) || selectedLevelId) && (
+            <div className="mb-6 rounded-xl border border-border bg-card p-6">
+              <h2 className="mb-3 font-semibold text-foreground">
+                {subjectHasLevels ? '4.' : '3.'} Chọn phần
+              </h2>
+              <div className="mb-4">
+                <select
+                  value={selectedSectionId}
+                  onChange={(e) => setSelectedSectionId(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="">-- Chọn phần --</option>
+                  {filteredSections.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {selectedLevelId && (
+                <SectionManager
+                  levelId={selectedLevelId}
+                  sections={sections}
+                  onSectionCreated={(section) => {
+                    setSections([...sections, section]);
+                    setSelectedSectionId(section.id);
+                  }}
+                />
+              )}
+            </div>
+          )}
 
           {/* Upload file */}
-          <div className="mb-6 rounded-xl border border-border bg-card p-6">
-            <h2 className="mb-3 font-semibold text-foreground">3. Tải file câu hỏi</h2>
-            
-            <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border p-8 transition-colors hover:border-primary/50 hover:bg-primary/5">
-              <FileSpreadsheet className="mb-3 h-12 w-12 text-muted-foreground" />
-              <span className="mb-1 font-medium text-foreground">
-                {file ? file.name : 'Chọn file CSV'}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                Click để chọn hoặc kéo thả file vào đây
-              </span>
-              <input
-                type="file"
-                accept=".csv"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-            </label>
+          {selectedSectionId && (
+            <div className="mb-6 rounded-xl border border-border bg-card p-6">
+              <h2 className="mb-3 font-semibold text-foreground">
+                {subjectHasLevels ? '5.' : '4.'} Tải file câu hỏi
+              </h2>
 
-            {parsedQuestions.length > 0 && (
-              <div className="mt-4 flex items-center gap-2 text-sm text-success">
-                <CheckCircle2 className="h-4 w-4" />
-                Đã đọc {parsedQuestions.length} câu hỏi từ file
-              </div>
-            )}
-          </div>
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border p-8 transition-colors hover:border-primary/50 hover:bg-primary/5">
+                <FileSpreadsheet className="mb-3 h-12 w-12 text-muted-foreground" />
+                <span className="mb-1 font-medium text-foreground">
+                  {file ? file.name : 'Chọn file CSV'}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  Click để chọn hoặc kéo thả file vào đây
+                </span>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
+
+              {parsedQuestions.length > 0 && (
+                <div className="mt-4 flex items-center gap-2 text-sm text-success">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Đã đọc {parsedQuestions.length} câu hỏi từ file
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Preview */}
           {parsedQuestions.length > 0 && (
             <div className="mb-6 rounded-xl border border-border bg-card p-6">
-              <h2 className="mb-3 font-semibold text-foreground">4. Xem trước</h2>
+              <h2 className="mb-3 font-semibold text-foreground">Xem trước</h2>
               <div className="max-h-64 space-y-3 overflow-y-auto">
                 {parsedQuestions.slice(0, 5).map((q, i) => (
                   <div key={i} className="rounded-lg bg-muted/30 p-3 text-sm">
@@ -325,15 +492,17 @@ const ImportQuestionsPage = () => {
           )}
 
           {/* Import button */}
-          <Button
-            onClick={handleImport}
-            disabled={isLoading || !selectedSectionId || parsedQuestions.length === 0}
-            size="lg"
-            className="w-full gap-2"
-          >
-            <Upload className="h-5 w-5" />
-            {isLoading ? 'Đang import...' : `Import ${parsedQuestions.length} câu hỏi`}
-          </Button>
+          {selectedSectionId && (
+            <Button
+              onClick={handleImport}
+              disabled={isLoading || parsedQuestions.length === 0}
+              size="lg"
+              className="w-full gap-2"
+            >
+              <Upload className="h-5 w-5" />
+              {isLoading ? 'Đang import...' : `Import ${parsedQuestions.length} câu hỏi`}
+            </Button>
+          )}
 
           {/* Import result */}
           {importResult && (

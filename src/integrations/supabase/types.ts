@@ -23,7 +23,7 @@ export type Database = {
           name: string
           order_index: number | null
           slug: string
-          subject_id: string
+          subject_id: string | null
         }
         Insert: {
           created_at?: string
@@ -33,7 +33,7 @@ export type Database = {
           name: string
           order_index?: number | null
           slug: string
-          subject_id: string
+          subject_id?: string | null
         }
         Update: {
           created_at?: string
@@ -43,7 +43,7 @@ export type Database = {
           name?: string
           order_index?: number | null
           slug?: string
-          subject_id?: string
+          subject_id?: string | null
         }
         Relationships: [
           {
@@ -55,6 +55,33 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       question_history: {
         Row: {
           answered_at: string
@@ -63,6 +90,7 @@ export type Database = {
           is_correct: boolean
           question_id: string
           selected_answer: string
+          user_id: string | null
         }
         Insert: {
           answered_at?: string
@@ -71,6 +99,7 @@ export type Database = {
           is_correct: boolean
           question_id: string
           selected_answer: string
+          user_id?: string | null
         }
         Update: {
           answered_at?: string
@@ -79,6 +108,7 @@ export type Database = {
           is_correct?: boolean
           question_id?: string
           selected_answer?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -182,6 +212,7 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
+          has_levels: boolean
           icon: string | null
           id: string
           name: string
@@ -190,6 +221,7 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string | null
+          has_levels?: boolean
           icon?: string | null
           id?: string
           name: string
@@ -198,10 +230,29 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string | null
+          has_levels?: boolean
           icon?: string | null
           id?: string
           name?: string
           slug?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
         }
         Relationships: []
       }
@@ -210,10 +261,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -340,6 +397,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
