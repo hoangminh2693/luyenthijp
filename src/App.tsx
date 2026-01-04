@@ -11,6 +11,8 @@ import LevelsPage from "./pages/LevelsPage";
 import SectionsPage from "./pages/SectionsPage";
 import ExamsPage from "./pages/ExamsPage";
 import QuizPage from "./pages/QuizPage";
+import StartQuizPage from "./pages/StartQuizPage";
+import ImportQuestionsPage from "./pages/ImportQuestionsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -18,14 +20,6 @@ const queryClient = new QueryClient();
 /**
  * App Component - Component gốc của ứng dụng
  * Quản lý routing và layout chung
- * 
- * Cấu trúc navigation:
- * - / : Trang chủ
- * - /subjects : Danh sách môn học
- * - /subjects/:subjectSlug : Danh sách cấp độ của môn
- * - /subjects/:subjectSlug/:levelSlug : Danh sách phần của cấp độ
- * - /subjects/:subjectSlug/:levelSlug/:sectionSlug : Danh sách đề thi của phần
- * - /exam/:examId : Trang làm bài thi
  */
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -52,8 +46,17 @@ const App = () => (
               {/* Danh sách đề thi theo phần */}
               <Route path="/subjects/:subjectSlug/:levelSlug/:sectionSlug" element={<ExamsPage />} />
               
-              {/* Trang làm bài thi */}
+              {/* Trang cấu hình trước khi làm bài */}
+              <Route path="/start/:subjectSlug/:levelSlug/:sectionSlug" element={<StartQuizPage />} />
+              
+              {/* Trang làm bài thi mới (random questions) */}
+              <Route path="/quiz/:subjectSlug/:levelSlug/:sectionSlug" element={<QuizPage />} />
+              
+              {/* Trang làm bài thi cũ (theo đề) */}
               <Route path="/exam/:examId" element={<QuizPage />} />
+              
+              {/* Import câu hỏi */}
+              <Route path="/import" element={<ImportQuestionsPage />} />
               
               {/* Trang 404 */}
               <Route path="*" element={<NotFound />} />

@@ -14,7 +14,197 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      levels: {
+        Row: {
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+          order_index: number | null
+          slug: string
+          subject_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          order_index?: number | null
+          slug: string
+          subject_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          order_index?: number | null
+          slug?: string
+          subject_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "levels_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      question_history: {
+        Row: {
+          answered_at: string
+          device_id: string
+          id: string
+          is_correct: boolean
+          question_id: string
+          selected_answer: string
+        }
+        Insert: {
+          answered_at?: string
+          device_id: string
+          id?: string
+          is_correct: boolean
+          question_id: string
+          selected_answer: string
+        }
+        Update: {
+          answered_at?: string
+          device_id?: string
+          id?: string
+          is_correct?: boolean
+          question_id?: string
+          selected_answer?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_history_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      questions: {
+        Row: {
+          content: string
+          correct_option: string
+          created_at: string
+          explanation: string | null
+          id: string
+          option_a: string
+          option_b: string
+          option_c: string
+          option_d: string
+          section_id: string
+        }
+        Insert: {
+          content: string
+          correct_option: string
+          created_at?: string
+          explanation?: string | null
+          id?: string
+          option_a: string
+          option_b: string
+          option_c: string
+          option_d: string
+          section_id: string
+        }
+        Update: {
+          content?: string
+          correct_option?: string
+          created_at?: string
+          explanation?: string | null
+          id?: string
+          option_a?: string
+          option_b?: string
+          option_c?: string
+          option_d?: string
+          section_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questions_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sections: {
+        Row: {
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          level_id: string
+          name: string
+          order_index: number | null
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          level_id: string
+          name: string
+          order_index?: number | null
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          level_id?: string
+          name?: string
+          order_index?: number | null
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sections_level_id_fkey"
+            columns: ["level_id"]
+            isOneToOne: false
+            referencedRelation: "levels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subjects: {
+        Row: {
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -567,6 +567,24 @@ export function getQuestionsByExam(examId: string): Question[] {
 }
 
 /**
+ * Lấy danh sách câu hỏi theo phần (section) - gom tất cả câu hỏi từ các đề trong phần đó
+ */
+export function getQuestionsBySection(sectionId: string): Question[] {
+  const sectionExams = exams.filter((e) => e.sectionId === sectionId);
+  const examIds = sectionExams.map((e) => e.id);
+  return questions.filter((q) => examIds.includes(q.examId));
+}
+
+/**
+ * Lấy câu hỏi ngẫu nhiên từ một phần với số lượng chỉ định
+ */
+export function getRandomQuestions(sectionId: string, count: number): Question[] {
+  const allQuestions = getQuestionsBySection(sectionId);
+  const shuffled = [...allQuestions].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, Math.min(count, shuffled.length));
+}
+
+/**
  * Lấy thông tin môn học theo slug
  */
 export function getSubjectBySlug(slug: string): Subject | undefined {

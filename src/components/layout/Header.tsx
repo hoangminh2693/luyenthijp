@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, Home, ChevronRight } from 'lucide-react';
+import { BookOpen, Home, ChevronRight, Upload } from 'lucide-react';
 
 /**
  * Header Component - Thanh điều hướng chính của ứng dụng
@@ -26,7 +26,7 @@ export function Header() {
         </Link>
 
         {/* Navigation */}
-        <nav className="flex items-center gap-4">
+        <nav className="flex items-center gap-2 sm:gap-4">
           <Link
             to="/"
             className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
@@ -36,18 +36,29 @@ export function Header() {
             }`}
           >
             <Home className="h-4 w-4" />
-            Trang chủ
+            <span className="hidden sm:inline">Trang chủ</span>
           </Link>
           <Link
             to="/subjects"
             className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-              location.pathname.includes('/subjects') || location.pathname.includes('/exam')
+              location.pathname.includes('/subjects') || location.pathname.includes('/exam') || location.pathname.includes('/quiz') || location.pathname.includes('/start')
                 ? 'bg-primary/10 text-primary'
                 : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
             }`}
           >
             <BookOpen className="h-4 w-4" />
-            Chọn môn học
+            <span className="hidden sm:inline">Chọn môn học</span>
+          </Link>
+          <Link
+            to="/import"
+            className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              location.pathname === '/import'
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+            }`}
+          >
+            <Upload className="h-4 w-4" />
+            <span className="hidden sm:inline">Import</span>
           </Link>
         </nav>
       </div>

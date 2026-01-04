@@ -1,6 +1,7 @@
 import { Check, X } from 'lucide-react';
 import type { Question } from '@/data/quizData';
 import { cn } from '@/lib/utils';
+import { QuestionHistoryBadge } from './QuestionHistoryBadge';
 
 /**
  * QuestionCard Component - Hiển thị một câu hỏi trắc nghiệm
@@ -12,6 +13,10 @@ interface QuestionCardProps {
   onSelectAnswer: (answer: string) => void;
   showResult?: boolean;
   isSubmitted?: boolean;
+  historyStats?: {
+    totalAttempts: number;
+    correctCount: number;
+  };
 }
 
 export function QuestionCard({
@@ -21,6 +26,7 @@ export function QuestionCard({
   onSelectAnswer,
   showResult = false,
   isSubmitted = false,
+  historyStats,
 }: QuestionCardProps) {
   const options = ['A', 'B', 'C', 'D'] as const;
 
@@ -55,9 +61,19 @@ export function QuestionCard({
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
           {questionNumber}
         </span>
-        <p className="text-base font-medium text-foreground leading-relaxed">
-          {question.content}
-        </p>
+        <div className="flex-1">
+          <p className="text-base font-medium text-foreground leading-relaxed">
+            {question.content}
+          </p>
+          {/* History badge */}
+          {historyStats && historyStats.totalAttempts > 0 && (
+            <QuestionHistoryBadge
+              totalAttempts={historyStats.totalAttempts}
+              correctCount={historyStats.correctCount}
+              className="mt-2"
+            />
+          )}
+        </div>
       </div>
 
       {/* Options */}
