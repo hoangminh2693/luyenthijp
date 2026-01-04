@@ -10,9 +10,6 @@ import { Breadcrumb } from '@/components/layout/Header';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { SubjectManager } from '@/components/admin/SubjectManager';
-import { LevelManager } from '@/components/admin/LevelManager';
-import { SectionManager } from '@/components/admin/SectionManager';
 
 interface ParsedQuestion {
   content: string;
@@ -365,13 +362,11 @@ const ImportQuestionsPage = () => {
                 ))}
               </select>
             </div>
-            <SubjectManager
-              subjects={subjects}
-              onSubjectCreated={(subject) => {
-                setSubjects([...subjects, subject]);
-                setSelectedSubjectId(subject.id);
-              }}
-            />
+            {subjects.length === 0 && !loadingData && (
+              <p className="text-sm text-muted-foreground">
+                Chưa có môn học. <Link to="/manage-subjects" className="text-primary hover:underline">Thêm môn học</Link> trước khi import.
+              </p>
+            )}
           </div>
 
           {/* Select level (if subject has levels) */}
@@ -392,14 +387,11 @@ const ImportQuestionsPage = () => {
                   ))}
                 </select>
               </div>
-              <LevelManager
-                subjectId={selectedSubjectId}
-                levels={levels}
-                onLevelCreated={(level) => {
-                  setLevels([...levels, level]);
-                  setSelectedLevelId(level.id);
-                }}
-              />
+              {filteredLevels.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Chưa có cấp độ. <Link to="/manage-subjects" className="text-primary hover:underline">Thêm cấp độ</Link> trước.
+                </p>
+              )}
             </div>
           )}
 
@@ -423,15 +415,10 @@ const ImportQuestionsPage = () => {
                   ))}
                 </select>
               </div>
-              {selectedLevelId && (
-                <SectionManager
-                  levelId={selectedLevelId}
-                  sections={sections}
-                  onSectionCreated={(section) => {
-                    setSections([...sections, section]);
-                    setSelectedSectionId(section.id);
-                  }}
-                />
+              {filteredSections.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Chưa có phần luyện thi. <Link to="/manage-subjects" className="text-primary hover:underline">Thêm phần</Link> trước.
+                </p>
               )}
             </div>
           )}
