@@ -14,6 +14,7 @@ import ExamsPage from "./pages/ExamsPage";
 import QuizPage from "./pages/QuizPage";
 import StartQuizPage from "./pages/StartQuizPage";
 import ImportQuestionsPage from "./pages/ImportQuestionsPage";
+import ManageSubjectsPage from "./pages/ManageSubjectsPage";
 import AuthPage from "./pages/AuthPage";
 import NotFound from "./pages/NotFound";
 
@@ -42,6 +43,9 @@ const App = () => (
                 
                 {/* Danh sách môn học */}
                 <Route path="/subjects" element={<SubjectsPage />} />
+                
+                {/* Quản lý môn học (Admin) */}
+                <Route path="/manage-subjects" element={<ManageSubjectsPage />} />
                 
                 {/* Danh sách cấp độ theo môn */}
                 <Route path="/subjects/:subjectSlug" element={<LevelsPage />} />

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, Home, ChevronRight, Upload, LogIn, LogOut, User } from 'lucide-react';
+import { BookOpen, Home, ChevronRight, Upload, LogIn, LogOut, User, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -75,17 +75,30 @@ export function Header() {
             <span className="hidden sm:inline">Chọn môn học</span>
           </Link>
           {isAdmin && (
-            <Link
-              to="/import"
-              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                location.pathname === '/import'
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-              }`}
-            >
-              <Upload className="h-4 w-4" />
-              <span className="hidden sm:inline">Import</span>
-            </Link>
+            <>
+              <Link
+                to="/manage-subjects"
+                className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  location.pathname === '/manage-subjects'
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                }`}
+              >
+                <Settings className="h-4 w-4" />
+                <span className="hidden sm:inline">Quản lý</span>
+              </Link>
+              <Link
+                to="/import"
+                className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  location.pathname === '/import'
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                }`}
+              >
+                <Upload className="h-4 w-4" />
+                <span className="hidden sm:inline">Import</span>
+              </Link>
+            </>
           )}
 
           {/* Auth */}
