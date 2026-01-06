@@ -6,26 +6,20 @@ import { Button } from '@/components/ui/button';
  * Index Page - Trang chủ của ứng dụng luyện đề thi
  */
 const Index = () => {
-  const features = [
-    {
-      icon: BookOpen,
-      title: 'Đa dạng môn học',
-      description: 'Nhiều môn học khác nhau từ Toán, Lý, Hóa và nhiều môn khác',
-    },
-    {
-      icon: CheckCircle,
-      title: 'Chấm điểm tự động',
-      description: 'Xem kết quả ngay lập tức sau khi hoàn thành bài thi',
-    },
-    {
-      icon: Clock,
-      title: 'Luyện tập mọi lúc',
-      description: 'Truy cập và luyện tập bất cứ khi nào bạn muốn',
-    },
-  ];
-
-  return (
-    <div className="min-h-screen bg-background">
+  const features = [{
+    icon: BookOpen,
+    title: 'Đa dạng môn học',
+    description: 'Nhiều môn học khác nhau từ Toán, Lý, Hóa và nhiều môn khác'
+  }, {
+    icon: CheckCircle,
+    title: 'Chấm điểm tự động',
+    description: 'Xem kết quả ngay lập tức sau khi hoàn thành bài thi'
+  }, {
+    icon: Clock,
+    title: 'Luyện tập mọi lúc',
+    description: 'Truy cập và luyện tập bất cứ khi nào bạn muốn'
+  }];
+  return <div className="min-h-screen bg-background">
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         {/* Background decoration */}
@@ -83,12 +77,9 @@ const Index = () => {
           </div>
 
           <div className="grid gap-8 md:grid-cols-3">
-            {features.map((feature, index) => (
-              <div
-                key={feature.title}
-                className="group rounded-xl border border-border bg-background p-6 transition-all duration-300 hover:border-primary/30 hover:shadow-card-hover animate-fade-in-up opacity-0"
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
+            {features.map((feature, index) => <div key={feature.title} className="group rounded-xl border border-border bg-background p-6 transition-all duration-300 hover:border-primary/30 hover:shadow-card-hover animate-fade-in-up opacity-0" style={{
+            animationDelay: `${index * 0.1}s`
+          }}>
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
                   <feature.icon className="h-6 w-6" />
                 </div>
@@ -98,8 +89,7 @@ const Index = () => {
                 <p className="text-sm text-muted-foreground">
                   {feature.description}
                 </p>
-              </div>
-            ))}
+              </div>)}
           </div>
         </div>
       </section>
@@ -109,18 +99,11 @@ const Index = () => {
         <div className="container">
           <div className="relative overflow-hidden rounded-2xl gradient-hero p-8 text-center md:p-16">
             <div className="relative z-10">
-              <h2 className="mb-4 text-3xl font-bold text-primary-foreground md:text-4xl">
-                Sẵn sàng bắt đầu?
-              </h2>
+              <h2 className="mb-4 text-3xl font-bold text-primary-foreground md:text-4xl">Sẵn sàng bắt đầu?</h2>
               <p className="mb-8 text-primary-foreground/80">
                 Chọn môn học và bắt đầu luyện đề ngay bây giờ
               </p>
-              <Button
-                asChild
-                size="lg"
-                variant="secondary"
-                className="gap-2 text-base font-semibold"
-              >
+              <Button asChild size="lg" variant="secondary" className="gap-2 text-base font-semibold">
                 <Link to="/subjects">
                   Chọn môn học
                   <ArrowRight className="h-5 w-5" />
@@ -134,8 +117,6 @@ const Index = () => {
           </div>
         </div>
       </section>
-    </div>
-  );
+    </div>;
 };
-
 export default Index;
