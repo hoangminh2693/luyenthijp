@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, Home, ChevronRight, Upload, LogIn, LogOut, User, Settings, Trophy } from 'lucide-react';
+import { BookOpen, Home, ChevronRight, Upload, LogIn, LogOut, User, Settings, Trophy, BarChart3 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -84,6 +84,17 @@ export function Header() {
           >
             <Trophy className="h-4 w-4" />
             <span className="hidden sm:inline">Xếp hạng</span>
+          </Link>
+          <Link
+            to="/statistics"
+            className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              location.pathname === '/statistics'
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+            }`}
+          >
+            <BarChart3 className="h-4 w-4" />
+            <span className="hidden sm:inline">Thống kê</span>
           </Link>
           {isAdmin && (
             <>
