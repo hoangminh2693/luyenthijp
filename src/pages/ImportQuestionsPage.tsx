@@ -190,7 +190,7 @@ const ImportQuestionsPage = () => {
     }
   }, [parseCSV]);
 
-  // Import questions to database
+  // Import questions to database with duplicate check
   const handleImport = useCallback(async () => {
     if (!selectedSectionId || parsedQuestions.length === 0) {
       toast.error('Vui lòng chọn phần và tải file câu hỏi');
@@ -198,11 +198,36 @@ const ImportQuestionsPage = () => {
     }
 
     setIsLoading(true);
-    const result: ImportResult = { success: 0, failed: 0, errors: [] };
+    const result: ImportResult & { duplicates: number } = { success: 0, failed: 0, duplicates: 0, errors: [] };
 
     try {
+      // Fetch existing questions in this section to check for duplicates
+      const { data: existingQuestions, error: fetchError } = await supabase
+        .from('questions')
+        .select('content')
+        .eq('section_id', selectedSectionId);
+
+      if (fetchError) {
+        console.error('Error fetching existing questions:', fetchError);
+        toast.error('Lỗi khi kiểm tra câu hỏi trùng lặp');
+        setIsLoading(false);
+        return;
+      }
+
+      // Create a Set of existing question contents for fast lookup
+      const existingContents = new Set(
+        (existingQuestions || []).map(q => q.content.trim().toLowerCase())
+      );
+
       for (let i = 0; i < parsedQuestions.length; i++) {
         const q = parsedQuestions[i];
+        const normalizedContent = q.content.trim().toLowerCase();
+
+        // Check for duplicate
+        if (existingContents.has(normalizedContent)) {
+          result.duplicates++;
+          continue; // Skip duplicate
+        }
 
         const { error } = await supabase
           .from('questions')
@@ -222,13 +247,22 @@ const ImportQuestionsPage = () => {
           result.errors.push(`Câu ${i + 1}: ${error.message}`);
         } else {
           result.success++;
+          // Add to set to prevent duplicates within the same import batch
+          existingContents.add(normalizedContent);
         }
       }
 
       setImportResult(result);
 
+      const messages: string[] = [];
+      if (result.success > 0) messages.push(`${result.success} câu hỏi mới`);
+      if (result.duplicates > 0) messages.push(`${result.duplicates} câu trùng lặp bỏ qua`);
+      if (result.failed > 0) messages.push(`${result.failed} lỗi`);
+
       if (result.success > 0) {
-        toast.success(`Đã import ${result.success} câu hỏi thành công`);
+        toast.success(`Import thành công: ${messages.join(', ')}`);
+      } else if (result.duplicates > 0) {
+        toast.warning(`Tất cả ${result.duplicates} câu hỏi đều trùng lặp`);
       }
       if (result.failed > 0) {
         toast.error(`${result.failed} câu hỏi không import được`);

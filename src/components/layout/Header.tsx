@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, Home, ChevronRight, Upload, LogIn, LogOut, User, Settings } from 'lucide-react';
+import { BookOpen, Home, ChevronRight, Upload, LogIn, LogOut, User, Settings, Trophy } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -73,6 +73,17 @@ export function Header() {
           >
             <BookOpen className="h-4 w-4" />
             <span className="hidden sm:inline">Chọn môn học</span>
+          </Link>
+          <Link
+            to="/leaderboard"
+            className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              location.pathname === '/leaderboard'
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+            }`}
+          >
+            <Trophy className="h-4 w-4" />
+            <span className="hidden sm:inline">Xếp hạng</span>
           </Link>
           {isAdmin && (
             <>
