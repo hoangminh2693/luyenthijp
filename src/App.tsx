@@ -16,6 +16,7 @@ import StartQuizPage from "./pages/StartQuizPage";
 import ImportQuestionsPage from "./pages/ImportQuestionsPage";
 import ManageSubjectsPage from "./pages/ManageSubjectsPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
+import StatisticsPage from "./pages/StatisticsPage";
 import AuthPage from "./pages/AuthPage";
 import NotFound from "./pages/NotFound";
 
@@ -50,6 +51,9 @@ const App = () => (
                 
                 {/* Bảng xếp hạng */}
                 <Route path="/leaderboard" element={<LeaderboardPage />} />
+                
+                {/* Thống kê học tập */}
+                <Route path="/statistics" element={<StatisticsPage />} />
                 
                 {/* Danh sách cấp độ theo môn */}
                 <Route path="/subjects/:subjectSlug" element={<LevelsPage />} />
