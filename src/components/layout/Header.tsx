@@ -42,9 +42,11 @@ export function Header() {
           to="/" 
           className="flex items-center gap-2 transition-opacity hover:opacity-80"
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <BookOpen className="h-5 w-5" />
-          </div>
+          <img 
+            src="/favicon.png" 
+            alt="Luyện Đề Thi" 
+            className="h-9 w-9 rounded-lg"
+          />
           <span className="text-lg font-bold text-foreground">
             Luyện Đề Thi
           </span>
