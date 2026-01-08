@@ -2,7 +2,7 @@
  * TableImport - Component nhập câu hỏi trực tiếp bằng bảng
  * Cho phép copy/paste từ Excel hoặc nhập tay từng ô
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, type ClipboardEvent } from 'react';
 import { Plus, Trash2, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { sanitizeRichText } from '@/lib/richText';
 
 export interface TableQuestion {
   content: string;
@@ -71,6 +72,28 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
     setQuestions(updated);
     onQuestionsChange(updated);
   }, [questions, onQuestionsChange]);
+
+  // Giữ định dạng (in đậm/gạch chân/...) khi paste từ Word/Docs
+  const handleRichPasteIntoField = useCallback((
+    e: ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+    index: number,
+    field: keyof TableQuestion,
+  ) => {
+    const html = e.clipboardData.getData('text/html');
+    if (!html) return;
+
+    e.preventDefault();
+
+    const sanitized = sanitizeRichText(html);
+    const current = questions[index]?.[field] ?? '';
+
+    const target = e.currentTarget;
+    const start = (target.selectionStart ?? current.length);
+    const end = (target.selectionEnd ?? current.length);
+
+    const next = current.slice(0, start) + sanitized + current.slice(end);
+    updateQuestion(index, field, next);
+  }, [questions, updateQuestion]);
 
   // Xử lý paste từ Excel/Sheets
   const handlePaste = useCallback(() => {
@@ -188,6 +211,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                       <Textarea
                         value={q.content}
                         onChange={(e) => updateQuestion(index, 'content', e.target.value)}
+                        onPaste={(e) => handleRichPasteIntoField(e, index, 'content')}
                         placeholder="Nội dung câu hỏi..."
                         className="min-h-[60px] text-sm"
                       />
@@ -196,6 +220,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                       <Input
                         value={q.option_a}
                         onChange={(e) => updateQuestion(index, 'option_a', e.target.value)}
+                        onPaste={(e) => handleRichPasteIntoField(e, index, 'option_a')}
                         placeholder="Đáp án A"
                         className="text-sm"
                       />
@@ -204,6 +229,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                       <Input
                         value={q.option_b}
                         onChange={(e) => updateQuestion(index, 'option_b', e.target.value)}
+                        onPaste={(e) => handleRichPasteIntoField(e, index, 'option_b')}
                         placeholder="Đáp án B"
                         className="text-sm"
                       />
@@ -212,6 +238,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                       <Input
                         value={q.option_c}
                         onChange={(e) => updateQuestion(index, 'option_c', e.target.value)}
+                        onPaste={(e) => handleRichPasteIntoField(e, index, 'option_c')}
                         placeholder="Đáp án C"
                         className="text-sm"
                       />
@@ -220,6 +247,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                       <Input
                         value={q.option_d}
                         onChange={(e) => updateQuestion(index, 'option_d', e.target.value)}
+                        onPaste={(e) => handleRichPasteIntoField(e, index, 'option_d')}
                         placeholder="Đáp án D"
                         className="text-sm"
                       />
@@ -244,6 +272,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                       <Input
                         value={q.explanation}
                         onChange={(e) => updateQuestion(index, 'explanation', e.target.value)}
+                        onPaste={(e) => handleRichPasteIntoField(e, index, 'explanation')}
                         placeholder="Giải thích (tùy chọn)"
                         className="text-sm"
                       />

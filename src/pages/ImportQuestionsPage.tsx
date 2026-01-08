@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { TableImport, TableQuestion } from '@/components/admin/TableImport';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { sanitizeRichText } from '@/lib/richText';
 
 interface ParsedQuestion {
   content: string;
@@ -228,14 +229,23 @@ const ImportQuestionsPage = () => {
         return;
       }
 
+      const normalizeContent = (content: string) => {
+        // so sánh trùng lặp theo text thuần (bỏ tag HTML)
+        return content
+          .replace(/<[^>]*>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase();
+      };
+
       // Create a Set of existing question contents for fast lookup
       const existingContents = new Set(
-        (existingQuestions || []).map(q => q.content.trim().toLowerCase())
+        (existingQuestions || []).map(q => normalizeContent(q.content))
       );
 
       for (let i = 0; i < questionsToImport.length; i++) {
         const q = questionsToImport[i];
-        const normalizedContent = q.content.trim().toLowerCase();
+        const normalizedContent = normalizeContent(q.content);
 
         // Check for duplicate
         if (existingContents.has(normalizedContent)) {
@@ -243,17 +253,22 @@ const ImportQuestionsPage = () => {
           continue; // Skip duplicate
         }
 
+        const explanationRaw = (q as { explanation?: string }).explanation;
+        const safeExplanation = explanationRaw && explanationRaw.trim().length > 0
+          ? sanitizeRichText(explanationRaw)
+          : null;
+
         const { error } = await supabase
           .from('questions')
           .insert({
             section_id: selectedSectionId,
-            content: q.content,
-            option_a: q.option_a,
-            option_b: q.option_b,
-            option_c: q.option_c,
-            option_d: q.option_d,
+            content: sanitizeRichText(q.content),
+            option_a: sanitizeRichText(q.option_a),
+            option_b: sanitizeRichText(q.option_b),
+            option_c: sanitizeRichText(q.option_c),
+            option_d: sanitizeRichText(q.option_d),
             correct_option: q.correct_option,
-            explanation: q.explanation,
+            explanation: safeExplanation,
           });
 
         if (error) {
