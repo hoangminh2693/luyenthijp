@@ -277,16 +277,16 @@ const ImportQuestionsPage = () => {
 
   // Download sample template
   const downloadTemplate = useCallback(() => {
-    const headers = 'content,option_a,option_b,option_c,option_d,correct_option,explanation';
+    const headers = 'câu hỏi,đáp án 1,đáp án 2,đáp án 3,đáp án 4,đáp án đúng,giải thích';
     const sample1 = '"「やま」の漢字はどれですか。","川","山","田","森","B","山 có nghĩa là núi"';
     const sample2 = '"「みず」の漢字はどれですか。","火","土","水","金","C",""';
     const csv = `${headers}\n${sample1}\n${sample2}`;
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'template_import_questions.csv';
+    link.download = 'mau_import_cau_hoi.csv';
     link.click();
     URL.revokeObjectURL(url);
   }, []);
