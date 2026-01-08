@@ -62,9 +62,10 @@ export function QuestionCard({
           {questionNumber}
         </span>
         <div className="flex-1">
-          <p className="text-base font-medium text-foreground leading-relaxed">
-            {question.content}
-          </p>
+          <p 
+            className="text-base font-medium text-foreground leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: question.content }}
+          />
           {/* History badge */}
           {historyStats && historyStats.totalAttempts > 0 && (
             <QuestionHistoryBadge
@@ -117,9 +118,10 @@ export function QuestionCard({
               </span>
 
               {/* Option text */}
-              <span className="flex-1 text-sm">
-                {question.options[option]}
-              </span>
+              <span 
+                className="flex-1 text-sm"
+                dangerouslySetInnerHTML={{ __html: question.options[option] }}
+              />
 
               {/* Result indicator */}
               {showResult && isCorrect && (
