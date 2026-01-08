@@ -148,7 +148,13 @@ const ImportQuestionsPage = () => {
       values.push(current.trim());
 
       if (values.length >= 6) {
-        const correctOption = values[5]?.toUpperCase();
+        let correctOption = values[5]?.trim().toUpperCase();
+        
+        // Support both formats: "A/B/C/D" or "option_a/option_b/option_c/option_d"
+        if (correctOption.startsWith('OPTION_')) {
+          correctOption = correctOption.replace('OPTION_', '');
+        }
+        
         if (['A', 'B', 'C', 'D'].includes(correctOption)) {
           questions.push({
             content: values[0] || '',
