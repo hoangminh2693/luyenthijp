@@ -55,6 +55,7 @@ export interface Question {
     D: string;
   };
   correctOption: 'A' | 'B' | 'C' | 'D';
+  explanation?: string;
 }
 
 // =====================

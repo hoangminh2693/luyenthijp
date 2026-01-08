@@ -1,4 +1,4 @@
-import { Check, X } from 'lucide-react';
+import { Check, X, Lightbulb } from 'lucide-react';
 import type { Question } from '@/data/quizData';
 import { cn } from '@/lib/utils';
 import { QuestionHistoryBadge } from './QuestionHistoryBadge';
@@ -138,6 +138,22 @@ export function QuestionCard({
           );
         })}
       </div>
+
+      {/* Explanation - hiển thị sau khi nộp bài */}
+      {showResult && question.explanation && (
+        <div className="mt-4 ml-11 rounded-lg border border-primary/20 bg-primary/5 p-4">
+          <div className="flex items-start gap-2">
+            <Lightbulb className="h-5 w-5 shrink-0 text-primary mt-0.5" />
+            <div>
+              <p className="font-medium text-primary mb-1">Giải thích</p>
+              <div 
+                className="text-sm text-foreground/80 leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: question.explanation }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
