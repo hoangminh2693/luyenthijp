@@ -1,15 +1,17 @@
 /**
- * ImportQuestionsPage - Trang import câu hỏi từ file Excel/CSV
+ * ImportQuestionsPage - Trang import câu hỏi từ file Excel/CSV hoặc nhập trực tiếp bằng bảng
  * Hỗ trợ tạo môn học, cấp độ, phần mới và import câu hỏi
  */
 import { useState, useCallback, useEffect } from 'react';
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download, LogIn, Shield } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download, LogIn, Shield, Table2, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/layout/Header';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { TableImport, TableQuestion } from '@/components/admin/TableImport';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface ParsedQuestion {
   content: string;
@@ -56,8 +58,10 @@ const ImportQuestionsPage = () => {
 
   const [file, setFile] = useState<File | null>(null);
   const [parsedQuestions, setParsedQuestions] = useState<ParsedQuestion[]>([]);
+  const [tableQuestions, setTableQuestions] = useState<TableQuestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [importMode, setImportMode] = useState<'table' | 'file'>('table');
 
   // Data from database
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -198,8 +202,12 @@ const ImportQuestionsPage = () => {
 
   // Import questions to database with duplicate check
   const handleImport = useCallback(async () => {
-    if (!selectedSectionId || parsedQuestions.length === 0) {
-      toast.error('Vui lòng chọn phần và tải file câu hỏi');
+    const questionsToImport = importMode === 'table' 
+      ? tableQuestions.filter(q => q.content && q.option_a && q.option_b && q.option_c && q.option_d && q.correct_option)
+      : parsedQuestions;
+
+    if (!selectedSectionId || questionsToImport.length === 0) {
+      toast.error('Vui lòng chọn phần và nhập câu hỏi');
       return;
     }
 
@@ -225,8 +233,8 @@ const ImportQuestionsPage = () => {
         (existingQuestions || []).map(q => q.content.trim().toLowerCase())
       );
 
-      for (let i = 0; i < parsedQuestions.length; i++) {
-        const q = parsedQuestions[i];
+      for (let i = 0; i < questionsToImport.length; i++) {
+        const q = questionsToImport[i];
         const normalizedContent = q.content.trim().toLowerCase();
 
         // Check for duplicate
@@ -279,7 +287,7 @@ const ImportQuestionsPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedSectionId, parsedQuestions]);
+  }, [selectedSectionId, parsedQuestions, tableQuestions, importMode]);
 
   // Download sample template
   const downloadTemplate = useCallback(() => {
@@ -365,28 +373,16 @@ const ImportQuestionsPage = () => {
         <div className="mx-auto max-w-3xl">
           <div className="mb-8">
             <h1 className="mb-2 text-3xl font-bold text-foreground">
-              Import câu hỏi từ CSV
+              Import câu hỏi
             </h1>
             <p className="text-muted-foreground">
-              Tải lên file CSV chứa danh sách câu hỏi để thêm vào ngân hàng câu hỏi
+              Nhập trực tiếp vào bảng hoặc tải lên file CSV để thêm câu hỏi vào ngân hàng
             </p>
-          </div>
-
-          {/* Download template */}
-          <div className="mb-6 rounded-xl border border-border bg-card p-6">
-            <h2 className="mb-3 font-semibold text-foreground">1. Tải file mẫu</h2>
-            <p className="mb-4 text-sm text-muted-foreground">
-              Tải file mẫu để xem định dạng chuẩn của file CSV
-            </p>
-            <Button variant="outline" onClick={downloadTemplate} className="gap-2">
-              <Download className="h-4 w-4" />
-              Tải file mẫu (CSV)
-            </Button>
           </div>
 
           {/* Select subject */}
           <div className="mb-6 rounded-xl border border-border bg-card p-6">
-            <h2 className="mb-3 font-semibold text-foreground">2. Chọn môn học</h2>
+            <h2 className="mb-3 font-semibold text-foreground">1. Chọn môn học</h2>
             <div className="mb-4">
               <select
                 value={selectedSubjectId}
@@ -412,7 +408,7 @@ const ImportQuestionsPage = () => {
           {/* Select level (if subject has levels) */}
           {selectedSubjectId && subjectHasLevels && (
             <div className="mb-6 rounded-xl border border-border bg-card p-6">
-              <h2 className="mb-3 font-semibold text-foreground">3. Chọn cấp độ</h2>
+              <h2 className="mb-3 font-semibold text-foreground">2. Chọn cấp độ</h2>
               <div className="mb-4">
                 <select
                   value={selectedLevelId}
@@ -439,7 +435,7 @@ const ImportQuestionsPage = () => {
           {((selectedSubjectId && !subjectHasLevels) || selectedLevelId) && (
             <div className="mb-6 rounded-xl border border-border bg-card p-6">
               <h2 className="mb-3 font-semibold text-foreground">
-                {subjectHasLevels ? '4.' : '3.'} Chọn phần
+                {subjectHasLevels ? '3.' : '2.'} Chọn phần
               </h2>
               <div className="mb-4">
                 <select
@@ -463,58 +459,89 @@ const ImportQuestionsPage = () => {
             </div>
           )}
 
-          {/* Upload file */}
+          {/* Input questions - Tabs for table/file */}
           {selectedSectionId && (
             <div className="mb-6 rounded-xl border border-border bg-card p-6">
               <h2 className="mb-3 font-semibold text-foreground">
-                {subjectHasLevels ? '5.' : '4.'} Tải file câu hỏi
+                {subjectHasLevels ? '4.' : '3.'} Nhập câu hỏi
               </h2>
+              
+              <Tabs value={importMode} onValueChange={(v) => setImportMode(v as 'table' | 'file')} className="w-full">
+                <TabsList className="mb-4 grid w-full grid-cols-2">
+                  <TabsTrigger value="table" className="gap-2">
+                    <Table2 className="h-4 w-4" />
+                    Nhập trực tiếp
+                  </TabsTrigger>
+                  <TabsTrigger value="file" className="gap-2">
+                    <FileText className="h-4 w-4" />
+                    Tải file CSV
+                  </TabsTrigger>
+                </TabsList>
 
-              <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border p-8 transition-colors hover:border-primary/50 hover:bg-primary/5">
-                <FileSpreadsheet className="mb-3 h-12 w-12 text-muted-foreground" />
-                <span className="mb-1 font-medium text-foreground">
-                  {file ? file.name : 'Chọn file CSV'}
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  Click để chọn hoặc kéo thả file vào đây
-                </span>
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </label>
+                <TabsContent value="table" className="mt-0">
+                  <TableImport onQuestionsChange={setTableQuestions} />
+                </TabsContent>
 
-              {parsedQuestions.length > 0 && (
-                <div className="mt-4 flex items-center gap-2 text-sm text-success">
-                  <CheckCircle2 className="h-4 w-4" />
-                  Đã đọc {parsedQuestions.length} câu hỏi từ file
-                </div>
-              )}
-            </div>
-          )}
+                <TabsContent value="file" className="mt-0">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <Button variant="outline" onClick={downloadTemplate} size="sm" className="gap-2">
+                        <Download className="h-4 w-4" />
+                        Tải file mẫu
+                      </Button>
+                      <span className="text-sm text-muted-foreground">
+                        Tải về để xem định dạng chuẩn
+                      </span>
+                    </div>
 
-          {/* Preview */}
-          {parsedQuestions.length > 0 && (
-            <div className="mb-6 rounded-xl border border-border bg-card p-6">
-              <h2 className="mb-3 font-semibold text-foreground">Xem trước</h2>
-              <div className="max-h-64 space-y-3 overflow-y-auto">
-                {parsedQuestions.slice(0, 5).map((q, i) => (
-                  <div key={i} className="rounded-lg bg-muted/30 p-3 text-sm">
-                    <p className="mb-1 font-medium">{i + 1}. {q.content}</p>
-                    <p className="text-muted-foreground">
-                      A: {q.option_a} | B: {q.option_b} | C: {q.option_c} | D: {q.option_d}
-                    </p>
-                    <p className="text-success">Đáp án đúng: {q.correct_option}</p>
+                    <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border p-8 transition-colors hover:border-primary/50 hover:bg-primary/5">
+                      <FileSpreadsheet className="mb-3 h-12 w-12 text-muted-foreground" />
+                      <span className="mb-1 font-medium text-foreground">
+                        {file ? file.name : 'Chọn file CSV'}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        Click để chọn hoặc kéo thả file vào đây
+                      </span>
+                      <input
+                        type="file"
+                        accept=".csv"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {parsedQuestions.length > 0 && (
+                      <div className="flex items-center gap-2 text-sm text-success">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Đã đọc {parsedQuestions.length} câu hỏi từ file
+                      </div>
+                    )}
+
+                    {/* Preview from file */}
+                    {parsedQuestions.length > 0 && (
+                      <div className="rounded-lg border border-border bg-muted/20 p-4">
+                        <h3 className="mb-2 text-sm font-medium text-foreground">Xem trước</h3>
+                        <div className="max-h-48 space-y-2 overflow-y-auto">
+                          {parsedQuestions.slice(0, 3).map((q, i) => (
+                            <div key={i} className="rounded bg-background p-2 text-xs">
+                              <p className="mb-1 font-medium">{i + 1}. {q.content}</p>
+                              <p className="text-muted-foreground">
+                                A: {q.option_a} | B: {q.option_b} | C: {q.option_c} | D: {q.option_d}
+                              </p>
+                              <p className="text-success">Đáp án: {q.correct_option}</p>
+                            </div>
+                          ))}
+                          {parsedQuestions.length > 3 && (
+                            <p className="text-xs text-muted-foreground">
+                              ... và {parsedQuestions.length - 3} câu khác
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ))}
-                {parsedQuestions.length > 5 && (
-                  <p className="text-sm text-muted-foreground">
-                    ... và {parsedQuestions.length - 5} câu hỏi khác
-                  </p>
-                )}
-              </div>
+                </TabsContent>
+              </Tabs>
             </div>
           )}
 
@@ -522,12 +549,18 @@ const ImportQuestionsPage = () => {
           {selectedSectionId && (
             <Button
               onClick={handleImport}
-              disabled={isLoading || parsedQuestions.length === 0}
+              disabled={isLoading || (importMode === 'table' 
+                ? tableQuestions.filter(q => q.content && q.option_a && q.option_b && q.option_c && q.option_d && q.correct_option).length === 0
+                : parsedQuestions.length === 0)}
               size="lg"
               className="w-full gap-2"
             >
               <Upload className="h-5 w-5" />
-              {isLoading ? 'Đang import...' : `Import ${parsedQuestions.length} câu hỏi`}
+              {isLoading ? 'Đang import...' : `Import ${
+                importMode === 'table' 
+                  ? tableQuestions.filter(q => q.content && q.option_a && q.option_b && q.option_c && q.option_d && q.correct_option).length
+                  : parsedQuestions.length
+              } câu hỏi`}
             </Button>
           )}
 
