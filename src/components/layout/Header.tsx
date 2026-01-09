@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, Home, ChevronRight, Upload, LogIn, LogOut, User, Settings, Trophy, BarChart3 } from 'lucide-react';
+import { BookOpen, Home, ChevronRight, Upload, LogIn, LogOut, User, Settings, Trophy, BarChart3, FileText } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -55,6 +55,10 @@ export function Header() {
               <Link to="/manage-subjects" className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${location.pathname === '/manage-subjects' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}`}>
                 <Settings className="h-4 w-4" />
                 <span className="hidden sm:inline">Quản lý</span>
+              </Link>
+              <Link to="/manage-questions" className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${location.pathname === '/manage-questions' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}`}>
+                <FileText className="h-4 w-4" />
+                <span className="hidden sm:inline">Câu hỏi</span>
               </Link>
               <Link to="/import" className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${location.pathname === '/import' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}`}>
                 <Upload className="h-4 w-4" />
