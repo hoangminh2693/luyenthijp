@@ -80,7 +80,11 @@ export function useRandomQuestions(sectionId: string | undefined, count: number)
       return shuffled.slice(0, Math.min(count, shuffled.length)).map(mapDbQuestion);
     },
     enabled: !!sectionId && count > 0,
-    staleTime: 0, // Luôn lấy random mới
+    staleTime: Infinity, // Không bao giờ coi là stale
+    gcTime: 1000 * 60 * 30, // Giữ cache 30 phút
+    refetchOnWindowFocus: false, // Không refetch khi chuyển tab
+    refetchOnMount: false, // Không refetch khi component mount lại
+    refetchOnReconnect: false, // Không refetch khi reconnect
   });
 }
 
