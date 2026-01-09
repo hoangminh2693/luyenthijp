@@ -14,6 +14,7 @@ import ExamsPage from "./pages/ExamsPage";
 import QuizPage from "./pages/QuizPage";
 import StartQuizPage from "./pages/StartQuizPage";
 import ImportQuestionsPage from "./pages/ImportQuestionsPage";
+import ManageQuestionsPage from "./pages/ManageQuestionsPage";
 import ManageSubjectsPage from "./pages/ManageSubjectsPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import StatisticsPage from "./pages/StatisticsPage";
@@ -75,6 +76,10 @@ const App = () => (
                 
                 {/* Import câu hỏi */}
                 <Route path="/import" element={<ImportQuestionsPage />} />
+                
+                {/* Quản lý câu hỏi (Admin) */}
+                <Route path="/manage-questions" element={<ManageQuestionsPage />} />
+                
                 
                 {/* Trang 404 */}
                 <Route path="*" element={<NotFound />} />
