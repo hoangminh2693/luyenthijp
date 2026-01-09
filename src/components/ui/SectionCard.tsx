@@ -1,20 +1,25 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, FileText, Play } from 'lucide-react';
-import { getExamsBySection, getQuestionsBySection, type Section } from '@/data/quizData';
+import { ArrowRight, FileText, Play, Loader2 } from 'lucide-react';
+import { useQuestionCount } from '@/hooks/useQuestions';
 
 /**
  * SectionCard Component - Thẻ hiển thị thông tin phần
  */
 interface SectionCardProps {
-  section: Section;
+  section: {
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    icon: string | null;
+  };
   subjectSlug: string;
   levelSlug: string;
   index?: number;
 }
 
 export function SectionCard({ section, subjectSlug, levelSlug, index = 0 }: SectionCardProps) {
-  const exams = getExamsBySection(section.id);
-  const totalQuestions = getQuestionsBySection(section.id).length;
+  const { data: totalQuestions = 0, isLoading } = useQuestionCount(section.id);
   
   return (
     <div
@@ -24,7 +29,7 @@ export function SectionCard({ section, subjectSlug, levelSlug, index = 0 }: Sect
       <div className="relative overflow-hidden rounded-xl border border-border bg-card p-6 shadow-card transition-all duration-300 hover:border-primary/30 hover:shadow-card-hover">
         {/* Icon */}
         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-2xl">
-          {section.icon}
+          {section.icon || '📝'}
         </div>
 
         {/* Content */}
@@ -38,8 +43,14 @@ export function SectionCard({ section, subjectSlug, levelSlug, index = 0 }: Sect
         {/* Stats */}
         <div className="mb-4 flex items-center gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-1.5">
-            <FileText className="h-4 w-4" />
-            <span>{totalQuestions} câu hỏi</span>
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <>
+                <FileText className="h-4 w-4" />
+                <span>{totalQuestions} câu hỏi</span>
+              </>
+            )}
           </div>
         </div>
 
