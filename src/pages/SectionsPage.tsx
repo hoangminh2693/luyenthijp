@@ -1,7 +1,10 @@
 import { useParams, Navigate } from 'react-router-dom';
-import { getSubjectBySlug, getLevelBySlug, getSectionsByLevel } from '@/data/quizData';
+import { Loader2 } from 'lucide-react';
 import { SectionCard } from '@/components/ui/SectionCard';
 import { Breadcrumb } from '@/components/layout/Header';
+import { useSubjectBySlug, useLevelBySlug } from '@/hooks/useSections';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * SectionsPage - Trang danh sách phần theo cấp độ
@@ -9,9 +12,36 @@ import { Breadcrumb } from '@/components/layout/Header';
 const SectionsPage = () => {
   const { subjectSlug, levelSlug } = useParams<{ subjectSlug: string; levelSlug: string }>();
   
-  // Lấy thông tin môn học và cấp độ
-  const subject = subjectSlug ? getSubjectBySlug(subjectSlug) : undefined;
-  const level = subject && levelSlug ? getLevelBySlug(subject.id, levelSlug) : undefined;
+  // Fetch dữ liệu từ Supabase
+  const { data: subject, isLoading: loadingSubject } = useSubjectBySlug(subjectSlug);
+  const { data: level, isLoading: loadingLevel } = useLevelBySlug(subject?.id, levelSlug);
+  
+  // Fetch sections từ database
+  const { data: sections = [], isLoading: loadingSections } = useQuery({
+    queryKey: ['sections', level?.id],
+    queryFn: async () => {
+      if (!level?.id) return [];
+      const { data, error } = await supabase
+        .from('sections')
+        .select('*')
+        .eq('level_id', level.id)
+        .order('order_index', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!level?.id,
+  });
+
+  const isLoading = loadingSubject || loadingLevel || loadingSections;
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
   
   // Nếu không tìm thấy, chuyển về trang trước
   if (!subject) {
@@ -21,9 +51,6 @@ const SectionsPage = () => {
   if (!level) {
     return <Navigate to={`/subjects/${subjectSlug}`} replace />;
   }
-
-  // Lấy danh sách phần của cấp độ
-  const sections = getSectionsByLevel(level.id);
 
   return (
     <div className="min-h-screen bg-background">
@@ -42,7 +69,7 @@ const SectionsPage = () => {
         {/* Header */}
         <div className="mb-8 flex items-center gap-4">
           <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10 text-4xl">
-            {subject.icon}
+            {subject.icon || '📚'}
           </div>
           <div>
             <h1 className="mb-1 text-3xl font-bold text-foreground">
