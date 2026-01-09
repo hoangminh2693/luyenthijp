@@ -1,9 +1,11 @@
 import { useParams, Navigate, Link } from 'react-router-dom';
-import { Play } from 'lucide-react';
-import { getSubjectBySlug, getLevelBySlug, getSectionBySlug, getExamsBySection, getQuestionsBySection } from '@/data/quizData';
+import { Play, Loader2 } from 'lucide-react';
+import { getExamsBySection } from '@/data/quizData';
 import { ExamCard } from '@/components/ui/ExamCard';
 import { Breadcrumb } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
+import { useSubjectBySlug, useLevelBySlug, useSectionBySlug } from '@/hooks/useSections';
+import { useQuestionCount } from '@/hooks/useQuestions';
 
 /**
  * ExamsPage - Trang danh sách đề thi theo phần
@@ -15,10 +17,22 @@ const ExamsPage = () => {
     sectionSlug: string;
   }>();
   
-  // Lấy thông tin môn học, cấp độ và phần
-  const subject = subjectSlug ? getSubjectBySlug(subjectSlug) : undefined;
-  const level = subject && levelSlug ? getLevelBySlug(subject.id, levelSlug) : undefined;
-  const section = level && sectionSlug ? getSectionBySlug(level.id, sectionSlug) : undefined;
+  // Fetch dữ liệu từ Supabase
+  const { data: subject, isLoading: loadingSubject } = useSubjectBySlug(subjectSlug);
+  const { data: level, isLoading: loadingLevel } = useLevelBySlug(subject?.id, levelSlug);
+  const { data: section, isLoading: loadingSection } = useSectionBySlug(level?.id, sectionSlug);
+  const { data: totalQuestions = 0 } = useQuestionCount(section?.id);
+
+  const isLoading = loadingSubject || loadingLevel || loadingSection;
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
   
   // Nếu không tìm thấy, chuyển về trang trước
   if (!subject) {
@@ -33,9 +47,8 @@ const ExamsPage = () => {
     return <Navigate to={`/subjects/${subjectSlug}/${levelSlug}`} replace />;
   }
 
-  // Lấy danh sách đề thi của phần
+  // Lấy danh sách đề thi của phần (từ hardcoded data - có thể migrate sau)
   const exams = getExamsBySection(section.id);
-  const totalQuestions = getQuestionsBySection(section.id).length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -56,7 +69,7 @@ const ExamsPage = () => {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10 text-4xl">
-              {section.icon}
+              {section.icon || '📝'}
             </div>
             <div>
               <h1 className="mb-1 text-3xl font-bold text-foreground">
