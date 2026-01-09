@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, LogIn, Shield, Pencil, Trash2, Search, ChevronDown, Save, X } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Breadcrumb } from '@/components/layout/Header';
@@ -73,6 +74,7 @@ interface Question {
 
 const ManageQuestionsPage = () => {
   const { user, isAdmin, isLoading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
 
   // Data
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -233,6 +235,9 @@ const ManageQuestionsPage = () => {
         )
       );
 
+      // Invalidate questions cache so QuizPage gets fresh data
+      queryClient.invalidateQueries({ queryKey: ['questions'] });
+
       toast.success('Đã lưu câu hỏi');
       setEditingQuestion(null);
     } catch (err) {
@@ -255,6 +260,9 @@ const ManageQuestionsPage = () => {
 
       // Update local state
       setQuestions((prev) => prev.filter((q) => q.id !== deletingQuestion.id));
+
+      // Invalidate questions cache so QuizPage gets fresh data
+      queryClient.invalidateQueries({ queryKey: ['questions'] });
 
       toast.success('Đã xóa câu hỏi');
       setDeletingQuestion(null);
