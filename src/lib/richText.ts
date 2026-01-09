@@ -12,6 +12,25 @@ export function extractClipboardFragment(html: string): string {
   return html;
 }
 
+function filterStyle(style: string): string {
+  // Chỉ giữ các style phục vụ định dạng cơ bản
+  const ALLOWED = new Set(['font-weight', 'font-style', 'text-decoration', 'text-decoration-line']);
+  return style
+    .split(';')
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((decl) => {
+      const [rawKey, ...rest] = decl.split(':');
+      const key = (rawKey || '').trim().toLowerCase();
+      const val = rest.join(':').trim();
+      if (!key || !val) return null;
+      if (!ALLOWED.has(key)) return null;
+      return `${key}: ${val}`;
+    })
+    .filter(Boolean)
+    .join('; ');
+}
+
 /**
  * Sanitize HTML để có thể render an toàn bằng dangerouslySetInnerHTML.
  * Cho phép các tag/attr cơ bản để giữ in đậm, gạch chân, xuống dòng.
@@ -20,7 +39,7 @@ export function sanitizeRichText(input: string): string {
   const html = input ?? '';
   const fragment = extractClipboardFragment(html);
 
-  return DOMPurify.sanitize(fragment, {
+  const sanitized = DOMPurify.sanitize(fragment, {
     ALLOWED_TAGS: [
       'b',
       'strong',
@@ -42,4 +61,22 @@ export function sanitizeRichText(input: string): string {
     ],
     ALLOWED_ATTR: ['style'],
   });
+
+  // Lọc style để tránh nhúng CSS lạ
+  try {
+    const doc = new DOMParser().parseFromString(`<div>${sanitized}</div>`, 'text/html');
+    const root = doc.body.firstElementChild as HTMLElement | null;
+    if (!root) return sanitized;
+
+    root.querySelectorAll<HTMLElement>('[style]').forEach((el) => {
+      const next = filterStyle(el.getAttribute('style') || '');
+      if (next) el.setAttribute('style', next);
+      else el.removeAttribute('style');
+    });
+
+    return root.innerHTML;
+  } catch {
+    return sanitized;
+  }
 }
+
