@@ -50,6 +50,16 @@ const emptyQuestion: TableQuestion = {
 
 type ActiveCell = { index: number; field: keyof TableQuestion } | null;
 
+/**
+ * Loại bỏ số thứ tự ở đầu câu hỏi (ví dụ: "1. Câu hỏi", "2) Nội dung", "3- Text")
+ * Chỉ loại bỏ khi số đứng đầu và theo sau bởi dấu phân cách (.  )  -  :)
+ */
+function removeQuestionNumber(text: string): string {
+  // Pattern: số ở đầu (có thể có khoảng trắng) + dấu phân cách (. ) - :) + khoảng trắng
+  // Ví dụ: "1. Câu hỏi", "2) Nội dung", "3- Text", "4: Câu", "  5.  Nội dung"
+  return text.replace(/^\s*\d+\s*[.\-):]\s*/, '');
+}
+
 export function TableImport({ onQuestionsChange }: TableImportProps) {
   const [questions, setQuestions] = useState<TableQuestion[]>([{ ...emptyQuestion }]);
   const [pasteMode, setPasteMode] = useState(false);
@@ -101,7 +111,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
         }
 
         parsed.push({
-          content: values[0]?.trim() || '',
+          content: removeQuestionNumber(values[0]?.trim() || ''),
           option_a: values[1]?.trim() || '',
           option_b: values[2]?.trim() || '',
           option_c: values[3]?.trim() || '',
