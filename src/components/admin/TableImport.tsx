@@ -1,11 +1,11 @@
 /**
  * TableImport - Component nhập câu hỏi trực tiếp bằng bảng
- * Cho phép copy/paste từ Excel hoặc nhập tay từng ô
+ * - Paste từ Word/Docs sẽ giữ in đậm / in nghiêng / gạch chân
+ * - Có toolbar để tự bôi đen và bấm In đậm/In nghiêng/Gạch chân
  */
-import { useState, useCallback, type ClipboardEvent } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { sanitizeRichText } from '@/lib/richText';
+import { RichTextEditable } from '@/components/admin/RichTextEditable';
 
 export interface TableQuestion {
   content: string;
@@ -48,17 +48,25 @@ const emptyQuestion: TableQuestion = {
   explanation: '',
 };
 
+type ActiveCell = { index: number; field: keyof TableQuestion } | null;
+
 export function TableImport({ onQuestionsChange }: TableImportProps) {
   const [questions, setQuestions] = useState<TableQuestion[]>([{ ...emptyQuestion }]);
   const [pasteMode, setPasteMode] = useState(false);
   const [pasteText, setPasteText] = useState('');
+  const [activeCell, setActiveCell] = useState<ActiveCell>(null);
 
-  const updateQuestion = useCallback((index: number, field: keyof TableQuestion, value: string) => {
-    const updated = [...questions];
-    updated[index] = { ...updated[index], [field]: value };
-    setQuestions(updated);
-    onQuestionsChange(updated);
-  }, [questions, onQuestionsChange]);
+  const cellRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  const updateQuestion = useCallback(
+    (index: number, field: keyof TableQuestion, value: string) => {
+      const updated = [...questions];
+      updated[index] = { ...updated[index], [field]: value };
+      setQuestions(updated);
+      onQuestionsChange(updated);
+    },
+    [questions, onQuestionsChange]
+  );
 
   const addRow = useCallback(() => {
     const updated = [...questions, { ...emptyQuestion }];
@@ -66,46 +74,26 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
     onQuestionsChange(updated);
   }, [questions, onQuestionsChange]);
 
-  const removeRow = useCallback((index: number) => {
-    if (questions.length === 1) return;
-    const updated = questions.filter((_, i) => i !== index);
-    setQuestions(updated);
-    onQuestionsChange(updated);
-  }, [questions, onQuestionsChange]);
+  const removeRow = useCallback(
+    (index: number) => {
+      if (questions.length === 1) return;
+      const updated = questions.filter((_, i) => i !== index);
+      setQuestions(updated);
+      onQuestionsChange(updated);
+    },
+    [questions, onQuestionsChange]
+  );
 
-  // Giữ định dạng (in đậm/gạch chân/...) khi paste từ Word/Docs
-  const handleRichPasteIntoField = useCallback((
-    e: ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>,
-    index: number,
-    field: keyof TableQuestion,
-  ) => {
-    const html = e.clipboardData.getData('text/html');
-    if (!html) return;
-
-    e.preventDefault();
-
-    const sanitized = sanitizeRichText(html);
-    const current = questions[index]?.[field] ?? '';
-
-    const target = e.currentTarget;
-    const start = (target.selectionStart ?? current.length);
-    const end = (target.selectionEnd ?? current.length);
-
-    const next = current.slice(0, start) + sanitized + current.slice(end);
-    updateQuestion(index, field, next);
-  }, [questions, updateQuestion]);
-
-  // Xử lý paste từ Excel/Sheets
+  // Xử lý paste từ Excel/Sheets (text thuần)
   const handlePaste = useCallback(() => {
     if (!pasteText.trim()) return;
 
     const lines = pasteText.trim().split('\n');
     const parsed: TableQuestion[] = [];
 
-    lines.forEach(line => {
-      // Tab-separated hoặc comma-separated
+    lines.forEach((line) => {
       const values = line.includes('\t') ? line.split('\t') : line.split(',');
-      
+
       if (values.length >= 5) {
         let correctOption = values[5]?.trim().toUpperCase() || '';
         if (correctOption.startsWith('OPTION_')) {
@@ -132,8 +120,41 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
     }
   }, [pasteText, onQuestionsChange]);
 
-  const validQuestions = questions.filter(q => 
-    q.content && q.option_a && q.option_b && q.option_c && q.option_d && q.correct_option
+  const validQuestions = useMemo(
+    () =>
+      questions.filter(
+        (q) => q.content && q.option_a && q.option_b && q.option_c && q.option_d && q.correct_option
+      ),
+    [questions]
+  );
+
+  const setCellRef = useCallback(
+    (index: number, field: keyof TableQuestion, el: HTMLDivElement | null) => {
+      const key = `${index}:${field}`;
+      if (!el) {
+        cellRefs.current.delete(key);
+        return;
+      }
+      cellRefs.current.set(key, el);
+    },
+    []
+  );
+
+  const applyFormat = useCallback(
+    (cmd: 'bold' | 'italic' | 'underline' | 'removeFormat') => {
+      if (!activeCell) return;
+
+      const key = `${activeCell.index}:${activeCell.field}`;
+      const el = cellRefs.current.get(key);
+      if (!el) return;
+
+      el.focus();
+      document.execCommand(cmd);
+
+      // Đồng bộ lại state từ DOM sau khi apply định dạng
+      updateQuestion(activeCell.index, activeCell.field, el.innerHTML || '');
+    },
+    [activeCell, updateQuestion]
   );
 
   return (
@@ -141,7 +162,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
       {/* Toggle paste mode */}
       <div className="flex items-center gap-2">
         <Button
-          variant={pasteMode ? "default" : "outline"}
+          variant={pasteMode ? 'default' : 'outline'}
           size="sm"
           onClick={() => setPasteMode(!pasteMode)}
           className="gap-2"
@@ -151,7 +172,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
         </Button>
         {!pasteMode && (
           <span className="text-sm text-muted-foreground">
-            hoặc nhập trực tiếp vào bảng bên dưới
+            hoặc nhập trực tiếp vào bảng bên dưới (có thể paste từ Word/Docs để giữ in đậm)
           </span>
         )}
       </div>
@@ -172,10 +193,13 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
             <Button onClick={handlePaste} size="sm">
               Xác nhận
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => { setPasteMode(false); setPasteText(''); }}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPasteMode(false);
+                setPasteText('');
+              }}
             >
               Hủy
             </Button>
@@ -186,77 +210,98 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
       {/* Table input */}
       {!pasteMode && (
         <>
+          {/* Toolbar */}
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/20 p-2">
+            <span className="text-sm text-muted-foreground">Định dạng:</span>
+            <Button type="button" variant="outline" size="sm" onClick={() => applyFormat('bold')} disabled={!activeCell}>
+              <span className="font-bold">B</span>
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => applyFormat('italic')} disabled={!activeCell}>
+              <span className="italic">I</span>
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => applyFormat('underline')} disabled={!activeCell}>
+              <span className="underline">U</span>
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => applyFormat('removeFormat')} disabled={!activeCell}>
+              Xóa định dạng
+            </Button>
+            <span className="ml-auto text-xs text-muted-foreground">(Bôi đen text trong ô rồi bấm nút)</span>
+          </div>
+
           <div className="overflow-x-auto rounded-lg border border-border">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead className="w-10 text-center">#</TableHead>
-                  <TableHead className="min-w-[200px]">Câu hỏi</TableHead>
-                  <TableHead className="min-w-[120px]">Đáp án A</TableHead>
-                  <TableHead className="min-w-[120px]">Đáp án B</TableHead>
-                  <TableHead className="min-w-[120px]">Đáp án C</TableHead>
-                  <TableHead className="min-w-[120px]">Đáp án D</TableHead>
+                  <TableHead className="min-w-[260px]">Câu hỏi</TableHead>
+                  <TableHead className="min-w-[160px]">Đáp án A</TableHead>
+                  <TableHead className="min-w-[160px]">Đáp án B</TableHead>
+                  <TableHead className="min-w-[160px]">Đáp án C</TableHead>
+                  <TableHead className="min-w-[160px]">Đáp án D</TableHead>
                   <TableHead className="w-[100px]">Đúng</TableHead>
-                  <TableHead className="min-w-[150px]">Giải thích</TableHead>
+                  <TableHead className="min-w-[220px]">Giải thích</TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
               </TableHeader>
+
               <TableBody>
                 {questions.map((q, index) => (
                   <TableRow key={index}>
-                    <TableCell className="text-center text-muted-foreground">
-                      {index + 1}
-                    </TableCell>
+                    <TableCell className="text-center text-muted-foreground">{index + 1}</TableCell>
+
                     <TableCell>
-                      <Textarea
+                      <RichTextEditable
+                        ref={(el) => setCellRef(index, 'content', el)}
                         value={q.content}
-                        onChange={(e) => updateQuestion(index, 'content', e.target.value)}
-                        onPaste={(e) => handleRichPasteIntoField(e, index, 'content')}
                         placeholder="Nội dung câu hỏi..."
-                        className="min-h-[60px] text-sm"
+                        className="min-h-[64px]"
+                        onFocus={() => setActiveCell({ index, field: 'content' })}
+                        onChange={(v) => updateQuestion(index, 'content', v)}
                       />
                     </TableCell>
+
                     <TableCell>
-                      <Input
+                      <RichTextEditable
+                        ref={(el) => setCellRef(index, 'option_a', el)}
                         value={q.option_a}
-                        onChange={(e) => updateQuestion(index, 'option_a', e.target.value)}
-                        onPaste={(e) => handleRichPasteIntoField(e, index, 'option_a')}
                         placeholder="Đáp án A"
-                        className="text-sm"
+                        onFocus={() => setActiveCell({ index, field: 'option_a' })}
+                        onChange={(v) => updateQuestion(index, 'option_a', v)}
                       />
                     </TableCell>
+
                     <TableCell>
-                      <Input
+                      <RichTextEditable
+                        ref={(el) => setCellRef(index, 'option_b', el)}
                         value={q.option_b}
-                        onChange={(e) => updateQuestion(index, 'option_b', e.target.value)}
-                        onPaste={(e) => handleRichPasteIntoField(e, index, 'option_b')}
                         placeholder="Đáp án B"
-                        className="text-sm"
+                        onFocus={() => setActiveCell({ index, field: 'option_b' })}
+                        onChange={(v) => updateQuestion(index, 'option_b', v)}
                       />
                     </TableCell>
+
                     <TableCell>
-                      <Input
+                      <RichTextEditable
+                        ref={(el) => setCellRef(index, 'option_c', el)}
                         value={q.option_c}
-                        onChange={(e) => updateQuestion(index, 'option_c', e.target.value)}
-                        onPaste={(e) => handleRichPasteIntoField(e, index, 'option_c')}
                         placeholder="Đáp án C"
-                        className="text-sm"
+                        onFocus={() => setActiveCell({ index, field: 'option_c' })}
+                        onChange={(v) => updateQuestion(index, 'option_c', v)}
                       />
                     </TableCell>
+
                     <TableCell>
-                      <Input
+                      <RichTextEditable
+                        ref={(el) => setCellRef(index, 'option_d', el)}
                         value={q.option_d}
-                        onChange={(e) => updateQuestion(index, 'option_d', e.target.value)}
-                        onPaste={(e) => handleRichPasteIntoField(e, index, 'option_d')}
                         placeholder="Đáp án D"
-                        className="text-sm"
+                        onFocus={() => setActiveCell({ index, field: 'option_d' })}
+                        onChange={(v) => updateQuestion(index, 'option_d', v)}
                       />
                     </TableCell>
+
                     <TableCell>
-                      <Select
-                        value={q.correct_option}
-                        onValueChange={(value) => updateQuestion(index, 'correct_option', value)}
-                      >
+                      <Select value={q.correct_option} onValueChange={(value) => updateQuestion(index, 'correct_option', value)}>
                         <SelectTrigger className="text-sm">
                           <SelectValue placeholder="Chọn" />
                         </SelectTrigger>
@@ -268,15 +313,18 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                         </SelectContent>
                       </Select>
                     </TableCell>
+
                     <TableCell>
-                      <Input
+                      <RichTextEditable
+                        ref={(el) => setCellRef(index, 'explanation', el)}
                         value={q.explanation}
-                        onChange={(e) => updateQuestion(index, 'explanation', e.target.value)}
-                        onPaste={(e) => handleRichPasteIntoField(e, index, 'explanation')}
                         placeholder="Giải thích (tùy chọn)"
-                        className="text-sm"
+                        className="min-h-[64px]"
+                        onFocus={() => setActiveCell({ index, field: 'explanation' })}
+                        onChange={(v) => updateQuestion(index, 'explanation', v)}
                       />
                     </TableCell>
+
                     <TableCell>
                       <Button
                         variant="ghost"
