@@ -1,6 +1,8 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { sanitizeRichText } from "@/lib/richText";
+import { Bold, Italic, Underline } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export type RichTextEditableProps = {
   value: string;
@@ -8,16 +10,19 @@ export type RichTextEditableProps = {
   placeholder?: string;
   className?: string;
   onFocus?: () => void;
+  showToolbar?: boolean;
 };
 
 /**
  * RichTextEditable
  * - contentEditable div để paste giữ định dạng (bold/underline/italic)
  * - sanitize HTML trước khi lưu state
+ * - toolbar với các nút bold/italic/underline
  */
 export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditableProps>(
-  ({ value, onChange, placeholder, className, onFocus }, ref) => {
+  ({ value, onChange, placeholder, className, onFocus, showToolbar = true }, ref) => {
     const innerRef = React.useRef<HTMLDivElement | null>(null);
+    const [isFocused, setIsFocused] = React.useState(false);
 
     React.useImperativeHandle(ref, () => innerRef.current as HTMLDivElement);
 
@@ -62,23 +67,97 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       [emitChange]
     );
 
+    const applyFormat = React.useCallback(
+      (command: string) => {
+        const el = innerRef.current;
+        if (!el) return;
+        el.focus();
+        document.execCommand(command, false);
+        setTimeout(emitChange, 0);
+      },
+      [emitChange]
+    );
+
+    const handleFocus = React.useCallback(() => {
+      setIsFocused(true);
+      onFocus?.();
+    }, [onFocus]);
+
+    const handleBlur = React.useCallback(() => {
+      // Delay để cho phép click vào toolbar
+      setTimeout(() => {
+        if (!innerRef.current?.contains(document.activeElement)) {
+          setIsFocused(false);
+        }
+      }, 100);
+      emitChange();
+    }, [emitChange]);
+
     return (
-      <div
-        ref={innerRef}
-        contentEditable
-        suppressContentEditableWarning
-        onInput={emitChange}
-        onBlur={emitChange}
-        onFocus={onFocus}
-        onPaste={handlePaste}
-        data-placeholder={placeholder || ""}
-        className={cn(
-          "min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-          // placeholder
-          "empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground empty:before:pointer-events-none",
-          className
+      <div className="relative">
+        {/* Toolbar */}
+        {showToolbar && isFocused && (
+          <div className="absolute -top-8 left-0 z-10 flex gap-0.5 rounded-md border border-border bg-popover p-0.5 shadow-md">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                applyFormat("bold");
+              }}
+              title="In đậm (Ctrl+B)"
+            >
+              <Bold className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                applyFormat("italic");
+              }}
+              title="In nghiêng (Ctrl+I)"
+            >
+              <Italic className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                applyFormat("underline");
+              }}
+              title="Gạch chân (Ctrl+U)"
+            >
+              <Underline className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         )}
-      />
+
+        <div
+          ref={innerRef}
+          contentEditable
+          suppressContentEditableWarning
+          onInput={emitChange}
+          onBlur={handleBlur}
+          onFocus={handleFocus}
+          onPaste={handlePaste}
+          data-placeholder={placeholder || ""}
+          className={cn(
+            "min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            // placeholder
+            "empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground empty:before:pointer-events-none",
+            showToolbar && isFocused && "mt-8",
+            className
+          )}
+        />
+      </div>
     );
   }
 );
