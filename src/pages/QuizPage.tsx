@@ -1,32 +1,22 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useParams, Navigate, Link, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Send } from 'lucide-react';
+import { ArrowLeft, Send, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
 import { QuizProgress } from '@/components/quiz/QuizProgress';
 import { ResultSummary } from '@/components/quiz/ResultSummary';
 import { Breadcrumb } from '@/components/layout/Header';
 import { useQuestionHistory } from '@/hooks/useQuestionHistory';
-import {
-  getExamById,
-  getQuestionsByExam,
-  getRandomQuestions,
-  getSectionBySlug,
-  getLevelBySlug,
-  getSubjectBySlug,
-  type Question,
-  type QuizResult,
-} from '@/data/quizData';
+import { useSubjectBySlug, useLevelBySlug, useSectionBySlug } from '@/hooks/useSections';
+import { useRandomQuestions, type Question } from '@/hooks/useQuestions';
+import { type QuizResult } from '@/data/quizData';
 
 /**
  * QuizPage - Trang làm bài thi
- * Hỗ trợ 2 mode:
- * - Mode đề thi: /exam/:examId
- * - Mode random: /quiz/:subjectSlug/:levelSlug/:sectionSlug?count=N
+ * Mode random: /quiz/:subjectSlug/:levelSlug/:sectionSlug?count=N
  */
 const QuizPage = () => {
-  const { examId, subjectSlug, levelSlug, sectionSlug } = useParams<{ 
-    examId?: string; 
+  const { subjectSlug, levelSlug, sectionSlug } = useParams<{ 
     subjectSlug?: string;
     levelSlug?: string;
     sectionSlug?: string;
@@ -43,54 +33,41 @@ const QuizPage = () => {
   // Question history hook
   const { saveAnswer, getQuestionStats } = useQuestionHistory();
 
-  // Xác định mode và lấy dữ liệu
-  const isExamMode = !!examId;
-  
-  // Lấy thông tin cho random mode
-  const subject = subjectSlug ? getSubjectBySlug(subjectSlug) : undefined;
-  const level = subject && levelSlug ? getLevelBySlug(subject.id, levelSlug) : undefined;
-  const section = level && sectionSlug ? getSectionBySlug(level.id, sectionSlug) : undefined;
-  
-  // Lấy thông tin cho exam mode
-  const exam = examId ? getExamById(examId) : undefined;
-
-  // Lấy danh sách câu hỏi - useMemo để giữ stable
-  const questions: Question[] = useMemo(() => {
-    if (isExamMode && examId) {
-      return getQuestionsByExam(examId);
-    } else if (section) {
-      return getRandomQuestions(section.id, questionCount);
-    }
-    return [];
-  }, [isExamMode, examId, section?.id, questionCount]);
-
-  // Breadcrumb info
-  const breadcrumbSubject = subject;
-  const breadcrumbLevel = level;
-  const breadcrumbSection = section;
+  // Fetch dữ liệu từ Supabase
+  const { data: subject, isLoading: loadingSubject } = useSubjectBySlug(subjectSlug);
+  const { data: level, isLoading: loadingLevel } = useLevelBySlug(subject?.id, levelSlug);
+  const { data: section, isLoading: loadingSection } = useSectionBySlug(level?.id, sectionSlug);
+  const { data: questions = [], isLoading: loadingQuestions } = useRandomQuestions(section?.id, questionCount);
 
   // Scroll to top khi component mount
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [examId, sectionSlug]);
+  }, [sectionSlug]);
+
+  const isLoading = loadingSubject || loadingLevel || loadingSection || loadingQuestions;
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   // Nếu không tìm thấy dữ liệu
-  if (isExamMode && !exam) {
-    return <Navigate to="/subjects" replace />;
-  }
-  
-  if (!isExamMode && (!subject || !level || !section)) {
+  if (!subject || !level || !section) {
     return <Navigate to="/subjects" replace />;
   }
 
   // Xử lý chọn đáp án
-  const handleSelectAnswer = useCallback((questionId: string, answer: string) => {
+  const handleSelectAnswer = (questionId: string, answer: string) => {
     if (isSubmitted) return;
     setAnswers((prev) => ({ ...prev, [questionId]: answer }));
-  }, [isSubmitted]);
+  };
 
   // Xử lý nộp bài
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = async () => {
     if (isSubmitted) return;
     
     // Tính kết quả
@@ -125,36 +102,42 @@ const QuizPage = () => {
     
     // Scroll to top để xem kết quả
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [answers, isSubmitted, questions, saveAnswer]);
+  };
 
   // Xử lý làm lại bài
-  const handleRetry = useCallback(() => {
+  const handleRetry = () => {
     setAnswers({});
     setIsSubmitted(false);
     setResult(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+  };
 
   // Scroll đến câu hỏi cụ thể
-  const scrollToQuestion = useCallback((index: number) => {
+  const scrollToQuestion = (index: number) => {
     questionRefs.current[index]?.scrollIntoView({
       behavior: 'smooth',
       block: 'center',
     });
-  }, []);
+  };
 
   const answeredCount = Object.keys(answers).length;
   const questionIds = questions.map((q) => q.id);
   
   // Back URL
-  const backUrl = isExamMode 
-    ? `/subjects` 
-    : `/subjects/${subjectSlug}/${levelSlug}/${sectionSlug}`;
+  const backUrl = `/subjects/${subjectSlug}/${levelSlug}/${sectionSlug}`;
 
   // Title
-  const pageTitle = isExamMode 
-    ? exam?.name || 'Đề thi'
-    : `${breadcrumbSection?.name || ''} - ${questionCount} câu`;
+  const pageTitle = `${section.name} - ${questionCount} câu`;
+
+  // Convert questions to the format expected by QuestionCard
+  const mappedQuestions = questions.map(q => ({
+    id: q.id,
+    examId: '', // Not used in random mode
+    content: q.content,
+    options: q.options,
+    correctOption: q.correctOption,
+    explanation: q.explanation,
+  }));
 
   return (
     <div className="min-h-screen bg-background pb-8">
@@ -164,9 +147,9 @@ const QuizPage = () => {
           <Breadcrumb
             items={[
               { label: 'Chọn môn học', href: '/subjects' },
-              ...(breadcrumbSubject ? [{ label: breadcrumbSubject.name, href: `/subjects/${breadcrumbSubject.slug}` }] : []),
-              ...(breadcrumbLevel ? [{ label: breadcrumbLevel.name, href: `/subjects/${breadcrumbSubject?.slug}/${breadcrumbLevel.slug}` }] : []),
-              ...(breadcrumbSection ? [{ label: breadcrumbSection.name, href: backUrl }] : []),
+              { label: subject.name, href: `/subjects/${subject.slug}` },
+              { label: level.name, href: `/subjects/${subject.slug}/${level.slug}` },
+              { label: section.name, href: backUrl },
               { label: 'Làm bài' },
             ]}
           />
@@ -217,7 +200,7 @@ const QuizPage = () => {
             )}
 
             {/* Questions list */}
-            {questions.map((question, index) => {
+            {mappedQuestions.map((question, index) => {
               const stats = getQuestionStats(question.id);
               
               return (
@@ -240,8 +223,17 @@ const QuizPage = () => {
               );
             })}
 
+            {/* Empty state */}
+            {questions.length === 0 && (
+              <div className="rounded-xl border border-border bg-card p-12 text-center">
+                <p className="text-muted-foreground">
+                  Không có câu hỏi nào. Vui lòng quay lại và thử lại.
+                </p>
+              </div>
+            )}
+
             {/* Submit button - mobile */}
-            {!isSubmitted && (
+            {!isSubmitted && questions.length > 0 && (
               <div className="lg:hidden">
                 <Button
                   onClick={handleSubmit}
@@ -267,7 +259,7 @@ const QuizPage = () => {
                 onQuestionClick={scrollToQuestion}
               />
 
-              {!isSubmitted && (
+              {!isSubmitted && questions.length > 0 && (
                 <Button
                   onClick={handleSubmit}
                   size="lg"

@@ -4,16 +4,12 @@
  */
 import { useState, useEffect } from 'react';
 import { useParams, Navigate, useNavigate } from 'react-router-dom';
-import { Play, BookOpen, Clock, HelpCircle } from 'lucide-react';
+import { Play, Clock, HelpCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/layout/Header';
 import { QuestionCountSelector } from '@/components/quiz/QuestionCountSelector';
-import {
-  getSubjectBySlug,
-  getLevelBySlug,
-  getSectionBySlug,
-  getQuestionsBySection,
-} from '@/data/quizData';
+import { useSubjectBySlug, useLevelBySlug, useSectionBySlug } from '@/hooks/useSections';
+import { useQuestionCount } from '@/hooks/useQuestions';
 
 const QUESTION_COUNTS = [5, 10, 20, 50];
 
@@ -25,22 +21,33 @@ const StartQuizPage = () => {
   }>();
   const navigate = useNavigate();
 
-  // Lấy thông tin
-  const subject = subjectSlug ? getSubjectBySlug(subjectSlug) : undefined;
-  const level = subject && levelSlug ? getLevelBySlug(subject.id, levelSlug) : undefined;
-  const section = level && sectionSlug ? getSectionBySlug(level.id, sectionSlug) : undefined;
-  const allQuestions = section ? getQuestionsBySection(section.id) : [];
+  // Fetch dữ liệu từ Supabase
+  const { data: subject, isLoading: loadingSubject } = useSubjectBySlug(subjectSlug);
+  const { data: level, isLoading: loadingLevel } = useLevelBySlug(subject?.id, levelSlug);
+  const { data: section, isLoading: loadingSection } = useSectionBySlug(level?.id, sectionSlug);
+  const { data: totalQuestions = 0, isLoading: loadingCount } = useQuestionCount(section?.id);
 
   // State
   const [questionCount, setQuestionCount] = useState<number>(5);
 
   // Set default count based on available questions
   useEffect(() => {
-    if (allQuestions.length > 0) {
-      const defaultCount = QUESTION_COUNTS.find((c) => c <= allQuestions.length) || allQuestions.length;
-      setQuestionCount(Math.min(defaultCount, allQuestions.length));
+    if (totalQuestions > 0) {
+      const defaultCount = QUESTION_COUNTS.find((c) => c <= totalQuestions) || totalQuestions;
+      setQuestionCount(Math.min(defaultCount, totalQuestions));
     }
-  }, [allQuestions.length]);
+  }, [totalQuestions]);
+
+  const isLoading = loadingSubject || loadingLevel || loadingSection || loadingCount;
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   // Redirect nếu không tìm thấy
   if (!subject) return <Navigate to="/subjects" replace />;
@@ -76,7 +83,7 @@ const StartQuizPage = () => {
             {/* Header */}
             <div className="mb-8 text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10 text-4xl">
-                {section.icon}
+                {section.icon || '📝'}
               </div>
               <h1 className="mb-2 text-2xl font-bold text-foreground">
                 {section.name}
@@ -92,7 +99,7 @@ const StartQuizPage = () => {
                 <HelpCircle className="h-5 w-5 text-primary" />
                 <div>
                   <p className="text-sm text-muted-foreground">Tổng câu hỏi</p>
-                  <p className="font-semibold text-foreground">{allQuestions.length} câu</p>
+                  <p className="font-semibold text-foreground">{totalQuestions} câu</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 rounded-lg bg-muted/30 p-4">
@@ -109,7 +116,7 @@ const StartQuizPage = () => {
               <QuestionCountSelector
                 counts={QUESTION_COUNTS}
                 selectedCount={questionCount}
-                maxAvailable={allQuestions.length}
+                maxAvailable={totalQuestions}
                 onSelect={setQuestionCount}
               />
             </div>
@@ -119,13 +126,13 @@ const StartQuizPage = () => {
               onClick={handleStartQuiz}
               size="lg"
               className="w-full gap-2"
-              disabled={allQuestions.length === 0}
+              disabled={totalQuestions === 0}
             >
               <Play className="h-5 w-5" />
               Bắt đầu làm bài ({questionCount} câu)
             </Button>
 
-            {allQuestions.length === 0 && (
+            {totalQuestions === 0 && (
               <p className="mt-4 text-center text-sm text-muted-foreground">
                 Chưa có câu hỏi nào cho phần này. Vui lòng quay lại sau.
               </p>
