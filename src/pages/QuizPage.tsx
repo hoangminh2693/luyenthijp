@@ -129,15 +129,8 @@ const QuizPage = () => {
   // Title
   const pageTitle = `${section.name} - ${questionCount} câu`;
 
-  // Convert questions to the format expected by QuestionCard
-  const mappedQuestions = questions.map(q => ({
-    id: q.id,
-    examId: '', // Not used in random mode
-    content: q.content,
-    options: q.options,
-    correctOption: q.correctOption,
-    explanation: q.explanation,
-  }));
+  // Questions already have correct format from useRandomQuestions
+  const mappedQuestions = questions;
 
   return (
     <div className="min-h-screen bg-background pb-8">

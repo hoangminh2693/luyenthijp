@@ -10,7 +10,7 @@ import { Breadcrumb } from '@/components/layout/Header';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { TableImport, TableQuestion } from '@/components/admin/TableImport';
+import { TableImport, type TableQuestion } from '@/components/admin/TableImport';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { sanitizeRichText } from '@/lib/richText';
 
@@ -258,18 +258,40 @@ const ImportQuestionsPage = () => {
           ? sanitizeRichText(explanationRaw)
           : null;
 
-        const { error } = await supabase
+        const { data: parentQuestion, error } = await supabase
           .from('questions')
           .insert({
             section_id: selectedSectionId,
             content: sanitizeRichText(q.content),
-            option_a: sanitizeRichText(q.option_a),
-            option_b: sanitizeRichText(q.option_b),
-            option_c: sanitizeRichText(q.option_c),
-            option_d: sanitizeRichText(q.option_d),
-            correct_option: q.correct_option,
+            option_a: sanitizeRichText(q.option_a || ''),
+            option_b: sanitizeRichText(q.option_b || ''),
+            option_c: sanitizeRichText(q.option_c || ''),
+            option_d: sanitizeRichText(q.option_d || ''),
+            correct_option: q.correct_option || 'A',
             explanation: safeExplanation,
-          });
+            image_url: (q as TableQuestion).image_url || null,
+            audio_url: (q as TableQuestion).audio_url || null,
+          })
+          .select('id')
+          .single();
+
+        // Insert sub-questions if any
+        const subQuestions = (q as TableQuestion).subQuestions;
+        if (!error && parentQuestion && subQuestions && subQuestions.length > 0) {
+          for (const sq of subQuestions) {
+            await supabase.from('questions').insert({
+              section_id: selectedSectionId,
+              parent_id: parentQuestion.id,
+              content: sanitizeRichText(sq.content),
+              option_a: sanitizeRichText(sq.option_a),
+              option_b: sanitizeRichText(sq.option_b),
+              option_c: sanitizeRichText(sq.option_c),
+              option_d: sanitizeRichText(sq.option_d),
+              correct_option: sq.correct_option,
+              explanation: sq.explanation ? sanitizeRichText(sq.explanation) : null,
+            });
+          }
+        }
 
         if (error) {
           result.failed++;
