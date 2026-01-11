@@ -122,42 +122,58 @@ export type Database = {
       }
       questions: {
         Row: {
+          audio_url: string | null
           content: string
           correct_option: string
           created_at: string
           explanation: string | null
           id: string
+          image_url: string | null
           option_a: string
           option_b: string
           option_c: string
           option_d: string
+          parent_id: string | null
           section_id: string
         }
         Insert: {
+          audio_url?: string | null
           content: string
           correct_option: string
           created_at?: string
           explanation?: string | null
           id?: string
+          image_url?: string | null
           option_a: string
           option_b: string
           option_c: string
           option_d: string
+          parent_id?: string | null
           section_id: string
         }
         Update: {
+          audio_url?: string | null
           content?: string
           correct_option?: string
           created_at?: string
           explanation?: string | null
           id?: string
+          image_url?: string | null
           option_a?: string
           option_b?: string
           option_c?: string
           option_d?: string
+          parent_id?: string | null
           section_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "questions_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "questions_section_id_fkey"
             columns: ["section_id"]
