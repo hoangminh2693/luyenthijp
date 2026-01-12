@@ -4,7 +4,7 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, LogIn, Shield, Pencil, Trash2, Search, ChevronDown, Save, X } from 'lucide-react';
+import { Loader2, LogIn, Shield, Pencil, Trash2, Search, ChevronDown, Save, X, Image, Volume2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,6 +39,7 @@ import {
 import { RichTextEditable } from '@/components/admin/RichTextEditable';
 import { SubQuestionInput, type SubQuestion } from '@/components/admin/SubQuestionInput';
 import { sanitizeRichText } from '@/lib/richText';
+import { MediaUpload } from '@/components/admin/MediaUpload';
 
 interface Subject {
   id: string;
@@ -250,6 +251,8 @@ const ManageQuestionsPage = () => {
       option_d: question.option_d,
       correct_option: question.correct_option,
       explanation: question.explanation || '',
+      image_url: question.image_url || undefined,
+      audio_url: question.audio_url || undefined,
       subQuestions: (question.subQuestions ?? []).map((sq) => ({
         id: sq.id,
         content: sq.content,
@@ -294,6 +297,21 @@ const ManageQuestionsPage = () => {
     }
   }, []);
 
+  // Helper: delete file from storage bucket by URL
+  const deleteStorageFile = useCallback(async (publicUrl: string | null | undefined) => {
+    if (!publicUrl) return;
+    try {
+      // Extract path from public URL (after /object/public/question-media/)
+      const match = publicUrl.match(/\/object\/public\/question-media\/(.+)$/);
+      if (match && match[1]) {
+        const filePath = decodeURIComponent(match[1]);
+        await supabase.storage.from('question-media').remove([filePath]);
+      }
+    } catch (err) {
+      console.error('Error deleting storage file:', err);
+    }
+  }, []);
+
   // Save edited question (câu cha + câu hỏi con nếu có)
   const handleSave = useCallback(async () => {
     if (!editingQuestion) return;
@@ -303,6 +321,21 @@ const ManageQuestionsPage = () => {
       const safeExplanation = (editForm.explanation || '').trim().length > 0
         ? sanitizeRichText(editForm.explanation || '')
         : null;
+
+      // Handle media deletion when user removes from form
+      const oldImageUrl = editingQuestion.image_url;
+      const newImageUrl = editForm.image_url ?? null;
+      const oldAudioUrl = editingQuestion.audio_url;
+      const newAudioUrl = editForm.audio_url ?? null;
+
+      // Delete old image from storage if removed
+      if (oldImageUrl && oldImageUrl !== newImageUrl) {
+        await deleteStorageFile(oldImageUrl);
+      }
+      // Delete old audio from storage if removed
+      if (oldAudioUrl && oldAudioUrl !== newAudioUrl) {
+        await deleteStorageFile(oldAudioUrl);
+      }
 
       // 1) Update parent
       const { error: parentErr } = await supabase
@@ -315,6 +348,8 @@ const ManageQuestionsPage = () => {
           option_d: sanitizeRichText(editForm.option_d || ''),
           correct_option: (editForm.correct_option || 'A') as string,
           explanation: safeExplanation,
+          image_url: newImageUrl,
+          audio_url: newAudioUrl,
         })
         .eq('id', editingQuestion.id);
 
@@ -398,18 +433,34 @@ const ManageQuestionsPage = () => {
     }
   }, [editingQuestion, editForm, queryClient]);
 
-  // Delete question
+  // Delete question (xóa cả câu hỏi con & file media)
   const handleDelete = useCallback(async () => {
     if (!deletingQuestion) return;
 
     setDeleting(true);
     try {
+      // Delete media from storage
+      if (deletingQuestion.image_url) await deleteStorageFile(deletingQuestion.image_url);
+      if (deletingQuestion.audio_url) await deleteStorageFile(deletingQuestion.audio_url);
+
+      // Delete sub-questions first (FK constraint)
+      const subQuestions = deletingQuestion.subQuestions ?? [];
+      if (subQuestions.length > 0) {
+        const childIds = subQuestions.map((sq) => sq.id);
+        const { error: childDelErr } = await supabase
+          .from('questions')
+          .delete()
+          .in('id', childIds);
+        if (childDelErr) throw childDelErr;
+      }
+
+      // Delete parent question
       const { error } = await supabase.from('questions').delete().eq('id', deletingQuestion.id);
 
       if (error) throw error;
 
       // Update local state
-      setQuestions((prev) => prev.filter((q) => q.id !== deletingQuestion.id));
+      setQuestions((prev) => prev.filter((q) => q.id !== deletingQuestion.id && q.parent_id !== deletingQuestion.id));
 
       // Invalidate questions cache so QuizPage gets fresh data
       queryClient.invalidateQueries({ queryKey: ['questions'] });
@@ -422,7 +473,7 @@ const ManageQuestionsPage = () => {
     } finally {
       setDeleting(false);
     }
-  }, [deletingQuestion]);
+  }, [deletingQuestion, deleteStorageFile, queryClient]);
 
   // Loading state
   if (authLoading) {
@@ -731,6 +782,28 @@ const ManageQuestionsPage = () => {
                       </div>
                     </>
                   )}
+
+                  {/* Media section */}
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">Hình ảnh</label>
+                      <MediaUpload
+                        type="image"
+                        value={editForm.image_url || undefined}
+                        onChange={(url) => setEditForm((prev) => ({ ...prev, image_url: url ?? null }))}
+                        disabled={saving}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">Âm thanh</label>
+                      <MediaUpload
+                        type="audio"
+                        value={editForm.audio_url || undefined}
+                        onChange={(url) => setEditForm((prev) => ({ ...prev, audio_url: url ?? null }))}
+                        disabled={saving}
+                      />
+                    </div>
+                  </div>
 
                   <div>
                     <label className="mb-1 block text-sm font-medium">
