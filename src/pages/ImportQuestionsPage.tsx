@@ -204,7 +204,15 @@ const ImportQuestionsPage = () => {
   // Import questions to database with duplicate check
   const handleImport = useCallback(async () => {
     const questionsToImport = importMode === 'table' 
-      ? tableQuestions.filter(q => q.content && q.option_a && q.option_b && q.option_c && q.option_d && q.correct_option)
+      ? tableQuestions.filter(q => {
+          if (!q.content) return false;
+          // Has direct answer
+          const hasDirectAnswer = q.option_a && q.option_b && q.option_c && q.option_d && q.correct_option;
+          // Has valid sub-questions
+          const hasSubQuestions = q.subQuestions && q.subQuestions.length > 0 && 
+            q.subQuestions.every(sq => sq.content && sq.option_a && sq.option_b && sq.option_c && sq.option_d && sq.correct_option);
+          return hasDirectAnswer || hasSubQuestions;
+        })
       : parsedQuestions;
 
     if (!selectedSectionId || questionsToImport.length === 0) {
