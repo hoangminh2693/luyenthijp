@@ -1,10 +1,12 @@
 /**
  * SubQuestionInput - Component nhập câu hỏi con (sub-questions)
  * Dùng cho đề bài có nhiều câu hỏi nhỏ
+ * Hỗ trợ paste từ Excel/Sheets
  */
-import { useCallback } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { Plus, Trash2, Copy, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { RichTextEditable } from '@/components/admin/RichTextEditable';
 import {
   Select,
@@ -40,7 +42,17 @@ const emptySubQuestion: SubQuestion = {
   explanation: '',
 };
 
+/**
+ * Loại bỏ số thứ tự ở đầu câu hỏi (ví dụ: "1. Câu hỏi", "2) Nội dung")
+ */
+function removeQuestionNumber(text: string): string {
+  return text.replace(/^\s*\d+\s*[.\-):]\s*/, '');
+}
+
 export function SubQuestionInput({ subQuestions, onChange, disabled }: SubQuestionInputProps) {
+  const [pasteMode, setPasteMode] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+
   const addSubQuestion = useCallback(() => {
     onChange([...subQuestions, { ...emptySubQuestion }]);
   }, [subQuestions, onChange]);
@@ -55,26 +67,113 @@ export function SubQuestionInput({ subQuestions, onChange, disabled }: SubQuesti
     onChange(updated);
   }, [subQuestions, onChange]);
 
+  // Xử lý paste từ Excel/Sheets
+  const handlePaste = useCallback(() => {
+    if (!pasteText.trim()) return;
+
+    const lines = pasteText.trim().split('\n');
+    const parsed: SubQuestion[] = [];
+
+    lines.forEach((line) => {
+      const values = line.includes('\t') ? line.split('\t') : line.split(',');
+
+      if (values.length >= 5) {
+        let correctOption = values[5]?.trim().toUpperCase() || '';
+        if (correctOption.startsWith('OPTION_')) {
+          correctOption = correctOption.replace('OPTION_', '');
+        }
+
+        parsed.push({
+          content: removeQuestionNumber(values[0]?.trim() || ''),
+          option_a: values[1]?.trim() || '',
+          option_b: values[2]?.trim() || '',
+          option_c: values[3]?.trim() || '',
+          option_d: values[4]?.trim() || '',
+          correct_option: ['A', 'B', 'C', 'D'].includes(correctOption) ? correctOption : '',
+          explanation: values[6]?.trim() || '',
+        });
+      }
+    });
+
+    if (parsed.length > 0) {
+      onChange([...subQuestions, ...parsed]);
+      setPasteMode(false);
+      setPasteText('');
+    }
+  }, [pasteText, subQuestions, onChange]);
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <h4 className="font-medium text-foreground">Câu hỏi con</h4>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={addSubQuestion}
-          disabled={disabled}
-          className="gap-1"
-        >
-          <Plus className="h-4 w-4" />
-          Thêm câu con
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setPasteMode(!pasteMode)}
+            disabled={disabled}
+            className="gap-1"
+          >
+            <Copy className="h-4 w-4" />
+            Paste từ Excel
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addSubQuestion}
+            disabled={disabled}
+            className="gap-1"
+          >
+            <Plus className="h-4 w-4" />
+            Thêm câu con
+          </Button>
+        </div>
       </div>
 
-      {subQuestions.length === 0 && (
+      {pasteMode && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Paste dữ liệu từ Excel/Sheets. Mỗi dòng 1 câu hỏi, các cột: Nội dung | A | B | C | D | Đáp án đúng | Giải thích
+          </p>
+          <Textarea
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+            placeholder="Paste dữ liệu vào đây..."
+            className="min-h-[100px] font-mono text-sm"
+          />
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              onClick={handlePaste}
+              disabled={!pasteText.trim()}
+              className="gap-1"
+            >
+              <Check className="h-4 w-4" />
+              Xác nhận
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setPasteMode(false);
+                setPasteText('');
+              }}
+              className="gap-1"
+            >
+              <X className="h-4 w-4" />
+              Hủy
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {subQuestions.length === 0 && !pasteMode && (
         <p className="text-sm text-muted-foreground italic">
-          Chưa có câu hỏi con. Bấm "Thêm câu con" để thêm.
+          Chưa có câu hỏi con. Bấm "Thêm câu con" hoặc "Paste từ Excel" để thêm.
         </p>
       )}
 
