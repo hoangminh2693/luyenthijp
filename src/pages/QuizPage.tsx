@@ -26,6 +26,7 @@ const QuizPage = () => {
   
   // State quản lý bài thi
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [subAnswers, setSubAnswers] = useState<Record<string, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [result, setResult] = useState<QuizResult | null>(null);
   const questionRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -66,20 +67,43 @@ const QuizPage = () => {
     setAnswers((prev) => ({ ...prev, [questionId]: answer }));
   };
 
+  // Xử lý chọn đáp án cho câu hỏi con
+  const handleSelectSubAnswer = (subQuestionId: string, answer: string) => {
+    if (isSubmitted) return;
+    setSubAnswers((prev) => ({ ...prev, [subQuestionId]: answer }));
+  };
+
   // Xử lý nộp bài
   const handleSubmit = async () => {
     if (isSubmitted) return;
     
-    // Tính kết quả
-    const details = questions.map((q) => ({
-      questionId: q.id,
-      userAnswer: answers[q.id] || null,
-      correctAnswer: q.correctOption,
-      isCorrect: answers[q.id] === q.correctOption,
-    }));
+    // Tính kết quả - bao gồm cả câu hỏi con
+    const details: { questionId: string; userAnswer: string | null; correctAnswer: string; isCorrect: boolean }[] = [];
+    
+    for (const q of questions) {
+      if (q.subQuestions && q.subQuestions.length > 0) {
+        // Câu hỏi có câu con - tính điểm cho từng câu con
+        for (const subQ of q.subQuestions) {
+          details.push({
+            questionId: subQ.id,
+            userAnswer: subAnswers[subQ.id] || null,
+            correctAnswer: subQ.correctOption,
+            isCorrect: subAnswers[subQ.id] === subQ.correctOption,
+          });
+        }
+      } else {
+        // Câu hỏi thường
+        details.push({
+          questionId: q.id,
+          userAnswer: answers[q.id] || null,
+          correctAnswer: q.correctOption,
+          isCorrect: answers[q.id] === q.correctOption,
+        });
+      }
+    }
 
     const correctAnswers = details.filter((d) => d.isCorrect).length;
-    const totalQuestions = questions.length;
+    const totalQuestions = details.length;
 
     const quizResult: QuizResult = {
       totalQuestions,
@@ -107,6 +131,7 @@ const QuizPage = () => {
   // Xử lý làm lại bài
   const handleRetry = () => {
     setAnswers({});
+    setSubAnswers({});
     setIsSubmitted(false);
     setResult(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -120,7 +145,16 @@ const QuizPage = () => {
     });
   };
 
-  const answeredCount = Object.keys(answers).length;
+  // Tính tổng số câu đã trả lời (bao gồm câu con)
+  const answeredCount = Object.keys(answers).length + Object.keys(subAnswers).length;
+  
+  // Tính tổng số câu hỏi thực tế (bao gồm câu con)
+  const totalQuestionCount = questions.reduce((total, q) => {
+    if (q.subQuestions && q.subQuestions.length > 0) {
+      return total + q.subQuestions.length;
+    }
+    return total + 1;
+  }, 0);
   const questionIds = questions.map((q) => q.id);
   
   // Back URL
@@ -211,6 +245,8 @@ const QuizPage = () => {
                     showResult={isSubmitted}
                     isSubmitted={isSubmitted}
                     historyStats={stats}
+                    subAnswers={subAnswers}
+                    onSelectSubAnswer={handleSelectSubAnswer}
                   />
                 </div>
               );
@@ -235,7 +271,7 @@ const QuizPage = () => {
                   disabled={answeredCount === 0}
                 >
                   <Send className="h-5 w-5" />
-                  Nộp bài ({answeredCount}/{questions.length} câu)
+                  Nộp bài ({answeredCount}/{totalQuestionCount} câu)
                 </Button>
               </div>
             )}
@@ -245,9 +281,9 @@ const QuizPage = () => {
           <div className="hidden lg:block">
             <div className="sticky top-24 space-y-4">
               <QuizProgress
-                totalQuestions={questions.length}
+                totalQuestions={totalQuestionCount}
                 answeredQuestions={answeredCount}
-                answers={answers}
+                answers={{...answers, ...subAnswers}}
                 questionIds={questionIds}
                 onQuestionClick={scrollToQuestion}
               />
@@ -264,9 +300,9 @@ const QuizPage = () => {
                 </Button>
               )}
 
-              {!isSubmitted && answeredCount < questions.length && (
+              {!isSubmitted && answeredCount < totalQuestionCount && (
                 <p className="text-center text-sm text-muted-foreground">
-                  Bạn còn {questions.length - answeredCount} câu chưa trả lời
+                  Bạn còn {totalQuestionCount - answeredCount} câu chưa trả lời
                 </p>
               )}
             </div>
