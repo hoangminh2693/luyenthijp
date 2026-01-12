@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 
 export interface SubQuestion {
+  id?: string;
   content: string;
   option_a: string;
   option_b: string;

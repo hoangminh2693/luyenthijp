@@ -2,7 +2,7 @@
  * ManageQuestionsPage - Trang quản lý câu hỏi đã import
  * Cho phép xem, sửa, xóa câu hỏi
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, LogIn, Shield, Pencil, Trash2, Search, ChevronDown, Save, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -37,6 +37,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { RichTextEditable } from '@/components/admin/RichTextEditable';
+import { SubQuestionInput, type SubQuestion } from '@/components/admin/SubQuestionInput';
+import { sanitizeRichText } from '@/lib/richText';
 
 interface Subject {
   id: string;
@@ -59,7 +61,7 @@ interface Section {
   level_id: string;
 }
 
-interface Question {
+interface QuestionRow {
   id: string;
   content: string;
   option_a: string;
@@ -70,6 +72,43 @@ interface Question {
   explanation: string | null;
   section_id: string;
   created_at: string;
+  parent_id?: string | null;
+  image_url?: string | null;
+  audio_url?: string | null;
+}
+
+interface ParentQuestionRow extends QuestionRow {
+  subQuestions?: QuestionRow[];
+}
+
+type EditQuestionForm = Partial<QuestionRow> & { subQuestions?: SubQuestion[] };
+
+const stripHtml = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+function groupQuestionsWithChildren(rows: QuestionRow[]): ParentQuestionRow[] {
+  const parents = rows
+    .filter((q) => !q.parent_id)
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+  const childrenByParent = new Map<string, QuestionRow[]>();
+  rows
+    .filter((q) => !!q.parent_id)
+    .forEach((child) => {
+      const parentId = child.parent_id as string;
+      const list = childrenByParent.get(parentId) ?? [];
+      list.push(child);
+      childrenByParent.set(parentId, list);
+    });
+
+  // sort children by created_at
+  childrenByParent.forEach((list, key) => {
+    childrenByParent.set(
+      key,
+      list.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    );
+  });
+
+  return parents.map((p) => ({ ...p, subQuestions: childrenByParent.get(p.id) ?? [] }));
 }
 
 const ManageQuestionsPage = () => {
@@ -80,7 +119,7 @@ const ManageQuestionsPage = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [levels, setLevels] = useState<Level[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<QuestionRow[]>([]);
 
   // Filters
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
@@ -93,12 +132,12 @@ const ManageQuestionsPage = () => {
   const [loadingQuestions, setLoadingQuestions] = useState(false);
 
   // Edit dialog
-  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
-  const [editForm, setEditForm] = useState<Partial<Question>>({});
+  const [editingQuestion, setEditingQuestion] = useState<ParentQuestionRow | null>(null);
+  const [editForm, setEditForm] = useState<EditQuestionForm>({ subQuestions: [] });
   const [saving, setSaving] = useState(false);
 
   // Delete dialog
-  const [deletingQuestion, setDeletingQuestion] = useState<Question | null>(null);
+  const [deletingQuestion, setDeletingQuestion] = useState<ParentQuestionRow | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   // Get selected subject
@@ -183,16 +222,24 @@ const ManageQuestionsPage = () => {
     loadQuestions();
   }, [selectedSectionId]);
 
-  // Filter questions by search
-  const filteredQuestions = questions.filter((q) => {
-    if (!searchQuery.trim()) return true;
-    const query = searchQuery.toLowerCase();
-    const textContent = q.content.replace(/<[^>]*>/g, '').toLowerCase();
-    return textContent.includes(query);
-  });
+  const groupedQuestions = useMemo(() => groupQuestionsWithChildren(questions), [questions]);
 
-  // Open edit dialog
-  const openEditDialog = useCallback((question: Question) => {
+  // Filter questions by search (tìm trong câu cha + câu con)
+  const filteredQuestions = useMemo(() => {
+    if (!searchQuery.trim()) return groupedQuestions;
+    const query = searchQuery.toLowerCase();
+
+    return groupedQuestions.filter((q) => {
+      const parentText = stripHtml(q.content).toLowerCase();
+      if (parentText.includes(query)) return true;
+
+      const children = q.subQuestions ?? [];
+      return children.some((c) => stripHtml(c.content).toLowerCase().includes(query));
+    });
+  }, [groupedQuestions, searchQuery]);
+
+  // Open edit dialog (câu cha, kèm câu con)
+  const openEditDialog = useCallback((question: ParentQuestionRow) => {
     setEditingQuestion(question);
     setEditForm({
       content: question.content,
@@ -202,6 +249,16 @@ const ManageQuestionsPage = () => {
       option_d: question.option_d,
       correct_option: question.correct_option,
       explanation: question.explanation || '',
+      subQuestions: (question.subQuestions ?? []).map((sq) => ({
+        id: sq.id,
+        content: sq.content,
+        option_a: sq.option_a,
+        option_b: sq.option_b,
+        option_c: sq.option_c,
+        option_d: sq.option_d,
+        correct_option: sq.correct_option,
+        explanation: sq.explanation || '',
+      })),
     });
   }, []);
 
