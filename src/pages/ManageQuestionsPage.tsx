@@ -239,7 +239,8 @@ const ManageQuestionsPage = () => {
   }, [groupedQuestions, searchQuery]);
 
   // Open edit dialog (câu cha, kèm câu con)
-  const openEditDialog = useCallback((question: ParentQuestionRow) => {
+  const openEditDialog = useCallback(async (question: ParentQuestionRow) => {
+    // set trước để mở dialog nhanh
     setEditingQuestion(question);
     setEditForm({
       content: question.content,
@@ -260,37 +261,129 @@ const ManageQuestionsPage = () => {
         explanation: sq.explanation || '',
       })),
     });
+
+    // Sau đó load lại câu hỏi con theo parent_id để đảm bảo đầy đủ (kể cả dữ liệu cũ bị lệch section)
+    try {
+      const { data: children, error } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('parent_id', question.id)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      const mappedChildren: QuestionRow[] = (children as unknown as QuestionRow[]) || [];
+      setEditingQuestion((prev) => (prev ? { ...prev, subQuestions: mappedChildren } : prev));
+      setEditForm((prev) => ({
+        ...prev,
+        subQuestions: mappedChildren.map((sq) => ({
+          id: sq.id,
+          content: sq.content,
+          option_a: sq.option_a,
+          option_b: sq.option_b,
+          option_c: sq.option_c,
+          option_d: sq.option_d,
+          correct_option: sq.correct_option,
+          explanation: sq.explanation || '',
+        })),
+      }));
+    } catch (err) {
+      console.error('Error loading sub questions:', err);
+      // vẫn cho sửa câu cha, nhưng báo lỗi để biết vì sao chưa thấy câu con
+      toast.error('Không tải được câu hỏi con. Vui lòng thử lại.');
+    }
   }, []);
 
-  // Save edited question
+  // Save edited question (câu cha + câu hỏi con nếu có)
   const handleSave = useCallback(async () => {
     if (!editingQuestion) return;
 
     setSaving(true);
     try {
-      const { error } = await supabase
+      const safeExplanation = (editForm.explanation || '').trim().length > 0
+        ? sanitizeRichText(editForm.explanation || '')
+        : null;
+
+      // 1) Update parent
+      const { error: parentErr } = await supabase
         .from('questions')
         .update({
-          content: editForm.content,
-          option_a: editForm.option_a,
-          option_b: editForm.option_b,
-          option_c: editForm.option_c,
-          option_d: editForm.option_d,
-          correct_option: editForm.correct_option,
-          explanation: editForm.explanation || null,
+          content: sanitizeRichText(editForm.content || ''),
+          option_a: sanitizeRichText(editForm.option_a || ''),
+          option_b: sanitizeRichText(editForm.option_b || ''),
+          option_c: sanitizeRichText(editForm.option_c || ''),
+          option_d: sanitizeRichText(editForm.option_d || ''),
+          correct_option: (editForm.correct_option || 'A') as string,
+          explanation: safeExplanation,
         })
         .eq('id', editingQuestion.id);
 
-      if (error) throw error;
+      if (parentErr) throw parentErr;
 
-      // Update local state
-      setQuestions((prev) =>
-        prev.map((q) =>
-          q.id === editingQuestion.id
-            ? { ...q, ...editForm, explanation: editForm.explanation || null }
-            : q
-        )
-      );
+      // 2) Sync sub-questions (if any)
+      const nextSubQuestions = editForm.subQuestions ?? [];
+      const prevSubQuestions = editingQuestion.subQuestions ?? [];
+
+      const prevIds = new Set(prevSubQuestions.map((sq) => sq.id).filter(Boolean));
+      const nextIds = new Set(nextSubQuestions.map((sq) => sq.id).filter(Boolean));
+
+      // Delete removed sub-questions
+      const toDelete = Array.from(prevIds).filter((id) => !nextIds.has(id));
+      if (toDelete.length > 0) {
+        const { error: delErr } = await supabase
+          .from('questions')
+          .delete()
+          .in('id', toDelete)
+          .eq('parent_id', editingQuestion.id);
+        if (delErr) throw delErr;
+      }
+
+      // Update existing / Insert new
+      for (const sq of nextSubQuestions) {
+        const sqExplanation = (sq.explanation || '').trim().length > 0
+          ? sanitizeRichText(sq.explanation)
+          : null;
+
+        if (sq.id) {
+          const { error: upErr } = await supabase
+            .from('questions')
+            .update({
+              content: sanitizeRichText(sq.content || ''),
+              option_a: sanitizeRichText(sq.option_a || ''),
+              option_b: sanitizeRichText(sq.option_b || ''),
+              option_c: sanitizeRichText(sq.option_c || ''),
+              option_d: sanitizeRichText(sq.option_d || ''),
+              correct_option: sq.correct_option || 'A',
+              explanation: sqExplanation,
+            })
+            .eq('id', sq.id)
+            .eq('parent_id', editingQuestion.id);
+          if (upErr) throw upErr;
+        } else {
+          const { error: insErr } = await supabase.from('questions').insert({
+            section_id: editingQuestion.section_id,
+            parent_id: editingQuestion.id,
+            content: sanitizeRichText(sq.content || ''),
+            option_a: sanitizeRichText(sq.option_a || ''),
+            option_b: sanitizeRichText(sq.option_b || ''),
+            option_c: sanitizeRichText(sq.option_c || ''),
+            option_d: sanitizeRichText(sq.option_d || ''),
+            correct_option: sq.correct_option || 'A',
+            explanation: sqExplanation,
+          });
+          if (insErr) throw insErr;
+        }
+      }
+
+      // 3) Refresh list after save
+      const { data: refreshed, error: refreshErr } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('section_id', editingQuestion.section_id)
+        .order('created_at', { ascending: true });
+
+      if (refreshErr) throw refreshErr;
+      setQuestions((refreshed as unknown as QuestionRow[]) || []);
 
       // Invalidate questions cache so QuizPage gets fresh data
       queryClient.invalidateQueries({ queryKey: ['questions'] });
@@ -303,7 +396,7 @@ const ManageQuestionsPage = () => {
     } finally {
       setSaving(false);
     }
-  }, [editingQuestion, editForm]);
+  }, [editingQuestion, editForm, queryClient]);
 
   // Delete question
   const handleDelete = useCallback(async () => {
@@ -492,7 +585,7 @@ const ManageQuestionsPage = () => {
               ) : (
                 <>
                   <p className="text-sm text-muted-foreground">
-                    Hiển thị {filteredQuestions.length} / {questions.length} câu hỏi
+                    Hiển thị {filteredQuestions.length} / {groupedQuestions.length} câu hỏi
                   </p>
                   {filteredQuestions.map((q, index) => (
                     <div
@@ -559,78 +652,100 @@ const ManageQuestionsPage = () => {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium">Nội dung câu hỏi</label>
-              <RichTextEditable
-                value={editForm.content || ''}
-                onChange={(v) => setEditForm((prev) => ({ ...prev, content: v }))}
-                placeholder="Nội dung câu hỏi..."
-                className="min-h-[80px]"
-              />
-            </div>
+            {(() => {
+              const hasSubQuestions = (editForm.subQuestions?.length ?? 0) > 0;
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-medium">Đáp án A</label>
-                <RichTextEditable
-                  value={editForm.option_a || ''}
-                  onChange={(v) => setEditForm((prev) => ({ ...prev, option_a: v }))}
-                  placeholder="Đáp án A"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">Đáp án B</label>
-                <RichTextEditable
-                  value={editForm.option_b || ''}
-                  onChange={(v) => setEditForm((prev) => ({ ...prev, option_b: v }))}
-                  placeholder="Đáp án B"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">Đáp án C</label>
-                <RichTextEditable
-                  value={editForm.option_c || ''}
-                  onChange={(v) => setEditForm((prev) => ({ ...prev, option_c: v }))}
-                  placeholder="Đáp án C"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">Đáp án D</label>
-                <RichTextEditable
-                  value={editForm.option_d || ''}
-                  onChange={(v) => setEditForm((prev) => ({ ...prev, option_d: v }))}
-                  placeholder="Đáp án D"
-                />
-              </div>
-            </div>
+              return (
+                <>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">
+                      {hasSubQuestions ? 'Đề bài (câu tổng)' : 'Nội dung câu hỏi'}
+                    </label>
+                    <RichTextEditable
+                      value={editForm.content || ''}
+                      onChange={(v) => setEditForm((prev) => ({ ...prev, content: v }))}
+                      placeholder={hasSubQuestions ? 'Nhập đề bài...' : 'Nội dung câu hỏi...'}
+                      className="min-h-[80px]"
+                    />
+                  </div>
 
-            <div>
-              <label className="mb-1 block text-sm font-medium">Đáp án đúng</label>
-              <Select
-                value={editForm.correct_option || ''}
-                onValueChange={(v) => setEditForm((prev) => ({ ...prev, correct_option: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Chọn đáp án đúng" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="A">A</SelectItem>
-                  <SelectItem value="B">B</SelectItem>
-                  <SelectItem value="C">C</SelectItem>
-                  <SelectItem value="D">D</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+                  {hasSubQuestions ? (
+                    <SubQuestionInput
+                      subQuestions={editForm.subQuestions || []}
+                      onChange={(sqs) => setEditForm((prev) => ({ ...prev, subQuestions: sqs }))}
+                      disabled={saving}
+                    />
+                  ) : (
+                    <>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-sm font-medium">Đáp án A</label>
+                          <RichTextEditable
+                            value={editForm.option_a || ''}
+                            onChange={(v) => setEditForm((prev) => ({ ...prev, option_a: v }))}
+                            placeholder="Đáp án A"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-medium">Đáp án B</label>
+                          <RichTextEditable
+                            value={editForm.option_b || ''}
+                            onChange={(v) => setEditForm((prev) => ({ ...prev, option_b: v }))}
+                            placeholder="Đáp án B"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-medium">Đáp án C</label>
+                          <RichTextEditable
+                            value={editForm.option_c || ''}
+                            onChange={(v) => setEditForm((prev) => ({ ...prev, option_c: v }))}
+                            placeholder="Đáp án C"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-medium">Đáp án D</label>
+                          <RichTextEditable
+                            value={editForm.option_d || ''}
+                            onChange={(v) => setEditForm((prev) => ({ ...prev, option_d: v }))}
+                            placeholder="Đáp án D"
+                          />
+                        </div>
+                      </div>
 
-            <div>
-              <label className="mb-1 block text-sm font-medium">Giải thích (tùy chọn)</label>
-              <RichTextEditable
-                value={editForm.explanation || ''}
-                onChange={(v) => setEditForm((prev) => ({ ...prev, explanation: v }))}
-                placeholder="Giải thích đáp án..."
-                className="min-h-[60px]"
-              />
-            </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium">Đáp án đúng</label>
+                        <Select
+                          value={editForm.correct_option || ''}
+                          onValueChange={(v) => setEditForm((prev) => ({ ...prev, correct_option: v }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Chọn đáp án đúng" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="A">A</SelectItem>
+                            <SelectItem value="B">B</SelectItem>
+                            <SelectItem value="C">C</SelectItem>
+                            <SelectItem value="D">D</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">
+                      {hasSubQuestions ? 'Giải thích/ghi chú đề bài (tùy chọn)' : 'Giải thích (tùy chọn)'}
+                    </label>
+                    <RichTextEditable
+                      value={editForm.explanation || ''}
+                      onChange={(v) => setEditForm((prev) => ({ ...prev, explanation: v }))}
+                      placeholder={hasSubQuestions ? 'Ghi chú cho đề bài...' : 'Giải thích đáp án...'}
+                      className="min-h-[60px]"
+                    />
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           <DialogFooter>
