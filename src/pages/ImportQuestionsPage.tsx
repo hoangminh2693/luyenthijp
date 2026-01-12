@@ -2,7 +2,7 @@
  * ImportQuestionsPage - Trang import câu hỏi từ file Excel/CSV hoặc nhập trực tiếp bằng bảng
  * Hỗ trợ tạo môn học, cấp độ, phần mới và import câu hỏi
  */
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download, LogIn, Shield, Table2, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -54,6 +54,26 @@ interface Section {
   description: string | null;
 }
 
+function isValidTableQuestion(q: TableQuestion): boolean {
+  if (!q.content) return false;
+
+  const hasDirectAnswer =
+    !!q.option_a && !!q.option_b && !!q.option_c && !!q.option_d && !!q.correct_option;
+
+  const hasValidSubQuestions =
+    (q.subQuestions ?? []).some(
+      (sq) =>
+        !!sq.content &&
+        !!sq.option_a &&
+        !!sq.option_b &&
+        !!sq.option_c &&
+        !!sq.option_d &&
+        !!sq.correct_option
+    );
+
+  return hasDirectAnswer || hasValidSubQuestions;
+}
+
 const ImportQuestionsPage = () => {
   const { user, isAdmin, isLoading: authLoading } = useAuth();
 
@@ -63,6 +83,11 @@ const ImportQuestionsPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importMode, setImportMode] = useState<'table' | 'file'>('table');
+
+  const validTableQuestionsCount = useMemo(
+    () => tableQuestions.filter(isValidTableQuestion).length,
+    [tableQuestions]
+  );
 
   // Data from database
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -203,19 +228,10 @@ const ImportQuestionsPage = () => {
 
   // Import questions to database with duplicate check
   const handleImport = useCallback(async () => {
-    const questionsToImport = importMode === 'table' 
-      ? tableQuestions.filter(q => {
-          if (!q.content) return false;
-          // Has direct answer
-          const hasDirectAnswer = q.option_a && q.option_b && q.option_c && q.option_d && q.correct_option;
-          // Has at least 1 valid sub-question
-          const validSubQuestions = q.subQuestions?.filter(
-            sq => sq.content && sq.option_a && sq.option_b && sq.option_c && sq.option_d && sq.correct_option
-          ) || [];
-          const hasValidSubQuestions = validSubQuestions.length > 0;
-          return hasDirectAnswer || hasValidSubQuestions;
-        })
-      : parsedQuestions;
+    const questionsToImport =
+      importMode === 'table'
+        ? tableQuestions.filter(isValidTableQuestion)
+        : parsedQuestions;
 
     if (!selectedSectionId || questionsToImport.length === 0) {
       toast.error('Vui lòng chọn phần và nhập câu hỏi');
@@ -601,18 +617,23 @@ const ImportQuestionsPage = () => {
           {selectedSectionId && (
             <Button
               onClick={handleImport}
-              disabled={isLoading || (importMode === 'table' 
-                ? tableQuestions.filter(q => q.content && q.option_a && q.option_b && q.option_c && q.option_d && q.correct_option).length === 0
-                : parsedQuestions.length === 0)}
+              disabled={
+                isLoading ||
+                (importMode === 'table'
+                  ? validTableQuestionsCount === 0
+                  : parsedQuestions.length === 0)
+              }
               size="lg"
               className="w-full gap-2"
             >
               <Upload className="h-5 w-5" />
-              {isLoading ? 'Đang import...' : `Import ${
-                importMode === 'table' 
-                  ? tableQuestions.filter(q => q.content && q.option_a && q.option_b && q.option_c && q.option_d && q.correct_option).length
-                  : parsedQuestions.length
-              } câu hỏi`}
+              {isLoading
+                ? 'Đang import...'
+                : `Import ${
+                    importMode === 'table'
+                      ? validTableQuestionsCount
+                      : parsedQuestions.length
+                  } câu hỏi`}
             </Button>
           )}
 
