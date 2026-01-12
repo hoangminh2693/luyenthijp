@@ -312,6 +312,11 @@ const ImportQuestionsPage = () => {
 
       if (result.success > 0) {
         toast.success(`Import thành công: ${messages.join(', ')}`);
+        // Reset form to import more questions quickly
+        setTableQuestions([]);
+        setParsedQuestions([]);
+        setFile(null);
+        setImportResult(null);
       } else if (result.duplicates > 0) {
         toast.warning(`Tất cả ${result.duplicates} câu hỏi đều trùng lặp`);
       }
