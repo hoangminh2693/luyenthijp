@@ -167,10 +167,14 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
     () =>
       questions.filter(
         (q) => {
+          if (!q.content) return false;
           const hasDirectAnswer = q.option_a && q.option_b && q.option_c && q.option_d && q.correct_option;
-          const hasSubQuestions = q.subQuestions && q.subQuestions.length > 0 && 
-            q.subQuestions.every(sq => sq.content && sq.option_a && sq.option_b && sq.option_c && sq.option_d && sq.correct_option);
-          return q.content && (hasDirectAnswer || hasSubQuestions);
+          // Có ít nhất 1 câu hỏi con hợp lệ
+          const validSubQuestions = q.subQuestions?.filter(
+            sq => sq.content && sq.option_a && sq.option_b && sq.option_c && sq.option_d && sq.correct_option
+          ) || [];
+          const hasValidSubQuestions = validSubQuestions.length > 0;
+          return hasDirectAnswer || hasValidSubQuestions;
         }
       ),
     [questions]

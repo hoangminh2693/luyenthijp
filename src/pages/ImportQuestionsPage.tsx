@@ -208,10 +208,12 @@ const ImportQuestionsPage = () => {
           if (!q.content) return false;
           // Has direct answer
           const hasDirectAnswer = q.option_a && q.option_b && q.option_c && q.option_d && q.correct_option;
-          // Has valid sub-questions
-          const hasSubQuestions = q.subQuestions && q.subQuestions.length > 0 && 
-            q.subQuestions.every(sq => sq.content && sq.option_a && sq.option_b && sq.option_c && sq.option_d && sq.correct_option);
-          return hasDirectAnswer || hasSubQuestions;
+          // Has at least 1 valid sub-question
+          const validSubQuestions = q.subQuestions?.filter(
+            sq => sq.content && sq.option_a && sq.option_b && sq.option_c && sq.option_d && sq.correct_option
+          ) || [];
+          const hasValidSubQuestions = validSubQuestions.length > 0;
+          return hasDirectAnswer || hasValidSubQuestions;
         })
       : parsedQuestions;
 
