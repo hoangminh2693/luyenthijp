@@ -1,10 +1,10 @@
 /**
  * LeaderboardPage - Bảng xếp hạng người dùng
  * Hiển thị xếp hạng theo % đúng của từng user theo section/level
- * Sử dụng Table component cho từng cấp độ
+ * % = số câu đúng distinct / tổng số câu trong database
  */
 import { useState, useEffect, useMemo } from 'react';
-import { Trophy, Medal, Award, User, Filter, ChevronDown, ChevronRight } from 'lucide-react';
+import { Trophy, Medal, Award, User, Filter, ChevronDown, ChevronRight, BookOpen } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Breadcrumb } from '@/components/layout/Header';
 import { useAuth } from '@/contexts/AuthContext';
@@ -58,12 +58,14 @@ interface UserStats {
   avatar_url: string | null;
   total_attempts: number;
   correct_count: number;
-  accuracy: number;
+  total_questions_in_db: number;
+  accuracy: number; // % = correct_count / total_questions_in_db
 }
 
 interface LevelLeaderboard {
   level: Level;
   users: UserStats[];
+  total_questions: number;
 }
 
 const LeaderboardPage = () => {
@@ -133,14 +135,63 @@ const LeaderboardPage = () => {
       setIsLoading(true);
 
       try {
-        // Build query for question_history with filters
-        let query = supabase
+        // 1. Lấy tổng số câu hỏi theo từng level (chỉ đếm câu cha - parent_id IS NULL)
+        let questionsQuery = supabase
+          .from('questions')
+          .select(`
+            id,
+            section_id,
+            sections!inner (
+              id,
+              level_id,
+              levels!inner (
+                id,
+                name,
+                subject_id,
+                order_index
+              )
+            )
+          `)
+          .is('parent_id', null);
+
+        if (selectedSubjectId !== 'all') {
+          questionsQuery = questionsQuery.eq('sections.levels.subject_id', selectedSubjectId);
+        }
+
+        const { data: questionsData, error: questionsError } = await questionsQuery;
+
+        if (questionsError) {
+          console.error('Error loading questions:', questionsError);
+          setLevelLeaderboards([]);
+          setIsLoading(false);
+          return;
+        }
+
+        // Đếm số câu hỏi theo level
+        const levelQuestionCount = new Map<string, number>();
+        const levelInfoMap = new Map<string, Level>();
+
+        (questionsData || []).forEach(q => {
+          const level = (q.sections as any)?.levels;
+          if (!level) return;
+
+          if (!levelInfoMap.has(level.id)) {
+            levelInfoMap.set(level.id, level);
+          }
+
+          levelQuestionCount.set(level.id, (levelQuestionCount.get(level.id) || 0) + 1);
+        });
+
+        // 2. Lấy history - đếm số câu distinct đã trả lời đúng
+        let historyQuery = supabase
           .from('question_history')
           .select(`
             user_id,
             is_correct,
             question_id,
             questions!inner (
+              id,
+              parent_id,
               section_id,
               sections!inner (
                 id,
@@ -156,12 +207,11 @@ const LeaderboardPage = () => {
           `)
           .not('user_id', 'is', null);
 
-        // Apply subject filter
         if (selectedSubjectId !== 'all') {
-          query = query.eq('questions.sections.levels.subject_id', selectedSubjectId);
+          historyQuery = historyQuery.eq('questions.sections.levels.subject_id', selectedSubjectId);
         }
 
-        const { data: historyData, error: historyError } = await query;
+        const { data: historyData, error: historyError } = await historyQuery;
 
         if (historyError) {
           console.error('Error loading history:', historyError);
@@ -179,7 +229,7 @@ const LeaderboardPage = () => {
           return;
         }
 
-        // Fetch profiles for these users
+        // Fetch profiles
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('user_id, display_name, avatar_url')
@@ -189,37 +239,37 @@ const LeaderboardPage = () => {
           console.error('Error loading profiles:', profilesError);
         }
 
-        // Create a map of user_id -> profile
         const profileMap = new Map(
           (profiles || []).map(p => [p.user_id, p])
         );
 
-        // Group by level, then by user
-        const levelUserMap = new Map<string, Map<string, { total: number; correct: number }>>();
-        const levelInfoMap = new Map<string, Level>();
+        // Group by level, then by user - đếm số câu DISTINCT đã trả lời đúng
+        const levelUserMap = new Map<string, Map<string, { correctQuestionIds: Set<string>; totalAttempts: number }>>();
 
         (historyData || []).forEach(h => {
           if (!h.user_id) return;
           
-          const section = (h.questions as any)?.sections;
+          const question = h.questions as any;
+          const section = question?.sections;
           const level = section?.levels;
           
           if (!level) return;
 
-          // Store level info
-          if (!levelInfoMap.has(level.id)) {
-            levelInfoMap.set(level.id, level);
-          }
+          // Xác định question_id thực sự (nếu là câu con thì lấy parent_id)
+          const effectiveQuestionId = question.parent_id || question.id;
 
-          // Initialize level in map
           if (!levelUserMap.has(level.id)) {
             levelUserMap.set(level.id, new Map());
           }
 
           const userMap = levelUserMap.get(level.id)!;
-          const existing = userMap.get(h.user_id) || { total: 0, correct: 0 };
-          existing.total++;
-          if (h.is_correct) existing.correct++;
+          const existing = userMap.get(h.user_id) || { correctQuestionIds: new Set<string>(), totalAttempts: 0 };
+          existing.totalAttempts++;
+          
+          if (h.is_correct) {
+            existing.correctQuestionIds.add(effectiveQuestionId);
+          }
+          
           userMap.set(h.user_id, existing);
         });
 
@@ -230,32 +280,38 @@ const LeaderboardPage = () => {
           const level = levelInfoMap.get(levelId);
           if (!level) return;
 
+          const totalQuestionsInLevel = levelQuestionCount.get(levelId) || 0;
+
           const users: UserStats[] = [];
           userMap.forEach((stats, userId) => {
             const profile = profileMap.get(userId);
+            const correctCount = stats.correctQuestionIds.size;
+            
             users.push({
               user_id: userId,
               display_name: profile?.display_name || 'Người dùng ẩn danh',
               avatar_url: profile?.avatar_url || null,
-              total_attempts: stats.total,
-              correct_count: stats.correct,
-              accuracy: stats.total > 0 ? (stats.correct / stats.total) * 100 : 0,
+              total_attempts: stats.totalAttempts,
+              correct_count: correctCount,
+              total_questions_in_db: totalQuestionsInLevel,
+              accuracy: totalQuestionsInLevel > 0 ? (correctCount / totalQuestionsInLevel) * 100 : 0,
             });
           });
 
-          // Sort by accuracy (desc), then by total_attempts (desc)
+          // Sort by accuracy (desc), then correct_count (desc), then total_attempts (asc)
           users.sort((a, b) => {
             if (b.accuracy !== a.accuracy) return b.accuracy - a.accuracy;
-            return b.total_attempts - a.total_attempts;
+            if (b.correct_count !== a.correct_count) return b.correct_count - a.correct_count;
+            return a.total_attempts - b.total_attempts;
           });
 
           leaderboards.push({
             level,
-            users: users.slice(0, 20), // Top 20 per level
+            users: users.slice(0, 20),
+            total_questions: totalQuestionsInLevel,
           });
         });
 
-        // Sort levels by order_index
         leaderboards.sort((a, b) => {
           const orderA = a.level.order_index ?? 0;
           const orderB = b.level.order_index ?? 0;
@@ -324,7 +380,7 @@ const LeaderboardPage = () => {
           </div>
           <h1 className="mb-2 text-3xl font-bold text-foreground">Bảng xếp hạng</h1>
           <p className="text-muted-foreground">
-            Xếp hạng theo từng cấp độ dựa trên tỷ lệ % trả lời đúng
+            Xếp hạng theo % câu đúng / tổng số câu trong kho đề
           </p>
         </div>
 
@@ -336,7 +392,6 @@ const LeaderboardPage = () => {
               <span className="text-sm font-medium">Lọc theo:</span>
             </div>
 
-            {/* Subject filter */}
             <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Tất cả môn học" />
@@ -383,7 +438,7 @@ const LeaderboardPage = () => {
                       <div className="text-left">
                         <h3 className="font-semibold text-foreground">{lb.level.name}</h3>
                         <p className="text-sm text-muted-foreground">
-                          {lb.users.length} người tham gia
+                          {lb.users.length} người tham gia • {lb.total_questions} câu hỏi
                         </p>
                       </div>
                     </div>
@@ -406,9 +461,9 @@ const LeaderboardPage = () => {
                           <TableRow className="bg-muted/30 hover:bg-muted/30">
                             <TableHead className="w-[80px] text-center">Hạng</TableHead>
                             <TableHead>Người dùng</TableHead>
-                            <TableHead className="w-[100px] text-center hidden sm:table-cell">Số câu</TableHead>
-                            <TableHead className="w-[100px] text-center hidden sm:table-cell">Đúng</TableHead>
-                            <TableHead className="w-[120px] text-center">Tỷ lệ</TableHead>
+                            <TableHead className="w-[120px] text-center hidden sm:table-cell">Tiến độ</TableHead>
+                            <TableHead className="w-[100px] text-center hidden sm:table-cell">Số lần làm</TableHead>
+                            <TableHead className="w-[120px] text-center">Hoàn thành</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -425,14 +480,12 @@ const LeaderboardPage = () => {
                                     : ''
                                 } ${rank <= 3 ? 'bg-muted/10' : ''}`}
                               >
-                                {/* Rank */}
                                 <TableCell className="text-center">
                                   <div className="flex justify-center">
                                     {renderRankBadge(rank)}
                                   </div>
                                 </TableCell>
 
-                                {/* User info */}
                                 <TableCell>
                                   <div className="flex items-center gap-3">
                                     {item.avatar_url ? (
@@ -455,25 +508,23 @@ const LeaderboardPage = () => {
                                           </Badge>
                                         )}
                                       </p>
-                                      {/* Mobile only: show stats */}
                                       <p className="text-xs text-muted-foreground sm:hidden">
-                                        {item.correct_count}/{item.total_attempts} câu đúng
+                                        {item.correct_count}/{item.total_questions_in_db} câu đúng
                                       </p>
                                     </div>
                                   </div>
                                 </TableCell>
 
-                                {/* Total attempts */}
                                 <TableCell className="text-center hidden sm:table-cell">
-                                  <span className="text-foreground">{item.total_attempts}</span>
+                                  <span className="text-foreground font-medium">
+                                    {item.correct_count}/{item.total_questions_in_db}
+                                  </span>
                                 </TableCell>
 
-                                {/* Correct count */}
                                 <TableCell className="text-center hidden sm:table-cell">
-                                  <span className="text-success">{item.correct_count}</span>
+                                  <span className="text-muted-foreground">{item.total_attempts}</span>
                                 </TableCell>
 
-                                {/* Accuracy */}
                                 <TableCell className="text-center">
                                   <Badge
                                     variant="secondary"
@@ -504,7 +555,7 @@ const LeaderboardPage = () => {
         {/* Info text */}
         {!isLoading && levelLeaderboards.length > 0 && (
           <p className="mt-6 text-center text-sm text-muted-foreground">
-            Chỉ hiển thị người dùng đã đăng nhập. Làm bài nhiều hơn để nâng hạng!
+            Xếp hạng dựa trên % câu hỏi đã trả lời đúng / tổng số câu hỏi trong kho đề. Chỉ hiển thị người dùng đã đăng nhập.
           </p>
         )}
       </div>

@@ -163,7 +163,7 @@ const StatisticsPage = () => {
   // Load statistics data
   useEffect(() => {
     const loadStatistics = async () => {
-      if (!user && !deviceId) return;
+      if (!deviceId) return;
       
       setIsLoading(true);
 
@@ -172,13 +172,15 @@ const StatisticsPage = () => {
         const startDate = startOfDay(subDays(new Date(), days - 1));
         const endDate = endOfDay(new Date());
 
-        // Build query
+        // Build query - Lấy dữ liệu theo cả user_id và device_id
         let query = supabase
           .from('question_history')
           .select(`
             is_correct,
             answered_at,
             question_id,
+            user_id,
+            device_id,
             questions!inner (
               section_id,
               sections!inner (
@@ -195,10 +197,12 @@ const StatisticsPage = () => {
           .gte('answered_at', startDate.toISOString())
           .lte('answered_at', endDate.toISOString());
 
-        // Filter by user or device
+        // Filter by user OR device - ưu tiên user_id nếu có, nếu không thì dùng device_id
         if (user) {
-          query = query.eq('user_id', user.id);
-        } else if (deviceId) {
+          // Nếu đã đăng nhập, lấy cả history của user và device
+          query = query.or(`user_id.eq.${user.id},device_id.eq.${deviceId}`);
+        } else {
+          // Nếu chưa đăng nhập, lấy theo device_id
           query = query.eq('device_id', deviceId);
         }
 
