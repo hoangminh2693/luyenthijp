@@ -4,7 +4,7 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, LogIn, Shield, Pencil, Trash2, Search, ChevronDown, Save, X, Image, Volume2 } from 'lucide-react';
+import { Loader2, LogIn, Shield, Pencil, Trash2, Search, ChevronDown, Save, X, Image, Volume2, ArrowRightLeft } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -82,7 +82,7 @@ interface ParentQuestionRow extends QuestionRow {
   subQuestions?: QuestionRow[];
 }
 
-type EditQuestionForm = Partial<QuestionRow> & { subQuestions?: SubQuestion[] };
+type EditQuestionForm = Partial<QuestionRow> & { subQuestions?: SubQuestion[]; newSectionId?: string };
 
 const stripHtml = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -253,6 +253,7 @@ const ManageQuestionsPage = () => {
       explanation: question.explanation || '',
       image_url: question.image_url || undefined,
       audio_url: question.audio_url || undefined,
+      newSectionId: question.section_id,
       subQuestions: (question.subQuestions ?? []).map((sq) => ({
         id: sq.id,
         content: sq.content,
@@ -337,6 +338,9 @@ const ManageQuestionsPage = () => {
         await deleteStorageFile(oldAudioUrl);
       }
 
+      // Determine target section (possibly changed)
+      const targetSectionId = editForm.newSectionId || editingQuestion.section_id;
+
       // 1) Update parent
       const { error: parentErr } = await supabase
         .from('questions')
@@ -350,6 +354,7 @@ const ManageQuestionsPage = () => {
           explanation: safeExplanation,
           image_url: newImageUrl,
           audio_url: newAudioUrl,
+          section_id: targetSectionId,
         })
         .eq('id', editingQuestion.id);
 
@@ -396,7 +401,7 @@ const ManageQuestionsPage = () => {
           if (upErr) throw upErr;
         } else {
           const { error: insErr } = await supabase.from('questions').insert({
-            section_id: editingQuestion.section_id,
+            section_id: targetSectionId,
             parent_id: editingQuestion.id,
             content: sanitizeRichText(sq.content || ''),
             option_a: sanitizeRichText(sq.option_a || ''),
@@ -410,11 +415,20 @@ const ManageQuestionsPage = () => {
         }
       }
 
-      // 3) Refresh list after save
+      // 3) Update sub-questions section_id if section changed
+      if (targetSectionId !== editingQuestion.section_id) {
+        const { error: updateChildrenErr } = await supabase
+          .from('questions')
+          .update({ section_id: targetSectionId })
+          .eq('parent_id', editingQuestion.id);
+        if (updateChildrenErr) throw updateChildrenErr;
+      }
+
+      // 4) Refresh list after save - re-fetch current section
       const { data: refreshed, error: refreshErr } = await supabase
         .from('questions')
         .select('*')
-        .eq('section_id', editingQuestion.section_id)
+        .eq('section_id', selectedSectionId)
         .order('created_at', { ascending: true });
 
       if (refreshErr) throw refreshErr;
@@ -431,7 +445,7 @@ const ManageQuestionsPage = () => {
     } finally {
       setSaving(false);
     }
-  }, [editingQuestion, editForm, queryClient]);
+  }, [editingQuestion, editForm, queryClient, selectedSectionId]);
 
   // Delete question (xóa cả câu hỏi con & file media)
   const handleDelete = useCallback(async () => {
@@ -803,6 +817,43 @@ const ManageQuestionsPage = () => {
                         disabled={saving}
                       />
                     </div>
+                  </div>
+
+                  {/* Move to different section */}
+                  <div>
+                    <label className="mb-1 flex items-center gap-2 text-sm font-medium">
+                      <ArrowRightLeft className="h-4 w-4" />
+                      Chuyển sang mục khác
+                    </label>
+                    <Select
+                      value={editForm.newSectionId || ''}
+                      onValueChange={(v) => setEditForm((prev) => ({ ...prev, newSectionId: v }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn mục đích" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sections.map((s) => {
+                          const level = levels.find((l) => l.id === s.level_id);
+                          const subject = subjects.find((sub) => sub.id === level?.subject_id);
+                          const label = subject && level
+                            ? `${subject.name} > ${level.name} > ${s.name}`
+                            : level
+                            ? `${level.name} > ${s.name}`
+                            : s.name;
+                          return (
+                            <SelectItem key={s.id} value={s.id}>
+                              {label}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    {editForm.newSectionId && editForm.newSectionId !== editingQuestion?.section_id && (
+                      <p className="mt-1 text-xs text-warning">
+                        ⚠️ Câu hỏi sẽ được chuyển sang mục khác sau khi lưu
+                      </p>
+                    )}
                   </div>
 
                   <div>
