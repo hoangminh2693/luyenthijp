@@ -1,60 +1,97 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, BookOpen, CheckCircle, Clock, Users } from "lucide-react";
+import { 
+  ArrowRight, 
+  BookOpen, 
+  CheckCircle, 
+  Clock, 
+  Users, 
+  GraduationCap,
+  Trophy,
+  BarChart3,
+  Target,
+  Sparkles,
+  Shield,
+  Smartphone
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 /**
  * Index Page - Trang chủ của ứng dụng luyện đề thi
+ * Chuẩn SEO, content-first, sẵn sàng cho AdSense
  */
 const Index = () => {
   const features = [
     {
-      icon: BookOpen,
-      title: "Đa dạng môn học",
-      description: "Nhiều môn học khác nhau từ JLPT, BJT, 宅建 và nhiều môn khác",
+      icon: GraduationCap,
+      title: "Đa dạng kỳ thi",
+      description: "Luyện tập các kỳ thi phổ biến tại Nhật: JLPT (N5-N1), BJT, 宅建, và nhiều chứng chỉ nghề nghiệp khác.",
     },
     {
       icon: CheckCircle,
       title: "Chấm điểm tự động",
-      description: "Xem kết quả ngay lập tức sau khi hoàn thành bài thi",
+      description: "Hệ thống chấm điểm tự động, hiển thị đáp án đúng và giải thích chi tiết cho từng câu hỏi.",
     },
     {
       icon: Clock,
       title: "Luyện tập mọi lúc",
-      description: "Truy cập và luyện tập bất cứ khi nào bạn muốn",
+      description: "Truy cập 24/7 từ mọi thiết bị. Phù hợp với lịch trình bận rộn của người đi làm tại Nhật.",
     },
+    {
+      icon: BarChart3,
+      title: "Theo dõi tiến độ",
+      description: "Thống kê chi tiết về tiến trình học tập, điểm mạnh/yếu để điều chỉnh phương pháp ôn luyện.",
+    },
+    {
+      icon: Trophy,
+      title: "Bảng xếp hạng",
+      description: "Thi đua với cộng đồng, xem thứ hạng theo từng môn học và cấp độ để có thêm động lực.",
+    },
+    {
+      icon: Smartphone,
+      title: "Tối ưu di động",
+      description: "Giao diện thân thiện với điện thoại, dễ dàng luyện tập trên tàu điện hay trong giờ nghỉ.",
+    },
+  ];
+
+  const examTypes = [
+    { name: "JLPT", description: "Kỳ thi năng lực Nhật ngữ", levels: "N5 - N1" },
+    { name: "BJT", description: "Tiếng Nhật thương mại", levels: "J5 - J1+" },
+    { name: "宅建", description: "Chứng chỉ bất động sản", levels: "Cơ bản - Nâng cao" },
+    { name: "Khác", description: "Các chứng chỉ nghề nghiệp", levels: "Đa cấp độ" },
   ];
 
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
       <section className="relative overflow-hidden">
-        {/* Background decoration */}
+        {/* Background decoration - subtle, không gây xao nhãng */}
         <div className="absolute inset-0 -z-10">
           <div className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-primary/5 blur-3xl" />
-          <div className="absolute right-0 bottom-0 translate-x-1/2 translate-y-1/2 h-[400px] w-[400px] rounded-full bg-accent/5 blur-3xl" />
         </div>
 
-        <div className="container py-20 md:py-32">
-          <div className="mx-auto max-w-3xl text-center">
+        <div className="container py-16 md:py-24">
+          <div className="mx-auto max-w-4xl text-center">
             {/* Badge */}
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary animate-fade-in-up">
-              <Users className="h-4 w-4" />
-              Nền tảng luyện đề thi trực tuyến
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
+              <Sparkles className="h-4 w-4" />
+              Miễn phí • Dễ sử dụng • Hiệu quả
             </div>
 
-            {/* Heading */}
-            <h1 className="mb-6 text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl animate-fade-in-up opacity-0 stagger-1">
-              Luyện đề thi trắc nghiệm <span className="text-gradient">hiệu quả</span>
+            {/* H1 - Main heading - SEO optimized */}
+            <h1 className="mb-6 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl md:text-5xl lg:text-6xl">
+              Luyện đề thi trắc nghiệm{" "}
+              <span className="text-primary">các kỳ thi tại Nhật</span>
             </h1>
 
-            {/* Description */}
-            <p className="mb-8 text-lg text-muted-foreground md:text-xl animate-fade-in-up opacity-0 stagger-2">
-              Hệ thống luyện đề thi trắc nghiệm đa dạng môn học, giúp bạn ôn tập và chuẩn bị tốt nhất cho các kỳ thi
-              quan trọng.
+            {/* Description - SEO content */}
+            <p className="mb-8 text-lg text-muted-foreground md:text-xl max-w-3xl mx-auto leading-relaxed">
+              Nền tảng luyện thi trực tuyến miễn phí dành cho người Việt tại Nhật Bản. 
+              Luyện tập JLPT, BJT, 宅建 và nhiều kỳ thi khác với hàng nghìn câu hỏi 
+              chất lượng, giải thích chi tiết và theo dõi tiến độ học tập.
             </p>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:justify-center animate-fade-in-up opacity-0 stagger-3">
+            <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
               <Button asChild size="lg" className="gap-2 text-base">
                 <Link to="/subjects">
                   Bắt đầu luyện đề
@@ -62,33 +99,113 @@ const Index = () => {
                 </Link>
               </Button>
               <Button asChild variant="outline" size="lg" className="text-base">
-                <a href="#features">Tìm hiểu thêm</a>
+                <Link to="/about">Tìm hiểu thêm</Link>
               </Button>
+            </div>
+
+            {/* Trust indicators */}
+            <div className="mt-12 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-success" />
+                <span>Miễn phí hoàn toàn</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" />
+                <span>Cộng đồng người Việt tại Nhật</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Target className="h-4 w-4 text-warning" />
+                <span>Đề thi cập nhật thường xuyên</span>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="border-t border-border bg-card py-20">
+      {/* Exam Types Section */}
+      <section className="border-t border-border bg-muted/30 py-16">
         <div className="container">
-          <div className="mb-12 text-center">
-            <h2 className="mb-4 text-3xl font-bold text-foreground">Tại sao chọn chúng tôi?</h2>
-            <p className="text-muted-foreground">Những tính năng nổi bật giúp bạn học tập hiệu quả hơn</p>
+          <div className="mb-10 text-center">
+            <h2 className="mb-3 text-2xl font-bold text-foreground md:text-3xl">
+              Các kỳ thi được hỗ trợ
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Chúng tôi liên tục cập nhật và mở rộng ngân hàng đề thi để phục vụ 
+              nhu cầu luyện tập đa dạng của cộng đồng
+            </p>
           </div>
 
-          <div className="grid gap-8 md:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {examTypes.map((exam) => (
+              <Link
+                key={exam.name}
+                to="/subjects"
+                className="group rounded-xl border border-border bg-card p-6 transition-all duration-200 hover:border-primary/30 hover:shadow-md"
+              >
+                <h3 className="text-xl font-bold text-foreground mb-1 group-hover:text-primary transition-colors">
+                  {exam.name}
+                </h3>
+                <p className="text-sm text-muted-foreground mb-2">{exam.description}</p>
+                <p className="text-xs text-primary font-medium">{exam.levels}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section id="features" className="py-16">
+        <div className="container">
+          <div className="mb-12 text-center">
+            <h2 className="mb-3 text-2xl font-bold text-foreground md:text-3xl">
+              Tại sao chọn Luyện Đề Thi?
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Những tính năng được thiết kế riêng cho người Việt đang học tập và làm việc tại Nhật Bản
+            </p>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {features.map((feature, index) => (
               <div
                 key={feature.title}
-                className="group rounded-xl border border-border bg-background p-6 transition-all duration-300 hover:border-primary/30 hover:shadow-card-hover animate-fade-in-up opacity-0"
-                style={{ animationDelay: `${index * 0.1}s` }}
+                className="group rounded-xl border border-border bg-card p-6 transition-all duration-200 hover:border-primary/30 hover:shadow-md"
               >
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
                   <feature.icon className="h-6 w-6" />
                 </div>
                 <h3 className="mb-2 text-lg font-semibold text-foreground">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground">{feature.description}</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">{feature.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How it works Section */}
+      <section className="border-t border-border bg-muted/30 py-16">
+        <div className="container">
+          <div className="mb-12 text-center">
+            <h2 className="mb-3 text-2xl font-bold text-foreground md:text-3xl">
+              Cách sử dụng
+            </h2>
+            <p className="text-muted-foreground">
+              Chỉ cần 3 bước đơn giản để bắt đầu luyện tập
+            </p>
+          </div>
+
+          <div className="grid gap-8 md:grid-cols-3">
+            {[
+              { step: 1, title: "Chọn môn thi", desc: "Chọn kỳ thi bạn muốn luyện tập từ danh sách các môn được hỗ trợ" },
+              { step: 2, title: "Chọn cấp độ & phần", desc: "Chọn cấp độ phù hợp và phần kiến thức bạn muốn tập trung ôn luyện" },
+              { step: 3, title: "Làm bài & xem kết quả", desc: "Làm bài, nộp đáp án và xem kết quả với giải thích chi tiết" },
+            ].map((item) => (
+              <div key={item.step} className="text-center">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold text-xl">
+                  {item.step}
+                </div>
+                <h3 className="mb-2 text-lg font-semibold text-foreground">{item.title}</h3>
+                <p className="text-sm text-muted-foreground">{item.desc}</p>
               </div>
             ))}
           </div>
@@ -96,26 +213,33 @@ const Index = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20">
+      <section className="py-16">
         <div className="container">
-          <div className="relative overflow-hidden rounded-2xl gradient-hero p-8 text-center md:p-16">
+          <div className="relative overflow-hidden rounded-2xl bg-primary p-8 text-center md:p-16">
             <div className="relative z-10">
-              <h2 className="mb-4 text-3xl font-bold text-primary-foreground md:text-4xl">Sẵn sàng bắt đầu?</h2>
-              <p className="mb-8 text-primary-foreground/80">Chọn môn học và bắt đầu luyện đề ngay bây giờ</p>
+              <h2 className="mb-4 text-2xl font-bold text-primary-foreground md:text-3xl">
+                Sẵn sàng bắt đầu luyện tập?
+              </h2>
+              <p className="mb-8 text-primary-foreground/80 max-w-xl mx-auto">
+                Hãy chọn môn học và bắt đầu luyện đề ngay bây giờ. 
+                Mỗi ngày một chút, thành công sẽ đến!
+              </p>
               <Button asChild size="lg" variant="secondary" className="gap-2 text-base font-semibold">
                 <Link to="/subjects">
+                  <BookOpen className="h-5 w-5" />
                   Chọn môn học
-                  <ArrowRight className="h-5 w-5" />
                 </Link>
               </Button>
             </div>
-
-            {/* Decorative elements */}
-            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary-foreground/10 blur-3xl" />
-            <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-primary-foreground/10 blur-3xl" />
           </div>
         </div>
       </section>
+
+      {/* Ad placeholder - future AdSense location */}
+      {/* This space intentionally left for future ad placement */}
+      <div className="container pb-8">
+        {/* Ad slot placeholder - do not remove */}
+      </div>
     </div>
   );
 };

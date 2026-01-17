@@ -19,6 +19,11 @@ import ManageSubjectsPage from "./pages/ManageSubjectsPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import StatisticsPage from "./pages/StatisticsPage";
 import AuthPage from "./pages/AuthPage";
+import AboutPage from "./pages/AboutPage";
+import ContactPage from "./pages/ContactPage";
+import PrivacyPage from "./pages/PrivacyPage";
+import TermsPage from "./pages/TermsPage";
+import BlogPage from "./pages/BlogPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -80,6 +85,12 @@ const App = () => (
                 {/* Quản lý câu hỏi (Admin) */}
                 <Route path="/manage-questions" element={<ManageQuestionsPage />} />
                 
+                {/* Static pages */}
+                <Route path="/about" element={<AboutPage />} />
+                <Route path="/contact" element={<ContactPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/blog" element={<BlogPage />} />
                 
                 {/* Trang 404 */}
                 <Route path="*" element={<NotFound />} />
