@@ -4,10 +4,11 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, LogIn, Shield, Pencil, Trash2, Search, ChevronDown, Save, X, Image, Volume2, ArrowRightLeft } from 'lucide-react';
+import { Loader2, LogIn, Shield, Pencil, Trash2, Search, ChevronDown, Save, X, Image, Volume2, ArrowRightLeft, CheckSquare, Square, MoveRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Breadcrumb } from '@/components/layout/Header';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -141,6 +142,12 @@ const ManageQuestionsPage = () => {
   const [deletingQuestion, setDeletingQuestion] = useState<ParentQuestionRow | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Bulk selection state
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<Set<string>>(new Set());
+  const [bulkMoveDialogOpen, setBulkMoveDialogOpen] = useState(false);
+  const [bulkTargetSectionId, setBulkTargetSectionId] = useState<string>('');
+  const [bulkMoving, setBulkMoving] = useState(false);
+
   // Get selected subject
   const selectedSubject = subjects.find((s) => s.id === selectedSubjectId);
   const subjectHasLevels = selectedSubject?.has_levels ?? true;
@@ -187,22 +194,26 @@ const ManageQuestionsPage = () => {
     setSelectedLevelId('');
     setSelectedSectionId('');
     setQuestions([]);
+    setSelectedQuestionIds(new Set());
   }, [selectedSubjectId]);
 
   useEffect(() => {
     setSelectedSectionId('');
     setQuestions([]);
+    setSelectedQuestionIds(new Set());
   }, [selectedLevelId]);
 
   // Load questions when section changes
   useEffect(() => {
     if (!selectedSectionId) {
       setQuestions([]);
+      setSelectedQuestionIds(new Set());
       return;
     }
 
     const loadQuestions = async () => {
       setLoadingQuestions(true);
+      setSelectedQuestionIds(new Set());
       try {
         const { data, error } = await supabase
           .from('questions')
@@ -238,6 +249,78 @@ const ManageQuestionsPage = () => {
       return children.some((c) => stripHtml(c.content).toLowerCase().includes(query));
     });
   }, [groupedQuestions, searchQuery]);
+
+  // Bulk selection handlers
+  const toggleQuestionSelection = useCallback((questionId: string) => {
+    setSelectedQuestionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(questionId)) {
+        next.delete(questionId);
+      } else {
+        next.add(questionId);
+      }
+      return next;
+    });
+  }, []);
+
+  const selectAllFiltered = useCallback(() => {
+    setSelectedQuestionIds(new Set(filteredQuestions.map((q) => q.id)));
+  }, [filteredQuestions]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedQuestionIds(new Set());
+  }, []);
+
+  const isAllSelected = filteredQuestions.length > 0 && selectedQuestionIds.size === filteredQuestions.length;
+
+  // Bulk move handler
+  const handleBulkMove = useCallback(async () => {
+    if (selectedQuestionIds.size === 0 || !bulkTargetSectionId) return;
+
+    setBulkMoving(true);
+    try {
+      const questionIds = Array.from(selectedQuestionIds);
+      
+      // Update parent questions
+      const { error: parentErr } = await supabase
+        .from('questions')
+        .update({ section_id: bulkTargetSectionId })
+        .in('id', questionIds);
+
+      if (parentErr) throw parentErr;
+
+      // Update all sub-questions of these parents
+      const { error: childErr } = await supabase
+        .from('questions')
+        .update({ section_id: bulkTargetSectionId })
+        .in('parent_id', questionIds);
+
+      if (childErr) throw childErr;
+
+      // Refresh list
+      const { data: refreshed, error: refreshErr } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('section_id', selectedSectionId)
+        .order('created_at', { ascending: true });
+
+      if (refreshErr) throw refreshErr;
+      setQuestions((refreshed as unknown as QuestionRow[]) || []);
+
+      // Invalidate questions cache
+      queryClient.invalidateQueries({ queryKey: ['questions'] });
+
+      toast.success(`Đã chuyển ${questionIds.length} câu hỏi`);
+      setBulkMoveDialogOpen(false);
+      setBulkTargetSectionId('');
+      setSelectedQuestionIds(new Set());
+    } catch (err) {
+      console.error('Error bulk moving questions:', err);
+      toast.error('Lỗi khi chuyển câu hỏi');
+    } finally {
+      setBulkMoving(false);
+    }
+  }, [selectedQuestionIds, bulkTargetSectionId, selectedSectionId, queryClient]);
 
   // Open edit dialog (câu cha, kèm câu con)
   const openEditDialog = useCallback(async (question: ParentQuestionRow) => {
@@ -634,6 +717,29 @@ const ManageQuestionsPage = () => {
             )}
           </div>
 
+          {/* Bulk action bar */}
+          {selectedSectionId && selectedQuestionIds.size > 0 && (
+            <div className="mb-4 flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 p-3">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-foreground">
+                  Đã chọn {selectedQuestionIds.size} câu hỏi
+                </span>
+                <Button variant="ghost" size="sm" onClick={clearSelection}>
+                  Bỏ chọn
+                </Button>
+              </div>
+              <Button
+                variant="default"
+                size="sm"
+                className="gap-2"
+                onClick={() => setBulkMoveDialogOpen(true)}
+              >
+                <MoveRight className="h-4 w-4" />
+                Chuyển mục
+              </Button>
+            </div>
+          )}
+
           {/* Questions list */}
           {selectedSectionId && (
             <div className="space-y-3">
@@ -649,14 +755,43 @@ const ManageQuestionsPage = () => {
                 </div>
               ) : (
                 <>
-                  <p className="text-sm text-muted-foreground">
-                    Hiển thị {filteredQuestions.length} / {groupedQuestions.length} câu hỏi
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Hiển thị {filteredQuestions.length} / {groupedQuestions.length} câu hỏi
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-2 text-xs"
+                      onClick={isAllSelected ? clearSelection : selectAllFiltered}
+                    >
+                      {isAllSelected ? (
+                        <>
+                          <Square className="h-3.5 w-3.5" />
+                          Bỏ chọn tất cả
+                        </>
+                      ) : (
+                        <>
+                          <CheckSquare className="h-3.5 w-3.5" />
+                          Chọn tất cả ({filteredQuestions.length})
+                        </>
+                      )}
+                    </Button>
+                  </div>
                   {filteredQuestions.map((q, index) => (
                     <div
                       key={q.id}
-                      className="flex items-start gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-muted/30"
+                      className={`flex items-start gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/30 ${
+                        selectedQuestionIds.has(q.id) 
+                          ? 'border-primary/50 bg-primary/5' 
+                          : 'border-border bg-card'
+                      }`}
                     >
+                      <Checkbox
+                        checked={selectedQuestionIds.has(q.id)}
+                        onCheckedChange={() => toggleQuestionSelection(q.id)}
+                        className="mt-1"
+                      />
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
                         {index + 1}
                       </span>
@@ -911,6 +1046,68 @@ const ManageQuestionsPage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk Move Dialog */}
+      <Dialog open={bulkMoveDialogOpen} onOpenChange={(open) => !open && setBulkMoveDialogOpen(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Chuyển {selectedQuestionIds.size} câu hỏi</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="mb-2 block text-sm font-medium">Chọn mục đích</label>
+            <Select
+              value={bulkTargetSectionId}
+              onValueChange={setBulkTargetSectionId}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Chọn mục đích..." />
+              </SelectTrigger>
+              <SelectContent>
+                {sections
+                  .filter((s) => s.id !== selectedSectionId)
+                  .map((s) => {
+                    const level = levels.find((l) => l.id === s.level_id);
+                    const subject = subjects.find((sub) => sub.id === level?.subject_id);
+                    const label = subject && level
+                      ? `${subject.name} > ${level.name} > ${s.name}`
+                      : level
+                      ? `${level.name} > ${s.name}`
+                      : s.name;
+                    return (
+                      <SelectItem key={s.id} value={s.id}>
+                        {label}
+                      </SelectItem>
+                    );
+                  })}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setBulkMoveDialogOpen(false);
+                setBulkTargetSectionId('');
+              }}
+              disabled={bulkMoving}
+            >
+              Hủy
+            </Button>
+            <Button
+              onClick={handleBulkMove}
+              disabled={bulkMoving || !bulkTargetSectionId}
+              className="gap-2"
+            >
+              {bulkMoving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <MoveRight className="h-4 w-4" />
+              )}
+              Chuyển
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
