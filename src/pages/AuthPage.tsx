@@ -1,25 +1,81 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Loader2, Calendar, Globe, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { supabase } from '@/integrations/supabase/client';
 
+// List of countries
+const COUNTRIES = [
+  { code: 'JP', name: 'Nhật Bản' },
+  { code: 'VN', name: 'Việt Nam' },
+  { code: 'US', name: 'Hoa Kỳ' },
+  { code: 'KR', name: 'Hàn Quốc' },
+  { code: 'CN', name: 'Trung Quốc' },
+  { code: 'TW', name: 'Đài Loan' },
+  { code: 'TH', name: 'Thái Lan' },
+  { code: 'PH', name: 'Philippines' },
+  { code: 'ID', name: 'Indonesia' },
+  { code: 'MY', name: 'Malaysia' },
+  { code: 'SG', name: 'Singapore' },
+  { code: 'AU', name: 'Úc' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'UK', name: 'Anh' },
+  { code: 'DE', name: 'Đức' },
+  { code: 'FR', name: 'Pháp' },
+  { code: 'OTHER', name: 'Khác' },
+];
+
+// List of inappropriate words to filter (add more as needed)
+const INAPPROPRIATE_WORDS = [
+  'admin', 'moderator', 'root', 'system', 'support',
+  'fuck', 'shit', 'damn', 'ass', 'dick', 'pussy', 'bitch',
+  'đụ', 'địt', 'lồn', 'buồi', 'cặc', 'đéo', 'vãi', 'đĩ', 'chó',
+];
+
+// Validation schemas
 const emailSchema = z.string().email('Email không hợp lệ');
 const passwordSchema = z.string().min(6, 'Mật khẩu phải có ít nhất 6 ký tự');
+const nicknameSchema = z.string()
+  .min(3, 'Nickname phải có ít nhất 3 ký tự')
+  .max(20, 'Nickname không được quá 20 ký tự')
+  .regex(/^[a-zA-Z0-9_]+$/, 'Nickname chỉ được chứa chữ cái, số và dấu gạch dưới')
+  .refine((val) => {
+    const lowerVal = val.toLowerCase();
+    return !INAPPROPRIATE_WORDS.some(word => lowerVal.includes(word));
+  }, 'Nickname chứa từ ngữ không phù hợp');
 
 const AuthPage = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  const [nickname, setNickname] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [country, setCountry] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [isCheckingNickname, setIsCheckingNickname] = useState(false);
+  const [nicknameAvailable, setNicknameAvailable] = useState<boolean | null>(null);
+  const [errors, setErrors] = useState<{ 
+    email?: string; 
+    password?: string; 
+    nickname?: string;
+    dateOfBirth?: string;
+    country?: string;
+  }>({});
 
-  const { user, signIn, signUp, signInWithGoogle } = useAuth();
+  const { user, signIn, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -28,8 +84,48 @@ const AuthPage = () => {
     }
   }, [user, navigate]);
 
+  // Check nickname availability with debounce
+  useEffect(() => {
+    if (!nickname || nickname.length < 3) {
+      setNicknameAvailable(null);
+      return;
+    }
+
+    const nicknameResult = nicknameSchema.safeParse(nickname);
+    if (!nicknameResult.success) {
+      setNicknameAvailable(null);
+      return;
+    }
+
+    const checkNickname = async () => {
+      setIsCheckingNickname(true);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('nickname')
+          .eq('nickname', nickname)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error checking nickname:', error);
+          setNicknameAvailable(null);
+        } else {
+          setNicknameAvailable(!data);
+        }
+      } catch (err) {
+        console.error('Error checking nickname:', err);
+        setNicknameAvailable(null);
+      } finally {
+        setIsCheckingNickname(false);
+      }
+    };
+
+    const timer = setTimeout(checkNickname, 500);
+    return () => clearTimeout(timer);
+  }, [nickname]);
+
   const validateForm = () => {
-    const newErrors: { email?: string; password?: string } = {};
+    const newErrors: typeof errors = {};
 
     const emailResult = emailSchema.safeParse(email);
     if (!emailResult.success) {
@@ -39,6 +135,32 @@ const AuthPage = () => {
     const passwordResult = passwordSchema.safeParse(password);
     if (!passwordResult.success) {
       newErrors.password = passwordResult.error.errors[0].message;
+    }
+
+    if (!isLogin) {
+      const nicknameResult = nicknameSchema.safeParse(nickname);
+      if (!nicknameResult.success) {
+        newErrors.nickname = nicknameResult.error.errors[0].message;
+      } else if (nicknameAvailable === false) {
+        newErrors.nickname = 'Nickname này đã được sử dụng';
+      }
+
+      if (!dateOfBirth) {
+        newErrors.dateOfBirth = 'Vui lòng chọn ngày sinh';
+      } else {
+        const birthDate = new Date(dateOfBirth);
+        const today = new Date();
+        const age = today.getFullYear() - birthDate.getFullYear();
+        if (age < 13) {
+          newErrors.dateOfBirth = 'Bạn phải từ 13 tuổi trở lên';
+        } else if (age > 120) {
+          newErrors.dateOfBirth = 'Ngày sinh không hợp lệ';
+        }
+      }
+
+      if (!country) {
+        newErrors.country = 'Vui lòng chọn quốc gia';
+      }
     }
 
     setErrors(newErrors);
@@ -65,16 +187,49 @@ const AuthPage = () => {
           toast.success('Đăng nhập thành công!');
         }
       } else {
-        const { error } = await signUp(email, password, displayName);
+        // Custom signup with additional profile data
+        const redirectUrl = `${window.location.origin}/`;
+        
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: redirectUrl,
+            data: {
+              full_name: nickname,
+            },
+          },
+        });
+
         if (error) {
           if (error.message.includes('already registered')) {
             toast.error('Email này đã được đăng ký');
           } else {
             toast.error(error.message);
           }
-        } else {
+        } else if (data.user) {
+          // Update profile with additional data
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({
+              nickname,
+              date_of_birth: dateOfBirth,
+              country,
+              display_name: nickname,
+            })
+            .eq('user_id', data.user.id);
+
+          if (profileError) {
+            console.error('Error updating profile:', profileError);
+            // Don't block signup, just log the error
+          }
+
           toast.success('Đăng ký thành công! Bạn có thể đăng nhập ngay.');
           setIsLogin(true);
+          // Reset form
+          setNickname('');
+          setDateOfBirth('');
+          setCountry('');
         }
       }
     } catch (err) {
@@ -97,6 +252,16 @@ const AuthPage = () => {
       setIsLoading(false);
     }
   };
+
+  // Calculate max date for date of birth (must be at least 13 years old)
+  const maxDate = new Date();
+  maxDate.setFullYear(maxDate.getFullYear() - 13);
+  const maxDateStr = maxDate.toISOString().split('T')[0];
+
+  // Min date (reasonable limit - 120 years ago)
+  const minDate = new Date();
+  minDate.setFullYear(minDate.getFullYear() - 120);
+  const minDateStr = minDate.toISOString().split('T')[0];
 
   return (
     <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-background px-4 py-12">
@@ -154,25 +319,115 @@ const AuthPage = () => {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
-              <div>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder="Tên hiển thị"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    className="pl-10"
-                    disabled={isLoading}
-                  />
+              <>
+                {/* Nickname */}
+                <div className="space-y-2">
+                  <Label htmlFor="nickname">Nickname (hiển thị trên bảng xếp hạng)</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="nickname"
+                      type="text"
+                      placeholder="vd: player_2024"
+                      value={nickname}
+                      onChange={(e) => {
+                        setNickname(e.target.value);
+                        setErrors((prev) => ({ ...prev, nickname: undefined }));
+                      }}
+                      className="pl-10 pr-10"
+                      disabled={isLoading}
+                      maxLength={20}
+                    />
+                    {isCheckingNickname && (
+                      <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                    )}
+                    {!isCheckingNickname && nicknameAvailable === true && nickname.length >= 3 && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-success text-sm">✓</span>
+                    )}
+                    {!isCheckingNickname && nicknameAvailable === false && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-destructive text-sm">✗</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    3-20 ký tự, chỉ chữ cái, số và dấu gạch dưới
+                  </p>
+                  {errors.nickname && (
+                    <p className="flex items-center gap-1 text-sm text-destructive">
+                      <AlertCircle className="h-3 w-3" />
+                      {errors.nickname}
+                    </p>
+                  )}
                 </div>
-              </div>
+
+                {/* Date of Birth */}
+                <div className="space-y-2">
+                  <Label htmlFor="dateOfBirth">Ngày sinh</Label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="dateOfBirth"
+                      type="date"
+                      value={dateOfBirth}
+                      onChange={(e) => {
+                        setDateOfBirth(e.target.value);
+                        setErrors((prev) => ({ ...prev, dateOfBirth: undefined }));
+                      }}
+                      className="pl-10"
+                      disabled={isLoading}
+                      max={maxDateStr}
+                      min={minDateStr}
+                    />
+                  </div>
+                  {errors.dateOfBirth && (
+                    <p className="flex items-center gap-1 text-sm text-destructive">
+                      <AlertCircle className="h-3 w-3" />
+                      {errors.dateOfBirth}
+                    </p>
+                  )}
+                </div>
+
+                {/* Country */}
+                <div className="space-y-2">
+                  <Label htmlFor="country">Nơi đang sống</Label>
+                  <Select 
+                    value={country} 
+                    onValueChange={(value) => {
+                      setCountry(value);
+                      setErrors((prev) => ({ ...prev, country: undefined }));
+                    }}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger className="w-full">
+                      <div className="flex items-center gap-2">
+                        <Globe className="h-4 w-4 text-muted-foreground" />
+                        <SelectValue placeholder="Chọn quốc gia..." />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COUNTRIES.map((c) => (
+                        <SelectItem key={c.code} value={c.code}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.country && (
+                    <p className="flex items-center gap-1 text-sm text-destructive">
+                      <AlertCircle className="h-3 w-3" />
+                      {errors.country}
+                    </p>
+                  )}
+                </div>
+              </>
             )}
 
-            <div>
+            {/* Email */}
+            <div className="space-y-2">
+              {!isLogin && <Label htmlFor="email">Email</Label>}
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
+                  id="email"
                   type="email"
                   placeholder="Email"
                   value={email}
@@ -185,14 +440,20 @@ const AuthPage = () => {
                 />
               </div>
               {errors.email && (
-                <p className="mt-1 text-sm text-error">{errors.email}</p>
+                <p className="flex items-center gap-1 text-sm text-destructive">
+                  <AlertCircle className="h-3 w-3" />
+                  {errors.email}
+                </p>
               )}
             </div>
 
-            <div>
+            {/* Password */}
+            <div className="space-y-2">
+              {!isLogin && <Label htmlFor="password">Mật khẩu</Label>}
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
+                  id="password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="Mật khẩu"
                   value={password}
@@ -216,11 +477,14 @@ const AuthPage = () => {
                 </button>
               </div>
               {errors.password && (
-                <p className="mt-1 text-sm text-error">{errors.password}</p>
+                <p className="flex items-center gap-1 text-sm text-destructive">
+                  <AlertCircle className="h-3 w-3" />
+                  {errors.password}
+                </p>
               )}
             </div>
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full" disabled={isLoading || (!isLogin && nicknameAvailable === false)}>
               {isLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : isLogin ? (

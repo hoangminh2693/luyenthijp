@@ -7,6 +7,9 @@ interface Profile {
   user_id: string;
   display_name: string | null;
   avatar_url: string | null;
+  nickname: string | null;
+  date_of_birth: string | null;
+  country: string | null;
 }
 
 interface AuthContextType {
