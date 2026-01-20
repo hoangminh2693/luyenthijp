@@ -142,18 +142,6 @@ const LeaderboardPage = () => {
   };
 
   // Get time range filter date
-  const getTimeRangeDate = (range: TimeRange): Date | null => {
-    const now = new Date();
-    switch (range) {
-      case 'week':
-        return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      case 'month':
-        return new Date(now.getFullYear(), now.getMonth(), 1);
-      case 'all':
-        return null;
-    }
-  };
-
   // Expand all levels by default when data loads
   useEffect(() => {
     if (levelLeaderboards.length > 0) {
@@ -161,7 +149,7 @@ const LeaderboardPage = () => {
     }
   }, [levelLeaderboards]);
 
-  // Load leaderboard data grouped by level
+  // Load leaderboard data using the database function
   useEffect(() => {
     if (!selectedSubjectId) {
       setLevelLeaderboards([]);
@@ -175,104 +163,22 @@ const LeaderboardPage = () => {
       setIsLoading(true);
 
       try {
-        const timeFilterDate = getTimeRangeDate(timeRange);
+        // Call the security definer function to get leaderboard data
+        const { data: leaderboardData, error: leaderboardError } = await supabase
+          .rpc('get_leaderboard_by_level', {
+            p_level_id: selectedLevelId !== 'all' ? selectedLevelId : null,
+            p_subject_id: selectedSubjectId,
+            p_time_range: timeRange
+          });
 
-        // 1. Get total questions per level
-        let questionsQuery = supabase
-          .from('questions')
-          .select(`
-            id,
-            section_id,
-            sections!inner (
-              id,
-              level_id,
-              levels!inner (
-                id,
-                name,
-                subject_id,
-                order_index
-              )
-            )
-          `)
-          .is('parent_id', null)
-          .eq('sections.levels.subject_id', selectedSubjectId);
-
-        if (selectedLevelId !== 'all') {
-          questionsQuery = questionsQuery.eq('sections.level_id', selectedLevelId);
-        }
-
-        const { data: questionsData, error: questionsError } = await questionsQuery;
-
-        if (questionsError) {
-          console.error('Error loading questions:', questionsError);
+        if (leaderboardError) {
+          console.error('Error loading leaderboard:', leaderboardError);
           setLevelLeaderboards([]);
           setIsLoading(false);
           return;
         }
 
-        // Count questions per level
-        const levelQuestionCount = new Map<string, number>();
-        const levelInfoMap = new Map<string, Level>();
-
-        (questionsData || []).forEach(q => {
-          const level = (q.sections as any)?.levels;
-          if (!level) return;
-
-          if (!levelInfoMap.has(level.id)) {
-            levelInfoMap.set(level.id, level);
-          }
-
-          levelQuestionCount.set(level.id, (levelQuestionCount.get(level.id) || 0) + 1);
-        });
-
-        // 2. Get history with time filter
-        let historyQuery = supabase
-          .from('question_history')
-          .select(`
-            user_id,
-            is_correct,
-            question_id,
-            answered_at,
-            questions!inner (
-              id,
-              parent_id,
-              section_id,
-              sections!inner (
-                id,
-                level_id,
-                levels!inner (
-                  id,
-                  name,
-                  subject_id,
-                  order_index
-                )
-              )
-            )
-          `)
-          .not('user_id', 'is', null)
-          .eq('questions.sections.levels.subject_id', selectedSubjectId);
-
-        if (selectedLevelId !== 'all') {
-          historyQuery = historyQuery.eq('questions.sections.level_id', selectedLevelId);
-        }
-
-        if (timeFilterDate) {
-          historyQuery = historyQuery.gte('answered_at', timeFilterDate.toISOString());
-        }
-
-        const { data: historyData, error: historyError } = await historyQuery;
-
-        if (historyError) {
-          console.error('Error loading history:', historyError);
-          setLevelLeaderboards([]);
-          setIsLoading(false);
-          return;
-        }
-
-        // Get unique user IDs
-        const userIds = [...new Set((historyData || []).map(h => h.user_id).filter(Boolean))] as string[];
-
-        if (userIds.length === 0) {
+        if (!leaderboardData || leaderboardData.length === 0) {
           setLevelLeaderboards([]);
           setCurrentUserRank(null);
           setCurrentUserStats(null);
@@ -281,82 +187,55 @@ const LeaderboardPage = () => {
           return;
         }
 
-        // Fetch profiles
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('user_id, display_name, avatar_url')
-          .in('user_id', userIds);
+        // Group data by level
+        const levelMap = new Map<string, {
+          level: Level;
+          users: UserStats[];
+          total_questions: number;
+        }>();
 
-        if (profilesError) {
-          console.error('Error loading profiles:', profilesError);
-        }
-
-        const profileMap = new Map(
-          (profiles || []).map(p => [p.user_id, p])
-        );
-
-        // Group by level, then by user
-        const levelUserMap = new Map<string, Map<string, { correctQuestionIds: Set<string>; totalAttempts: number }>>();
-
-        (historyData || []).forEach(h => {
-          if (!h.user_id) return;
-          
-          const question = h.questions as any;
-          const section = question?.sections;
-          const level = section?.levels;
-          
-          if (!level) return;
-
-          const effectiveQuestionId = question.parent_id || question.id;
-
-          if (!levelUserMap.has(level.id)) {
-            levelUserMap.set(level.id, new Map());
+        leaderboardData.forEach((row: any) => {
+          if (!levelMap.has(row.level_id)) {
+            levelMap.set(row.level_id, {
+              level: {
+                id: row.level_id,
+                name: row.level_name,
+                slug: '',
+                subject_id: selectedSubjectId,
+                order_index: row.level_order_index
+              },
+              users: [],
+              total_questions: Number(row.total_questions_in_level)
+            });
           }
 
-          const userMap = levelUserMap.get(level.id)!;
-          const existing = userMap.get(h.user_id) || { correctQuestionIds: new Set<string>(), totalAttempts: 0 };
-          existing.totalAttempts++;
-          
-          if (h.is_correct) {
-            existing.correctQuestionIds.add(effectiveQuestionId);
-          }
-          
-          userMap.set(h.user_id, existing);
+          const levelData = levelMap.get(row.level_id)!;
+          const correctCount = Number(row.distinct_correct);
+          const totalQuestions = Number(row.total_questions_in_level);
+          const accuracy = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
+          const totalScore = correctCount * 10 + Math.floor(accuracy);
+
+          levelData.users.push({
+            user_id: row.user_id,
+            display_name: row.display_name || 'Người dùng ẩn danh',
+            avatar_url: row.avatar_url,
+            total_attempts: Number(row.total_attempts),
+            correct_count: correctCount,
+            total_questions_in_db: totalQuestions,
+            accuracy,
+            total_score: totalScore
+          });
         });
 
-        // Build leaderboards per level
+        // Build leaderboards and sort users within each level
         const leaderboards: LevelLeaderboard[] = [];
         let foundCurrentUser = false;
         let currentUserOverallRank: number | null = null;
         let currentUserOverallStats: UserStats | null = null;
 
-        levelUserMap.forEach((userMap, levelId) => {
-          const level = levelInfoMap.get(levelId);
-          if (!level) return;
-
-          const totalQuestionsInLevel = levelQuestionCount.get(levelId) || 0;
-
-          const users: UserStats[] = [];
-          userMap.forEach((stats, userId) => {
-            const profile = profileMap.get(userId);
-            const correctCount = stats.correctQuestionIds.size;
-            const accuracy = totalQuestionsInLevel > 0 ? (correctCount / totalQuestionsInLevel) * 100 : 0;
-            const totalScore = correctCount * 10 + Math.floor(accuracy);
-            
-            users.push({
-              user_id: userId,
-              display_name: profile?.display_name || 'Người dùng ẩn danh',
-              avatar_url: profile?.avatar_url || null,
-              total_attempts: stats.totalAttempts,
-              correct_count: correctCount,
-              total_questions_in_db: totalQuestionsInLevel,
-              accuracy,
-              total_score: totalScore,
-            });
-          });
-
-          // Sort by score (desc), then accuracy (desc), then attempts (asc)
-          users.sort((a, b) => {
+        levelMap.forEach((levelData) => {
+          // Sort users by score (desc), accuracy (desc), attempts (asc)
+          levelData.users.sort((a, b) => {
             if (b.total_score !== a.total_score) return b.total_score - a.total_score;
             if (b.accuracy !== a.accuracy) return b.accuracy - a.accuracy;
             return a.total_attempts - b.total_attempts;
@@ -364,16 +243,16 @@ const LeaderboardPage = () => {
 
           // Find current user rank
           if (user && !foundCurrentUser) {
-            const userIndex = users.findIndex(u => u.user_id === user.id);
+            const userIndex = levelData.users.findIndex(u => u.user_id === user.id);
             if (userIndex !== -1) {
               foundCurrentUser = true;
               currentUserOverallRank = userIndex + 1;
-              currentUserOverallStats = users[userIndex];
+              currentUserOverallStats = levelData.users[userIndex];
               
               // Calculate distance to top 10
-              if (userIndex >= 10 && users.length > 10) {
-                const top10LastScore = users[9].total_score;
-                setDistanceToTop10(top10LastScore - users[userIndex].total_score);
+              if (userIndex >= 10 && levelData.users.length > 10) {
+                const top10LastScore = levelData.users[9].total_score;
+                setDistanceToTop10(top10LastScore - levelData.users[userIndex].total_score);
               } else {
                 setDistanceToTop10(null);
               }
@@ -381,12 +260,13 @@ const LeaderboardPage = () => {
           }
 
           leaderboards.push({
-            level,
-            users: users.slice(0, 20),
-            total_questions: totalQuestionsInLevel,
+            level: levelData.level,
+            users: levelData.users.slice(0, 20),
+            total_questions: levelData.total_questions
           });
         });
 
+        // Sort leaderboards by level order
         leaderboards.sort((a, b) => {
           const orderA = a.level.order_index ?? 0;
           const orderB = b.level.order_index ?? 0;
