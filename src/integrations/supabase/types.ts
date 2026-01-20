@@ -274,9 +274,49 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      leaderboard_stats: {
+        Row: {
+          attempts_this_month: number | null
+          attempts_this_week: number | null
+          correct_count: number | null
+          correct_this_month: number | null
+          correct_this_week: number | null
+          distinct_correct: number | null
+          level_id: string | null
+          total_attempts: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sections_level_id_fkey"
+            columns: ["level_id"]
+            isOneToOne: false
+            referencedRelation: "levels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      get_leaderboard_by_level: {
+        Args: {
+          p_level_id?: string
+          p_subject_id?: string
+          p_time_range?: string
+        }
+        Returns: {
+          avatar_url: string
+          correct_count: number
+          display_name: string
+          distinct_correct: number
+          level_id: string
+          level_name: string
+          level_order_index: number
+          total_attempts: number
+          total_questions_in_level: number
+          user_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
