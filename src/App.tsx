@@ -19,6 +19,7 @@ import ManageSubjectsPage from "./pages/ManageSubjectsPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import StatisticsPage from "./pages/StatisticsPage";
 import AuthPage from "./pages/AuthPage";
+import ProfilePage from "./pages/ProfilePage";
 import AboutPage from "./pages/AboutPage";
 import ContactPage from "./pages/ContactPage";
 import PrivacyPage from "./pages/PrivacyPage";
@@ -48,6 +49,7 @@ const App = () => (
                 
                 {/* Auth */}
                 <Route path="/auth" element={<AuthPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
                 
                 {/* Danh sách môn học */}
                 <Route path="/subjects" element={<SubjectsPage />} />
