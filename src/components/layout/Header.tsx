@@ -135,12 +135,19 @@ export function Header() {
                   </div>
                 </div>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link to="/profile" className="gap-2">
+                    <User className="h-4 w-4" />
+                    Hồ sơ cá nhân
+                  </Link>
+                </DropdownMenuItem>
                 {isAdmin && (
                   <DropdownMenuItem className="gap-2 text-primary">
-                    <User className="h-4 w-4" />
+                    <Settings className="h-4 w-4" />
                     Admin
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut} className="gap-2 text-destructive">
                   <LogOut className="h-4 w-4" />
                   Đăng xuất
