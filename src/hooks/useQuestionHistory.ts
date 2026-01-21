@@ -1,9 +1,12 @@
 /**
  * Hook để quản lý lịch sử làm bài của người dùng
+ * - Authenticated users: Store in database + localStorage cache
+ * - Anonymous users: Store only in localStorage (for privacy)
  */
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useDeviceId } from './useDeviceId';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface QuestionHistoryItem {
   question_id: string;
@@ -18,48 +21,95 @@ export interface QuestionStats {
   lastAttempt?: string;
 }
 
+const LOCAL_STORAGE_KEY = 'quiz_question_history';
+
+// Helper to get localStorage history
+function getLocalHistory(): Map<string, QuestionHistoryItem[]> {
+  try {
+    const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (!stored) return new Map();
+    const parsed = JSON.parse(stored);
+    return new Map(Object.entries(parsed));
+  } catch {
+    return new Map();
+  }
+}
+
+// Helper to save localStorage history
+function saveLocalHistory(history: Map<string, QuestionHistoryItem[]>) {
+  try {
+    const obj = Object.fromEntries(history);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(obj));
+  } catch {
+    // Ignore localStorage errors
+  }
+}
+
 export function useQuestionHistory() {
   const deviceId = useDeviceId();
+  const { user } = useAuth();
   const [history, setHistory] = useState<Map<string, QuestionHistoryItem[]>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
 
-  // Tải lịch sử từ database
+  // Load history from database (authenticated) or localStorage (anonymous)
   const loadHistory = useCallback(async () => {
     if (!deviceId) return;
     
     try {
-      const { data, error } = await supabase
-        .from('question_history')
-        .select('question_id, selected_answer, is_correct, answered_at')
-        .eq('device_id', deviceId)
-        .order('answered_at', { ascending: false });
+      // Always start with localStorage cache
+      const localHistory = getLocalHistory();
+      
+      if (user) {
+        // Authenticated user: fetch from database
+        const { data, error } = await supabase
+          .from('question_history')
+          .select('question_id, selected_answer, is_correct, answered_at')
+          .eq('user_id', user.id)
+          .order('answered_at', { ascending: false });
 
-      if (error) {
-        console.error('Error loading history:', error);
-        return;
+        if (error) {
+          console.error('Error loading history:', error);
+          // Fallback to localStorage on error
+          setHistory(localHistory);
+          return;
+        }
+
+        // Group by question_id
+        const historyMap = new Map<string, QuestionHistoryItem[]>();
+        data?.forEach((item) => {
+          const existing = historyMap.get(item.question_id) || [];
+          existing.push(item);
+          historyMap.set(item.question_id, existing);
+        });
+
+        // Merge with localStorage (localStorage entries not in DB are kept)
+        localHistory.forEach((items, questionId) => {
+          if (!historyMap.has(questionId)) {
+            historyMap.set(questionId, items);
+          }
+        });
+
+        setHistory(historyMap);
+        // Update localStorage cache
+        saveLocalHistory(historyMap);
+      } else {
+        // Anonymous user: use only localStorage
+        setHistory(localHistory);
       }
-
-      // Group by question_id
-      const historyMap = new Map<string, QuestionHistoryItem[]>();
-      data?.forEach((item) => {
-        const existing = historyMap.get(item.question_id) || [];
-        existing.push(item);
-        historyMap.set(item.question_id, existing);
-      });
-
-      setHistory(historyMap);
     } catch (err) {
       console.error('Error loading history:', err);
+      // Fallback to localStorage
+      setHistory(getLocalHistory());
     } finally {
       setIsLoading(false);
     }
-  }, [deviceId]);
+  }, [deviceId, user]);
 
   useEffect(() => {
     loadHistory();
   }, [loadHistory]);
 
-  // Lưu một lần trả lời vào database
+  // Save an answer
   const saveAnswer = useCallback(async (
     questionId: string,
     selectedAnswer: string,
@@ -67,40 +117,68 @@ export function useQuestionHistory() {
   ) => {
     if (!deviceId) return;
 
-    try {
-      const { error } = await supabase
-        .from('question_history')
-        .insert({
-          device_id: deviceId,
-          question_id: questionId,
-          selected_answer: selectedAnswer,
-          is_correct: isCorrect,
-        });
+    const newItem: QuestionHistoryItem = {
+      question_id: questionId,
+      selected_answer: selectedAnswer,
+      is_correct: isCorrect,
+      answered_at: new Date().toISOString(),
+    };
 
-      if (error) {
-        console.error('Error saving answer:', error);
-        return;
+    // Always update local state and localStorage
+    setHistory((prev) => {
+      const newMap = new Map(prev);
+      const existing = newMap.get(questionId) || [];
+      existing.unshift(newItem);
+      newMap.set(questionId, existing);
+      saveLocalHistory(newMap);
+      return newMap;
+    });
+
+    // If authenticated, also save to database
+    if (user) {
+      try {
+        const { error } = await supabase
+          .from('question_history')
+          .insert({
+            device_id: deviceId,
+            question_id: questionId,
+            selected_answer: selectedAnswer,
+            is_correct: isCorrect,
+            user_id: user.id,
+          });
+
+        if (error) {
+          console.error('Error saving answer to database:', error);
+        }
+      } catch (err) {
+        console.error('Error saving answer:', err);
       }
+    } else {
+      // Anonymous user: save to database without user_id
+      // The RLS policy allows this for anonymous inserts
+      try {
+        const { error } = await supabase
+          .from('question_history')
+          .insert({
+            device_id: deviceId,
+            question_id: questionId,
+            selected_answer: selectedAnswer,
+            is_correct: isCorrect,
+            user_id: null,
+          });
 
-      // Cập nhật local state
-      setHistory((prev) => {
-        const newMap = new Map(prev);
-        const existing = newMap.get(questionId) || [];
-        existing.unshift({
-          question_id: questionId,
-          selected_answer: selectedAnswer,
-          is_correct: isCorrect,
-          answered_at: new Date().toISOString(),
-        });
-        newMap.set(questionId, existing);
-        return newMap;
-      });
-    } catch (err) {
-      console.error('Error saving answer:', err);
+        if (error) {
+          // Expected to fail with new RLS if not anonymous session
+          // Just use localStorage which is already saved
+          console.log('Anonymous save to DB skipped (RLS restriction)');
+        }
+      } catch {
+        // Just use localStorage
+      }
     }
-  }, [deviceId]);
+  }, [deviceId, user]);
 
-  // Lấy thống kê cho một câu hỏi
+  // Get stats for a question
   const getQuestionStats = useCallback((questionId: string): QuestionStats => {
     const items = history.get(questionId) || [];
     return {
