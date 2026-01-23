@@ -208,20 +208,30 @@ const AuthPage = () => {
             toast.error(error.message);
           }
         } else if (data.user) {
-          // Update profile with additional data
+          // Update public profile with nickname
           const { error: profileError } = await supabase
             .from('profiles')
             .update({
               nickname,
-              date_of_birth: dateOfBirth,
-              country,
               display_name: nickname,
             })
             .eq('user_id', data.user.id);
 
           if (profileError) {
             console.error('Error updating profile:', profileError);
-            // Don't block signup, just log the error
+          }
+
+          // Save private data (date_of_birth, country) to profile_private
+          const { error: privateError } = await supabase
+            .from('profile_private')
+            .upsert({
+              user_id: data.user.id,
+              date_of_birth: dateOfBirth,
+              country,
+            }, { onConflict: 'user_id' });
+
+          if (privateError) {
+            console.error('Error saving private profile:', privateError);
           }
 
           toast.success('Đăng ký thành công! Bạn có thể đăng nhập ngay.');

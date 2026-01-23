@@ -8,6 +8,9 @@ interface Profile {
   display_name: string | null;
   avatar_url: string | null;
   nickname: string | null;
+}
+
+interface ProfilePrivate {
   date_of_birth: string | null;
   country: string | null;
 }
@@ -16,6 +19,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
+  profilePrivate: ProfilePrivate | null;
   isAdmin: boolean;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -30,6 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [profilePrivate, setProfilePrivate] = useState<ProfilePrivate | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -44,10 +49,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           setTimeout(() => {
             fetchProfile(session.user.id);
+            fetchProfilePrivate(session.user.id);
             checkAdminRole(session.user.id);
           }, 0);
         } else {
           setProfile(null);
+          setProfilePrivate(null);
           setIsAdmin(false);
         }
       }
@@ -60,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (session?.user) {
         fetchProfile(session.user.id);
+        fetchProfilePrivate(session.user.id);
         checkAdminRole(session.user.id);
       }
       setIsLoading(false);
@@ -72,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, user_id, display_name, avatar_url, nickname')
         .eq('user_id', userId)
         .single();
 
@@ -82,6 +90,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(data);
     } catch (err) {
       console.error('Error fetching profile:', err);
+    }
+  };
+
+  const fetchProfilePrivate = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profile_private')
+        .select('date_of_birth, country')
+        .eq('user_id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching profile private:', error);
+      }
+      setProfilePrivate(data);
+    } catch (err) {
+      console.error('Error fetching profile private:', err);
     }
   };
 
@@ -147,6 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         session,
         profile,
+        profilePrivate,
         isAdmin,
         isLoading,
         signIn,

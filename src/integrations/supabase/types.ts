@@ -55,12 +55,34 @@ export type Database = {
           },
         ]
       }
-      profiles: {
+      profile_private: {
         Row: {
-          avatar_url: string | null
           country: string | null
           created_at: string
           date_of_birth: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          country?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
           display_name: string | null
           id: string
           nickname: string | null
@@ -69,9 +91,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
-          country?: string | null
           created_at?: string
-          date_of_birth?: string | null
           display_name?: string | null
           id?: string
           nickname?: string | null
@@ -80,9 +100,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
-          country?: string | null
           created_at?: string
-          date_of_birth?: string | null
           display_name?: string | null
           id?: string
           nickname?: string | null
@@ -94,30 +112,27 @@ export type Database = {
       question_history: {
         Row: {
           answered_at: string
-          device_id: string
           id: string
           is_correct: boolean
           question_id: string
           selected_answer: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           answered_at?: string
-          device_id: string
           id?: string
           is_correct: boolean
           question_id: string
           selected_answer: string
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           answered_at?: string
-          device_id?: string
           id?: string
           is_correct?: boolean
           question_id?: string
           selected_answer?: string
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {

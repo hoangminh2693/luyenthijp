@@ -23,7 +23,7 @@ const INAPPROPRIATE_WORDS = [
 ];
 
 export default function ProfilePage() {
-  const { user, profile, isLoading: authLoading } = useAuth();
+  const { user, profile, profilePrivate, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -48,11 +48,16 @@ export default function ProfilePage() {
     if (profile) {
       setDisplayName(profile.display_name || '');
       setNickname(profile.nickname || '');
-      setDateOfBirth(profile.date_of_birth || '');
-      setCountry(profile.country || '');
       setAvatarUrl(profile.avatar_url || '');
     }
   }, [profile]);
+
+  useEffect(() => {
+    if (profilePrivate) {
+      setDateOfBirth(profilePrivate.date_of_birth || '');
+      setCountry(profilePrivate.country || '');
+    }
+  }, [profilePrivate]);
 
   const validateNickname = (value: string): string => {
     if (!value) return '';
@@ -176,19 +181,29 @@ export default function ProfilePage() {
 
     setIsLoading(true);
     try {
+      // Update public profile
       const { error } = await supabase
         .from('profiles')
         .update({
           display_name: displayName || null,
           nickname: nickname || null,
-          date_of_birth: dateOfBirth || null,
-          country: country || null,
           avatar_url: avatarUrl || null,
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', user.id);
 
       if (error) throw error;
+
+      // Update private profile (date_of_birth, country)
+      const { error: privateError } = await supabase
+        .from('profile_private')
+        .upsert({
+          user_id: user.id,
+          date_of_birth: dateOfBirth || null,
+          country: country || null,
+        }, { onConflict: 'user_id' });
+
+      if (privateError) throw privateError;
 
       toast({
         title: 'Thành công',

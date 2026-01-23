@@ -5,7 +5,6 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useDeviceId } from './useDeviceId';
 import { useAuth } from '@/contexts/AuthContext';
 
 export interface QuestionHistoryItem {
@@ -46,15 +45,12 @@ function saveLocalHistory(history: Map<string, QuestionHistoryItem[]>) {
 }
 
 export function useQuestionHistory() {
-  const deviceId = useDeviceId();
   const { user } = useAuth();
   const [history, setHistory] = useState<Map<string, QuestionHistoryItem[]>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
 
   // Load history from database (authenticated) or localStorage (anonymous)
   const loadHistory = useCallback(async () => {
-    if (!deviceId) return;
-    
     try {
       // Always start with localStorage cache
       const localHistory = getLocalHistory();
@@ -103,7 +99,7 @@ export function useQuestionHistory() {
     } finally {
       setIsLoading(false);
     }
-  }, [deviceId, user]);
+  }, [user]);
 
   useEffect(() => {
     loadHistory();
@@ -115,8 +111,6 @@ export function useQuestionHistory() {
     selectedAnswer: string,
     isCorrect: boolean
   ) => {
-    if (!deviceId) return;
-
     const newItem: QuestionHistoryItem = {
       question_id: questionId,
       selected_answer: selectedAnswer,
@@ -140,7 +134,6 @@ export function useQuestionHistory() {
         const { error } = await supabase
           .from('question_history')
           .insert({
-            device_id: deviceId,
             question_id: questionId,
             selected_answer: selectedAnswer,
             is_correct: isCorrect,
@@ -153,30 +146,9 @@ export function useQuestionHistory() {
       } catch (err) {
         console.error('Error saving answer:', err);
       }
-    } else {
-      // Anonymous user: save to database without user_id
-      // The RLS policy allows this for anonymous inserts
-      try {
-        const { error } = await supabase
-          .from('question_history')
-          .insert({
-            device_id: deviceId,
-            question_id: questionId,
-            selected_answer: selectedAnswer,
-            is_correct: isCorrect,
-            user_id: null,
-          });
-
-        if (error) {
-          // Expected to fail with new RLS if not anonymous session
-          // Just use localStorage which is already saved
-          console.log('Anonymous save to DB skipped (RLS restriction)');
-        }
-      } catch {
-        // Just use localStorage
-      }
     }
-  }, [deviceId, user]);
+    // Anonymous users: already saved to localStorage above, no database insert
+  }, [user]);
 
   // Get stats for a question
   const getQuestionStats = useCallback((questionId: string): QuestionStats => {
