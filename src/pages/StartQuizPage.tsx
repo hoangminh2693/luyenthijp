@@ -1,9 +1,10 @@
 /**
  * StartQuizPage - Trang cấu hình trước khi bắt đầu làm bài
  * Bao gồm giới thiệu chi tiết về kỳ thi và cho phép chọn số lượng câu hỏi
+ * Yêu cầu đăng nhập trước khi làm bài
  */
 import { useState, useEffect } from 'react';
-import { useParams, Navigate, useNavigate } from 'react-router-dom';
+import { useParams, Navigate, useNavigate, Link } from 'react-router-dom';
 import { 
   Play, 
   Clock, 
@@ -14,13 +15,15 @@ import {
   BookOpen, 
   CheckCircle,
   Info,
-  Lightbulb
+  Lightbulb,
+  LogIn
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/layout/Header';
 import { QuestionCountSelector } from '@/components/quiz/QuestionCountSelector';
 import { useSubjectBySlug, useLevelBySlug, useSectionBySlug } from '@/hooks/useSections';
 import { useQuestionCount } from '@/hooks/useQuestions';
+import { useAuth } from '@/contexts/AuthContext';
 
 const QUESTION_COUNTS = [5, 10, 20, 50];
 
@@ -117,6 +120,7 @@ const StartQuizPage = () => {
     sectionSlug: string;
   }>();
   const navigate = useNavigate();
+  const { user, isLoading: authLoading } = useAuth();
 
   // Fetch dữ liệu từ Supabase
   const { data: subject, isLoading: loadingSubject } = useSubjectBySlug(subjectSlug);
@@ -135,7 +139,7 @@ const StartQuizPage = () => {
     }
   }, [totalQuestions]);
 
-  const isLoading = loadingSubject || loadingLevel || loadingSection || loadingCount;
+  const isLoading = authLoading || loadingSubject || loadingLevel || loadingSection || loadingCount;
 
   // Loading state
   if (isLoading) {
@@ -150,6 +154,38 @@ const StartQuizPage = () => {
   if (!subject) return <Navigate to="/subjects" replace />;
   if (!level) return <Navigate to={`/subjects/${subjectSlug}`} replace />;
   if (!section) return <Navigate to={`/subjects/${subjectSlug}/${levelSlug}`} replace />;
+
+  // Yêu cầu đăng nhập trước khi làm bài
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container py-8">
+          <div className="mx-auto max-w-md text-center">
+            <LogIn className="mx-auto mb-4 h-12 w-12 text-primary" />
+            <h1 className="mb-2 text-2xl font-bold text-foreground">Đăng nhập để làm bài</h1>
+            <p className="mb-6 text-muted-foreground">
+              Bạn cần đăng nhập để làm bài và lưu kết quả vào lịch sử học tập. 
+              Điều này giúp bạn theo dõi tiến trình và xem thống kê cá nhân.
+            </p>
+            <div className="space-y-3">
+              <Link to="/auth" state={{ from: `/start/${subjectSlug}/${levelSlug}/${sectionSlug}` }}>
+                <Button className="w-full gap-2">
+                  <LogIn className="h-4 w-4" />
+                  Đăng nhập ngay
+                </Button>
+              </Link>
+              <p className="text-sm text-muted-foreground">
+                Chưa có tài khoản?{' '}
+                <Link to="/auth" className="text-primary hover:underline">
+                  Đăng ký miễn phí
+                </Link>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleStartQuiz = () => {
     navigate(`/quiz/${subjectSlug}/${levelSlug}/${sectionSlug}?count=${questionCount}`);
