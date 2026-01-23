@@ -16,7 +16,6 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { Breadcrumb } from '@/components/layout/Header';
 import { useAuth } from '@/contexts/AuthContext';
-import { useDeviceId } from '@/hooks/useDeviceId';
 import {
   Select,
   SelectContent,
@@ -111,7 +110,6 @@ const chartConfig = {
 
 const StatisticsPage = () => {
   const { user } = useAuth();
-  const deviceId = useDeviceId();
   
   // Filter states
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -163,8 +161,6 @@ const StatisticsPage = () => {
   // Load statistics data
   useEffect(() => {
     const loadStatistics = async () => {
-      if (!deviceId) return;
-      
       setIsLoading(true);
 
       try {
@@ -172,15 +168,20 @@ const StatisticsPage = () => {
         const startDate = startOfDay(subDays(new Date(), days - 1));
         const endDate = endOfDay(new Date());
 
-        // Build query - Lấy dữ liệu theo cả user_id và device_id
-        let query = supabase
+        // Build query - Only for authenticated users (device_id removed for privacy)
+        if (!user) {
+          // Anonymous users: no database history, use localStorage
+          setIsLoading(false);
+          return;
+        }
+
+        const query = supabase
           .from('question_history')
           .select(`
             is_correct,
             answered_at,
             question_id,
             user_id,
-            device_id,
             questions!inner (
               section_id,
               sections!inner (
@@ -194,26 +195,19 @@ const StatisticsPage = () => {
               )
             )
           `)
+          .eq('user_id', user.id)
           .gte('answered_at', startDate.toISOString())
           .lte('answered_at', endDate.toISOString());
 
-        // Filter by user OR device - ưu tiên user_id nếu có, nếu không thì dùng device_id
-        if (user) {
-          // Nếu đã đăng nhập, lấy cả history của user và device
-          query = query.or(`user_id.eq.${user.id},device_id.eq.${deviceId}`);
-        } else {
-          // Nếu chưa đăng nhập, lấy theo device_id
-          query = query.eq('device_id', deviceId);
-        }
-
         // Apply filters
+        let finalQuery = query;
         if (selectedLevelId !== 'all') {
-          query = query.eq('questions.sections.level_id', selectedLevelId);
+          finalQuery = query.eq('questions.sections.level_id', selectedLevelId);
         } else if (selectedSubjectId !== 'all') {
-          query = query.eq('questions.sections.levels.subject_id', selectedSubjectId);
+          finalQuery = query.eq('questions.sections.levels.subject_id', selectedSubjectId);
         }
 
-        const { data, error } = await query;
+        const { data, error } = await finalQuery;
 
         if (error) {
           console.error('Error loading statistics:', error);
@@ -302,7 +296,7 @@ const StatisticsPage = () => {
     };
 
     loadStatistics();
-  }, [user, deviceId, selectedSubjectId, selectedLevelId, timeRange]);
+  }, [user, selectedSubjectId, selectedLevelId, timeRange]);
 
   // Pie chart data
   const pieData = [
