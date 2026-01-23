@@ -279,15 +279,24 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
             <span className="ml-auto text-xs text-muted-foreground">(Bôi đen text trong ô rồi bấm nút)</span>
           </div>
 
-          {/* Questions list */}
-          <div className="space-y-4">
+          {/* Questions list - styled as table */}
+          <div className="rounded-lg border border-border overflow-hidden">
+            {/* Table header */}
+            <div className="grid grid-cols-[48px_1fr_auto] gap-3 bg-muted/50 px-4 py-3 border-b border-border">
+              <span className="text-sm font-medium text-muted-foreground">#</span>
+              <span className="text-sm font-medium text-muted-foreground">Nội dung câu hỏi</span>
+              <span className="text-sm font-medium text-muted-foreground">Thao tác</span>
+            </div>
+
+            {/* Table rows */}
+            <div className="divide-y divide-border">
             {questions.map((q, index) => (
               <Collapsible
                 key={index}
                 open={expandedRows.has(index)}
                 onOpenChange={() => toggleRowExpanded(index)}
               >
-                <div className="rounded-lg border border-border bg-card">
+                <div className="bg-card hover:bg-muted/20 transition-colors">
                   {/* Header row - always visible */}
                   <div className="flex items-start gap-3 p-4">
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground mt-1">
@@ -466,6 +475,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                 </div>
               </Collapsible>
             ))}
+            </div>
           </div>
 
           <div className="flex items-center justify-between">

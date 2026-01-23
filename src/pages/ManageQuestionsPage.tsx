@@ -754,47 +754,55 @@ const ManageQuestionsPage = () => {
                   </p>
                 </div>
               ) : (
-                <>
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">
-                      Hiển thị {filteredQuestions.length} / {groupedQuestions.length} câu hỏi
-                    </p>
+                <div className="rounded-lg border border-border overflow-hidden">
+                  {/* Table header */}
+                  <div className="grid grid-cols-[40px_48px_1fr_auto] gap-3 bg-muted/50 px-4 py-3 border-b border-border items-center">
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="gap-2 text-xs"
+                      className="h-8 w-8 p-0"
                       onClick={isAllSelected ? clearSelection : selectAllFiltered}
                     >
                       {isAllSelected ? (
-                        <>
-                          <Square className="h-3.5 w-3.5" />
-                          Bỏ chọn tất cả
-                        </>
+                        <CheckSquare className="h-4 w-4" />
                       ) : (
-                        <>
-                          <CheckSquare className="h-3.5 w-3.5" />
-                          Chọn tất cả ({filteredQuestions.length})
-                        </>
+                        <Square className="h-4 w-4" />
                       )}
                     </Button>
+                    <span className="text-sm font-medium text-muted-foreground">#</span>
+                    <span className="text-sm font-medium text-muted-foreground">Nội dung câu hỏi</span>
+                    <span className="text-sm font-medium text-muted-foreground">Thao tác</span>
                   </div>
+
+                  {/* Table info bar */}
+                  <div className="px-4 py-2 bg-muted/20 border-b border-border">
+                    <p className="text-sm text-muted-foreground">
+                      Hiển thị {filteredQuestions.length} / {groupedQuestions.length} câu hỏi
+                    </p>
+                  </div>
+
+                  {/* Table rows */}
+                  <div className="divide-y divide-border">
                   {filteredQuestions.map((q, index) => (
                     <div
                       key={q.id}
-                      className={`flex items-start gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/30 ${
+                      className={`grid grid-cols-[40px_48px_1fr_auto] gap-3 px-4 py-4 items-start transition-colors hover:bg-muted/30 ${
                         selectedQuestionIds.has(q.id) 
-                          ? 'border-primary/50 bg-primary/5' 
-                          : 'border-border bg-card'
+                          ? 'bg-primary/5' 
+                          : 'bg-card'
                       }`}
                     >
-                      <Checkbox
-                        checked={selectedQuestionIds.has(q.id)}
-                        onCheckedChange={() => toggleQuestionSelection(q.id)}
-                        className="mt-1"
-                      />
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
-                        {index + 1}
-                      </span>
+                      <div className="flex items-center justify-center">
+                        <Checkbox
+                          checked={selectedQuestionIds.has(q.id)}
+                          onCheckedChange={() => toggleQuestionSelection(q.id)}
+                        />
+                      </div>
+                      <div className="flex items-center justify-center">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                          {index + 1}
+                        </span>
+                      </div>
                       <div className="min-w-0 flex-1">
                         <div
                           className="mb-2 text-sm font-medium text-foreground"
@@ -830,7 +838,8 @@ const ManageQuestionsPage = () => {
                       </div>
                     </div>
                   ))}
-                </>
+                  </div>
+                </div>
               )}
             </div>
           )}
