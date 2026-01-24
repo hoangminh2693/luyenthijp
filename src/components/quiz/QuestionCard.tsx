@@ -220,8 +220,8 @@ export function QuestionCard({
                 option={option}
                 text={question.options[option]}
                 isSelected={selectedAnswer === option}
-                isCorrect={option === question.correctOption}
-                showResult={showResult}
+                isCorrect={showResult && option === question.correctOption}
+                showResult={showResult && !!question.correctOption}
                 isSubmitted={isSubmitted}
                 onClick={() => !isSubmitted && onSelectAnswer(option)}
               />
@@ -245,8 +245,8 @@ export function QuestionCard({
                       option={option}
                       text={subQ.options[option]}
                       isSelected={subAnswers[subQ.id] === option}
-                      isCorrect={option === subQ.correctOption}
-                      showResult={showResult}
+                      isCorrect={showResult && option === subQ.correctOption}
+                      showResult={showResult && !!subQ.correctOption}
                       isSubmitted={isSubmitted}
                       onClick={() => !isSubmitted && onSelectSubAnswer?.(subQ.id, option)}
                     />

@@ -142,6 +142,13 @@ export type Database = {
             referencedRelation: "questions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "question_history_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       questions: {
@@ -196,6 +203,13 @@ export type Database = {
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "questions_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "questions_safe"
             referencedColumns: ["id"]
           },
           {
@@ -320,6 +334,70 @@ export type Database = {
           },
         ]
       }
+      questions_safe: {
+        Row: {
+          audio_url: string | null
+          content: string | null
+          created_at: string | null
+          id: string | null
+          image_url: string | null
+          option_a: string | null
+          option_b: string | null
+          option_c: string | null
+          option_d: string | null
+          parent_id: string | null
+          section_id: string | null
+        }
+        Insert: {
+          audio_url?: string | null
+          content?: string | null
+          created_at?: string | null
+          id?: string | null
+          image_url?: string | null
+          option_a?: string | null
+          option_b?: string | null
+          option_c?: string | null
+          option_d?: string | null
+          parent_id?: string | null
+          section_id?: string | null
+        }
+        Update: {
+          audio_url?: string | null
+          content?: string | null
+          created_at?: string | null
+          id?: string | null
+          image_url?: string | null
+          option_a?: string | null
+          option_b?: string | null
+          option_c?: string | null
+          option_d?: string | null
+          parent_id?: string | null
+          section_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questions_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "questions_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "questions_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "questions_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       get_leaderboard_by_level: {
@@ -348,6 +426,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      submit_quiz_answers: { Args: { p_answers: Json }; Returns: Json }
     }
     Enums: {
       app_role: "admin" | "user"

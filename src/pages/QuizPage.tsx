@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useParams, Navigate, Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Send, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,10 +10,13 @@ import { useQuestionHistory } from '@/hooks/useQuestionHistory';
 import { useSubjectBySlug, useLevelBySlug, useSectionBySlug } from '@/hooks/useSections';
 import { useRandomQuestions, type Question } from '@/hooks/useQuestions';
 import { type QuizResult } from '@/data/quizData';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 /**
  * QuizPage - Trang làm bài thi
  * Mode random: /quiz/:subjectSlug/:levelSlug/:sectionSlug?count=N
+ * SECURE: Correct answers are only revealed after server-side submission
  */
 const QuizPage = () => {
   const { subjectSlug, levelSlug, sectionSlug } = useParams<{ 
@@ -28,11 +31,14 @@ const QuizPage = () => {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [subAnswers, setSubAnswers] = useState<Record<string, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<QuizResult | null>(null);
+  // Store revealed answers after submission
+  const [revealedAnswers, setRevealedAnswers] = useState<Record<string, { correctOption: string; explanation?: string }>>({});
   const questionRefs = useRef<(HTMLDivElement | null)[]>([]);
   
   // Question history hook
-  const { saveAnswer, getQuestionStats } = useQuestionHistory();
+  const { getQuestionStats } = useQuestionHistory();
 
   // Fetch dữ liệu từ Supabase
   const { data: subject, isLoading: loadingSubject } = useSubjectBySlug(subjectSlug);
@@ -73,59 +79,99 @@ const QuizPage = () => {
     setSubAnswers((prev) => ({ ...prev, [subQuestionId]: answer }));
   };
 
-  // Xử lý nộp bài
+  // Xử lý nộp bài - SECURE: Submit to server for validation
   const handleSubmit = async () => {
-    if (isSubmitted) return;
+    if (isSubmitted || isSubmitting) return;
     
-    // Tính kết quả - bao gồm cả câu hỏi con
-    const details: { questionId: string; userAnswer: string | null; correctAnswer: string; isCorrect: boolean }[] = [];
+    setIsSubmitting(true);
     
-    for (const q of questions) {
-      if (q.subQuestions && q.subQuestions.length > 0) {
-        // Câu hỏi có câu con - tính điểm cho từng câu con
-        for (const subQ of q.subQuestions) {
-          details.push({
-            questionId: subQ.id,
-            userAnswer: subAnswers[subQ.id] || null,
-            correctAnswer: subQ.correctOption,
-            isCorrect: subAnswers[subQ.id] === subQ.correctOption,
-          });
+    try {
+      // Collect all answers for submission
+      const answersToSubmit: { question_id: string; selected_answer: string }[] = [];
+      
+      for (const q of questions) {
+        if (q.subQuestions && q.subQuestions.length > 0) {
+          // Sub-questions
+          for (const subQ of q.subQuestions) {
+            if (subAnswers[subQ.id]) {
+              answersToSubmit.push({
+                question_id: subQ.id,
+                selected_answer: subAnswers[subQ.id],
+              });
+            }
+          }
+        } else {
+          // Regular question
+          if (answers[q.id]) {
+            answersToSubmit.push({
+              question_id: q.id,
+              selected_answer: answers[q.id],
+            });
+          }
         }
-      } else {
-        // Câu hỏi thường
+      }
+
+      // Submit to secure RPC function
+      const { data, error } = await supabase.rpc('submit_quiz_answers', {
+        p_answers: answersToSubmit,
+      });
+
+      if (error) throw error;
+
+      // Parse results from server
+      const serverResult = data as {
+        total_questions: number;
+        correct_answers: number;
+        wrong_answers: number;
+        percentage: number;
+        details: Array<{
+          question_id: string;
+          selected_answer: string;
+          correct_option: string;
+          explanation: string | null;
+          is_correct: boolean;
+        }>;
+      };
+
+      // Store revealed answers for display
+      const revealed: Record<string, { correctOption: string; explanation?: string }> = {};
+      const details: { questionId: string; userAnswer: string | null; correctAnswer: string; isCorrect: boolean }[] = [];
+      
+      for (const detail of serverResult.details) {
+        revealed[detail.question_id] = {
+          correctOption: detail.correct_option,
+          explanation: detail.explanation || undefined,
+        };
         details.push({
-          questionId: q.id,
-          userAnswer: answers[q.id] || null,
-          correctAnswer: q.correctOption,
-          isCorrect: answers[q.id] === q.correctOption,
+          questionId: detail.question_id,
+          userAnswer: detail.selected_answer,
+          correctAnswer: detail.correct_option,
+          isCorrect: detail.is_correct,
         });
       }
+
+      setRevealedAnswers(revealed);
+
+      const quizResult: QuizResult = {
+        totalQuestions: serverResult.total_questions,
+        correctAnswers: serverResult.correct_answers,
+        wrongAnswers: serverResult.wrong_answers,
+        score: serverResult.correct_answers,
+        percentage: serverResult.percentage,
+        details,
+      };
+
+      setResult(quizResult);
+      setIsSubmitted(true);
+      
+      // Scroll to top để xem kết quả
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      console.error('Error submitting quiz:', error);
+      toast.error('Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const correctAnswers = details.filter((d) => d.isCorrect).length;
-    const totalQuestions = details.length;
-
-    const quizResult: QuizResult = {
-      totalQuestions,
-      correctAnswers,
-      wrongAnswers: totalQuestions - correctAnswers,
-      score: correctAnswers,
-      percentage: Math.round((correctAnswers / totalQuestions) * 100),
-      details,
-    };
-
-    setResult(quizResult);
-    setIsSubmitted(true);
-    
-    // Lưu lịch sử làm bài
-    for (const detail of details) {
-      if (detail.userAnswer) {
-        await saveAnswer(detail.questionId, detail.userAnswer, detail.isCorrect);
-      }
-    }
-    
-    // Scroll to top để xem kết quả
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Xử lý làm lại bài
@@ -230,20 +276,32 @@ const QuizPage = () => {
             {mappedQuestions.map((question, index) => {
               const stats = getQuestionStats(question.id);
               
+              // Merge revealed answers into question for display after submission
+              const questionWithAnswers: Question = isSubmitted ? {
+                ...question,
+                correctOption: revealedAnswers[question.id]?.correctOption as 'A' | 'B' | 'C' | 'D',
+                explanation: revealedAnswers[question.id]?.explanation,
+                subQuestions: question.subQuestions?.map(subQ => ({
+                  ...subQ,
+                  correctOption: revealedAnswers[subQ.id]?.correctOption as 'A' | 'B' | 'C' | 'D',
+                  explanation: revealedAnswers[subQ.id]?.explanation,
+                })),
+              } : question;
+              
               return (
                 <div
                   key={question.id}
                   ref={(el) => (questionRefs.current[index] = el)}
                 >
                   <QuestionCard
-                    question={question}
+                    question={questionWithAnswers}
                     questionNumber={index + 1}
                     selectedAnswer={answers[question.id] || null}
                     onSelectAnswer={(answer) =>
                       handleSelectAnswer(question.id, answer)
                     }
                     showResult={isSubmitted}
-                    isSubmitted={isSubmitted}
+                    isSubmitted={isSubmitted || isSubmitting}
                     historyStats={stats}
                     subAnswers={subAnswers}
                     onSelectSubAnswer={handleSelectSubAnswer}
@@ -268,10 +326,14 @@ const QuizPage = () => {
                   onClick={handleSubmit}
                   size="lg"
                   className="w-full gap-2"
-                  disabled={answeredCount === 0}
+                  disabled={answeredCount === 0 || isSubmitting}
                 >
-                  <Send className="h-5 w-5" />
-                  Nộp bài ({answeredCount}/{totalQuestionCount} câu)
+                  {isSubmitting ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <Send className="h-5 w-5" />
+                  )}
+                  {isSubmitting ? 'Đang nộp...' : `Nộp bài (${answeredCount}/${totalQuestionCount} câu)`}
                 </Button>
               </div>
             )}
@@ -293,10 +355,14 @@ const QuizPage = () => {
                   onClick={handleSubmit}
                   size="lg"
                   className="w-full gap-2"
-                  disabled={answeredCount === 0}
+                  disabled={answeredCount === 0 || isSubmitting}
                 >
-                  <Send className="h-5 w-5" />
-                  Nộp bài
+                  {isSubmitting ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <Send className="h-5 w-5" />
+                  )}
+                  {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
                 </Button>
               )}
 

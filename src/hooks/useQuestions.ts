@@ -10,8 +10,8 @@ export interface Question {
     C: string;
     D: string;
   };
-  correctOption: 'A' | 'B' | 'C' | 'D';
-  explanation?: string;
+  correctOption?: 'A' | 'B' | 'C' | 'D'; // Optional - only available after submission
+  explanation?: string; // Optional - only available after submission
   section_id: string;
   image_url?: string;
   audio_url?: string;
@@ -19,6 +19,21 @@ export interface Question {
   subQuestions?: Question[]; // Câu hỏi con
 }
 
+// Safe question from view (no correct_option, no explanation)
+interface DbQuestionSafe {
+  id: string;
+  content: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+  section_id: string;
+  image_url: string | null;
+  audio_url: string | null;
+  parent_id: string | null;
+}
+
+// Full question (for admin - includes answers)
 interface DbQuestion {
   id: string;
   content: string;
@@ -34,7 +49,26 @@ interface DbQuestion {
   parent_id: string | null;
 }
 
-// Chuyển đổi dữ liệu từ database sang format Question
+// Chuyển đổi dữ liệu từ database (safe view - không có đáp án)
+function mapDbQuestionSafe(dbQuestion: DbQuestionSafe): Question {
+  return {
+    id: dbQuestion.id,
+    content: dbQuestion.content,
+    options: {
+      A: dbQuestion.option_a,
+      B: dbQuestion.option_b,
+      C: dbQuestion.option_c,
+      D: dbQuestion.option_d,
+    },
+    // correctOption and explanation NOT included - revealed only after submission
+    section_id: dbQuestion.section_id,
+    image_url: dbQuestion.image_url || undefined,
+    audio_url: dbQuestion.audio_url || undefined,
+    parent_id: dbQuestion.parent_id || undefined,
+  };
+}
+
+// Chuyển đổi dữ liệu từ database (full - có đáp án, cho admin)
 function mapDbQuestion(dbQuestion: DbQuestion): Question {
   return {
     id: dbQuestion.id,
@@ -54,7 +88,22 @@ function mapDbQuestion(dbQuestion: DbQuestion): Question {
   };
 }
 
-// Nhóm câu hỏi cha với câu hỏi con
+// Nhóm câu hỏi cha với câu hỏi con (safe version)
+function groupQuestionsWithChildrenSafe(questions: DbQuestionSafe[]): Question[] {
+  const parentQuestions = questions.filter(q => !q.parent_id);
+  const childQuestions = questions.filter(q => q.parent_id);
+  
+  return parentQuestions.map(parent => {
+    const mapped = mapDbQuestionSafe(parent);
+    const children = childQuestions.filter(c => c.parent_id === parent.id);
+    if (children.length > 0) {
+      mapped.subQuestions = children.map(mapDbQuestionSafe);
+    }
+    return mapped;
+  });
+}
+
+// Nhóm câu hỏi cha với câu hỏi con (full version for admin)
 function groupQuestionsWithChildren(questions: DbQuestion[]): Question[] {
   const parentQuestions = questions.filter(q => !q.parent_id);
   const childQuestions = questions.filter(q => q.parent_id);
@@ -69,13 +118,14 @@ function groupQuestionsWithChildren(questions: DbQuestion[]): Question[] {
   });
 }
 
-// Hook lấy câu hỏi theo section_id
+// Hook lấy câu hỏi theo section_id (cho admin - có đáp án)
 export function useQuestionsBySection(sectionId: string | undefined) {
   return useQuery({
     queryKey: ['questions', 'section', sectionId],
     queryFn: async () => {
       if (!sectionId) return [];
       
+      // Admin query - uses the full questions table (requires admin role via RLS)
       const { data, error } = await supabase
         .from('questions')
         .select('*')
@@ -88,22 +138,23 @@ export function useQuestionsBySection(sectionId: string | undefined) {
   });
 }
 
-// Hook lấy câu hỏi ngẫu nhiên từ section (chỉ lấy câu cha, kèm câu con)
+// Hook lấy câu hỏi ngẫu nhiên từ section (SECURE - không có đáp án)
 export function useRandomQuestions(sectionId: string | undefined, count: number) {
   return useQuery({
     queryKey: ['questions', 'random', sectionId, count],
     queryFn: async () => {
       if (!sectionId) return [];
       
+      // Use the SAFE view that excludes correct_option and explanation
       const { data, error } = await supabase
-        .from('questions')
+        .from('questions_safe')
         .select('*')
         .eq('section_id', sectionId);
       
       if (error) throw error;
       
       // Nhóm câu hỏi cha với câu con
-      const grouped = groupQuestionsWithChildren(data as DbQuestion[] || []);
+      const grouped = groupQuestionsWithChildrenSafe(data as DbQuestionSafe[] || []);
       
       // Shuffle và lấy số lượng câu cha cần thiết
       const shuffled = [...grouped].sort(() => Math.random() - 0.5);
@@ -125,8 +176,9 @@ export function useQuestionCount(sectionId: string | undefined) {
     queryFn: async () => {
       if (!sectionId) return 0;
       
+      // Use safe view for counting
       const { count, error } = await supabase
-        .from('questions')
+        .from('questions_safe')
         .select('*', { count: 'exact', head: true })
         .eq('section_id', sectionId);
       
