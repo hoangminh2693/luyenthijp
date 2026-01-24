@@ -15,35 +15,37 @@ const ContactPage = () => {
     name: '',
     email: '',
     subject: '',
-    message: '',
+    message: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     // Simulate form submission
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
+    await new Promise(resolve => setTimeout(resolve, 1000));
     toast.success('Cảm ơn bạn đã liên hệ! Chúng tôi sẽ phản hồi sớm nhất có thể.');
-    setFormData({ name: '', email: '', subject: '', message: '' });
+    setFormData({
+      name: '',
+      email: '',
+      subject: '',
+      message: ''
+    });
     setIsSubmitting(false);
   };
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
-      [e.target.name]: e.target.value,
+      [e.target.name]: e.target.value
     }));
   };
-
-  return (
-    <div className="min-h-screen bg-background">
+  return <div className="min-h-screen bg-background">
       <div className="container py-8">
         {/* Breadcrumb */}
         <div className="mb-8">
-          <Breadcrumb items={[{ label: 'Liên hệ' }]} />
+          <Breadcrumb items={[{
+          label: 'Liên hệ'
+        }]} />
         </div>
 
         {/* Header */}
@@ -68,7 +70,7 @@ const ContactPage = () => {
                 </div>
                 <div>
                   <h3 className="font-medium text-foreground">Email</h3>
-                  <p className="text-sm text-muted-foreground">contact@luyendethi.com</p>
+                  <p className="text-sm text-muted-foreground">hoangminh@thairise.co.jp</p>
                 </div>
               </div>
 
@@ -113,28 +115,13 @@ const ContactPage = () => {
                     <label htmlFor="name" className="block text-sm font-medium text-foreground mb-2">
                       Họ và tên <span className="text-destructive">*</span>
                     </label>
-                    <Input
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      placeholder="Nguyễn Văn A"
-                      required
-                    />
+                    <Input id="name" name="name" value={formData.name} onChange={handleChange} placeholder="Nguyễn Văn A" required />
                   </div>
                   <div>
                     <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
                       Email <span className="text-destructive">*</span>
                     </label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      placeholder="email@example.com"
-                      required
-                    />
+                    <Input id="email" name="email" type="email" value={formData.email} onChange={handleChange} placeholder="email@example.com" required />
                   </div>
                 </div>
 
@@ -142,48 +129,27 @@ const ContactPage = () => {
                   <label htmlFor="subject" className="block text-sm font-medium text-foreground mb-2">
                     Tiêu đề <span className="text-destructive">*</span>
                   </label>
-                  <Input
-                    id="subject"
-                    name="subject"
-                    value={formData.subject}
-                    onChange={handleChange}
-                    placeholder="Chủ đề bạn muốn trao đổi"
-                    required
-                  />
+                  <Input id="subject" name="subject" value={formData.subject} onChange={handleChange} placeholder="Chủ đề bạn muốn trao đổi" required />
                 </div>
 
                 <div>
                   <label htmlFor="message" className="block text-sm font-medium text-foreground mb-2">
                     Nội dung <span className="text-destructive">*</span>
                   </label>
-                  <Textarea
-                    id="message"
-                    name="message"
-                    value={formData.message}
-                    onChange={handleChange}
-                    placeholder="Nhập nội dung tin nhắn của bạn..."
-                    rows={6}
-                    required
-                  />
+                  <Textarea id="message" name="message" value={formData.message} onChange={handleChange} placeholder="Nhập nội dung tin nhắn của bạn..." rows={6} required />
                 </div>
 
                 <Button type="submit" size="lg" className="gap-2" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>Đang gửi...</>
-                  ) : (
-                    <>
+                  {isSubmitting ? <>Đang gửi...</> : <>
                       <Send className="h-5 w-5" />
                       Gửi tin nhắn
-                    </>
-                  )}
+                    </>}
                 </Button>
               </form>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default ContactPage;
