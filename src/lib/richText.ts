@@ -13,8 +13,23 @@ export function extractClipboardFragment(html: string): string {
 }
 
 function filterStyle(style: string): string {
-  // Chỉ giữ các style phục vụ định dạng cơ bản
-  const ALLOWED = new Set(['font-weight', 'font-style', 'text-decoration', 'text-decoration-line']);
+  // Chỉ giữ các style phục vụ định dạng cơ bản và bảng
+  const ALLOWED = new Set([
+    'font-weight', 
+    'font-style', 
+    'text-decoration', 
+    'text-decoration-line',
+    'border',
+    'border-collapse',
+    'border-width',
+    'border-style',
+    'border-color',
+    'padding',
+    'text-align',
+    'vertical-align',
+    'width',
+    'min-width',
+  ]);
   return style
     .split(';')
     .map((p) => p.trim())
@@ -58,8 +73,15 @@ export function sanitizeRichText(input: string): string {
       'code',
       'pre',
       'blockquote',
+      // Table tags
+      'table',
+      'thead',
+      'tbody',
+      'tr',
+      'th',
+      'td',
     ],
-    ALLOWED_ATTR: ['style'],
+    ALLOWED_ATTR: ['style', 'colspan', 'rowspan'],
   });
 
   // Lọc style để tránh nhúng CSS lạ
