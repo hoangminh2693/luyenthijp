@@ -54,6 +54,7 @@ interface Level {
   name: string;
   slug: string;
   subject_id: string | null;
+  order_index?: number;
 }
 
 interface Section {
@@ -61,6 +62,7 @@ interface Section {
   name: string;
   slug: string;
   level_id: string;
+  order_index?: number;
 }
 
 interface QuestionRow {
@@ -86,6 +88,42 @@ interface ParentQuestionRow extends QuestionRow {
 type EditQuestionForm = Partial<QuestionRow> & { subQuestions?: SubQuestion[]; newSectionId?: string };
 
 const stripHtml = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+// Helper to sort sections hierarchically: Subject name → Level order_index → Section order_index
+function getSortedSectionsWithLabels(
+  sections: Section[],
+  levels: Level[],
+  subjects: Subject[],
+  excludeSectionId?: string
+) {
+  return sections
+    .filter((s) => !excludeSectionId || s.id !== excludeSectionId)
+    .map((s) => {
+      const level = levels.find((l) => l.id === s.level_id);
+      const subject = subjects.find((sub) => sub.id === level?.subject_id);
+      const label = subject && level
+        ? `${subject.name} > ${level.name} > ${s.name}`
+        : level
+        ? `${level.name} > ${s.name}`
+        : s.name;
+      return {
+        ...s,
+        label,
+        subjectName: subject?.name || '',
+        levelOrderIndex: level?.order_index ?? 999,
+        sectionOrderIndex: s.order_index ?? 999,
+      };
+    })
+    .sort((a, b) => {
+      // Sort by subject name first
+      const subjectCompare = a.subjectName.localeCompare(b.subjectName, 'vi');
+      if (subjectCompare !== 0) return subjectCompare;
+      // Then by level order_index
+      if (a.levelOrderIndex !== b.levelOrderIndex) return a.levelOrderIndex - b.levelOrderIndex;
+      // Then by section order_index
+      return a.sectionOrderIndex - b.sectionOrderIndex;
+    });
+}
 
 function groupQuestionsWithChildren(rows: QuestionRow[]): ParentQuestionRow[] {
   const parents = rows
@@ -977,20 +1015,11 @@ const ManageQuestionsPage = () => {
                         <SelectValue placeholder="Chọn mục đích" />
                       </SelectTrigger>
                       <SelectContent>
-                        {sections.map((s) => {
-                          const level = levels.find((l) => l.id === s.level_id);
-                          const subject = subjects.find((sub) => sub.id === level?.subject_id);
-                          const label = subject && level
-                            ? `${subject.name} > ${level.name} > ${s.name}`
-                            : level
-                            ? `${level.name} > ${s.name}`
-                            : s.name;
-                          return (
-                            <SelectItem key={s.id} value={s.id}>
-                              {label}
-                            </SelectItem>
-                          );
-                        })}
+                        {getSortedSectionsWithLabels(sections, levels, subjects).map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     {editForm.newSectionId && editForm.newSectionId !== editingQuestion?.section_id && (
@@ -1072,22 +1101,11 @@ const ManageQuestionsPage = () => {
                 <SelectValue placeholder="Chọn mục đích..." />
               </SelectTrigger>
               <SelectContent>
-                {sections
-                  .filter((s) => s.id !== selectedSectionId)
-                  .map((s) => {
-                    const level = levels.find((l) => l.id === s.level_id);
-                    const subject = subjects.find((sub) => sub.id === level?.subject_id);
-                    const label = subject && level
-                      ? `${subject.name} > ${level.name} > ${s.name}`
-                      : level
-                      ? `${level.name} > ${s.name}`
-                      : s.name;
-                    return (
-                      <SelectItem key={s.id} value={s.id}>
-                        {label}
-                      </SelectItem>
-                    );
-                  })}
+                {getSortedSectionsWithLabels(sections, levels, subjects, selectedSectionId).map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
