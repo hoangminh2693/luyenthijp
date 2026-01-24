@@ -4,10 +4,11 @@ import { sanitizeRichText } from "@/lib/richText";
 import { Bold, Italic, Underline, Table } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export type RichTextEditableProps = {
   value: string;
@@ -22,14 +23,16 @@ export type RichTextEditableProps = {
  * RichTextEditable
  * - contentEditable div để paste giữ định dạng (bold/underline/italic)
  * - sanitize HTML trước khi lưu state
- * - toolbar với các nút bold/italic/underline
+ * - toolbar với các nút bold/italic/underline/table
  */
 export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditableProps>(
   ({ value, onChange, placeholder, className, onFocus, showToolbar = true }, ref) => {
     const innerRef = React.useRef<HTMLDivElement | null>(null);
     const [isFocused, setIsFocused] = React.useState(false);
-    const [tablePopoverOpen, setTablePopoverOpen] = React.useState(false);
+    const [tableDialogOpen, setTableDialogOpen] = React.useState(false);
     const [tableSize, setTableSize] = React.useState({ rows: 2, cols: 2 });
+    // Store selection range before opening dialog
+    const savedSelectionRef = React.useRef<Range | null>(null);
 
     React.useImperativeHandle(ref, () => innerRef.current as HTMLDivElement);
 
@@ -100,15 +103,41 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       return html;
     }, []);
 
+    // Save current selection before opening dialog
+    const saveSelection = React.useCallback(() => {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        savedSelectionRef.current = sel.getRangeAt(0).cloneRange();
+      }
+    }, []);
+
+    // Restore selection and insert table
     const insertTable = React.useCallback((rows: number, cols: number) => {
       const el = innerRef.current;
       if (!el) return;
+      
       el.focus();
+      
+      // Restore selection if we have one
+      if (savedSelectionRef.current) {
+        const sel = window.getSelection();
+        if (sel) {
+          sel.removeAllRanges();
+          sel.addRange(savedSelectionRef.current);
+        }
+      }
+      
       const tableHtml = generateTableHtml(rows, cols);
       document.execCommand("insertHTML", false, tableHtml);
       setTimeout(emitChange, 0);
-      setTablePopoverOpen(false);
+      setTableDialogOpen(false);
+      savedSelectionRef.current = null;
     }, [generateTableHtml, emitChange]);
+
+    const openTableDialog = React.useCallback(() => {
+      saveSelection();
+      setTableDialogOpen(true);
+    }, [saveSelection]);
 
     const handleFocus = React.useCallback(() => {
       setIsFocused(true);
@@ -116,14 +145,18 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
     }, [onFocus]);
 
     const handleBlur = React.useCallback(() => {
-      // Delay để cho phép click vào toolbar
+      // Delay để cho phép click vào toolbar hoặc dialog
       setTimeout(() => {
-        if (!innerRef.current?.contains(document.activeElement)) {
+        const el = innerRef.current;
+        if (!el) return;
+        // Keep focused if dialog is open
+        if (tableDialogOpen) return;
+        if (!el.contains(document.activeElement)) {
           setIsFocused(false);
         }
-      }, 100);
+      }, 150);
       emitChange();
-    }, [emitChange]);
+    }, [emitChange, tableDialogOpen]);
 
     // Keyboard shortcuts for formatting
     const handleKeyDown = React.useCallback(
@@ -144,12 +177,12 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
               break;
             case 't':
               e.preventDefault();
-              setTablePopoverOpen(true);
+              openTableDialog();
               break;
           }
         }
       },
-      [applyFormat]
+      [applyFormat, openTableDialog]
     );
 
     return (
@@ -198,57 +231,19 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
             </Button>
             
             {/* Table insert button */}
-            <Popover open={tablePopoverOpen} onOpenChange={setTablePopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onMouseDown={(e) => e.preventDefault()}
-                  title="Chèn bảng (Ctrl+T)"
-                >
-                  <Table className="h-3.5 w-3.5" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-48 p-3" align="start">
-                <div className="space-y-3">
-                  <p className="text-xs font-medium text-foreground">Chèn bảng</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-xs text-muted-foreground">Hàng</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={10}
-                        value={tableSize.rows}
-                        onChange={(e) => setTableSize(prev => ({ ...prev, rows: Math.max(1, Math.min(10, parseInt(e.target.value) || 1)) }))}
-                        className="w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Cột</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={10}
-                        value={tableSize.cols}
-                        onChange={(e) => setTableSize(prev => ({ ...prev, cols: Math.max(1, Math.min(10, parseInt(e.target.value) || 1)) }))}
-                        className="w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
-                      />
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => insertTable(tableSize.rows, tableSize.cols)}
-                  >
-                    Chèn
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                openTableDialog();
+              }}
+              title="Chèn bảng (Ctrl+T)"
+            >
+              <Table className="h-3.5 w-3.5" />
+            </Button>
           </div>
         )}
 
@@ -272,6 +267,54 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
             className
           )}
         />
+
+        {/* Table Dialog */}
+        <Dialog open={tableDialogOpen} onOpenChange={setTableDialogOpen}>
+          <DialogContent className="sm:max-w-[280px]">
+            <DialogHeader>
+              <DialogTitle>Chèn bảng</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Số hàng</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={tableSize.rows}
+                    onChange={(e) => setTableSize(prev => ({ 
+                      ...prev, 
+                      rows: Math.max(1, Math.min(20, parseInt(e.target.value) || 1)) 
+                    }))}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Số cột</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={tableSize.cols}
+                    onChange={(e) => setTableSize(prev => ({ 
+                      ...prev, 
+                      cols: Math.max(1, Math.min(20, parseInt(e.target.value) || 1)) 
+                    }))}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+              </div>
+              <Button
+                type="button"
+                className="w-full"
+                onClick={() => insertTable(tableSize.rows, tableSize.cols)}
+              >
+                Chèn bảng
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
