@@ -93,6 +93,29 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       emitChange();
     }, [emitChange]);
 
+    // Keyboard shortcuts for formatting
+    const handleKeyDown = React.useCallback(
+      (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+          switch (e.key.toLowerCase()) {
+            case 'b':
+              e.preventDefault();
+              applyFormat('bold');
+              break;
+            case 'i':
+              e.preventDefault();
+              applyFormat('italic');
+              break;
+            case 'u':
+              e.preventDefault();
+              applyFormat('underline');
+              break;
+          }
+        }
+      },
+      [applyFormat]
+    );
+
     return (
       <div className="relative">
         {/* Toolbar */}
@@ -148,6 +171,7 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
           onBlur={handleBlur}
           onFocus={handleFocus}
           onPaste={handlePaste}
+          onKeyDown={handleKeyDown}
           data-placeholder={placeholder || ""}
           className={cn(
             "min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
