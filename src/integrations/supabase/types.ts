@@ -400,6 +400,30 @@ export type Database = {
       }
     }
     Functions: {
+      get_enhanced_leaderboard: {
+        Args: {
+          p_leaderboard_type?: string
+          p_level_id?: string
+          p_subject_id?: string
+          p_time_range?: string
+        }
+        Returns: {
+          accuracy_percent: number
+          avatar_url: string
+          correct_count: number
+          display_name: string
+          distinct_correct: number
+          improvement_percent: number
+          level_id: string
+          level_name: string
+          level_order_index: number
+          ranking_score: number
+          streak_days: number
+          total_attempts: number
+          total_questions_in_level: number
+          user_id: string
+        }[]
+      }
       get_leaderboard_by_level: {
         Args: {
           p_level_id?: string
