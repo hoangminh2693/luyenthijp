@@ -39,6 +39,12 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { 
+  AchievementBadges, 
+  calculateAchievements, 
+  getTopAchievements,
+  type UserStatsForAchievements 
+} from '@/components/ui/AchievementBadge';
 
 interface Subject {
   id: string;
@@ -492,6 +498,17 @@ const LeaderboardPage = () => {
                         {currentUserStats.accuracy_percent.toFixed(1)}%
                       </Badge>
                     </div>
+                    {/* Achievement Badges */}
+                    <div className="mt-2">
+                      <AchievementBadges 
+                        achievements={calculateAchievements({
+                          ...currentUserStats,
+                          rank: currentUserRank || undefined
+                        })} 
+                        size="sm"
+                        maxDisplay={5}
+                      />
+                    </div>
                   </div>
                 </div>
                 
@@ -723,12 +740,22 @@ const LeaderboardPage = () => {
                                       </AvatarFallback>
                                     </Avatar>
                                     <div>
-                                      <p className="font-medium text-foreground flex items-center gap-2">
-                                        {item.display_name}
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <p className="font-medium text-foreground">
+                                          {item.display_name}
+                                        </p>
                                         {isCurrentUser && (
                                           <Badge variant="outline" className="text-xs">Bạn</Badge>
                                         )}
-                                      </p>
+                                        <AchievementBadges 
+                                          achievements={getTopAchievements({
+                                            ...item,
+                                            rank
+                                          }, 3)} 
+                                          size="sm"
+                                          maxDisplay={3}
+                                        />
+                                      </div>
                                       {item.streak_days > 0 && activeTab === 'diligent' && (
                                         <p className="text-xs text-orange-500 flex items-center gap-1">
                                           <Flame className="h-3 w-3" />
@@ -921,6 +948,18 @@ const TopUserCard = ({ user, rank, isCurrentUser, activeTab }: TopUserCardProps)
           <Badge variant="outline" className="ml-1 text-xs">Bạn</Badge>
         )}
       </p>
+
+      {/* Achievement Badges */}
+      <div className="mt-2 flex justify-center">
+        <AchievementBadges 
+          achievements={getTopAchievements({
+            ...user,
+            rank
+          }, 3)} 
+          size="sm"
+          maxDisplay={3}
+        />
+      </div>
 
       {/* Stats based on tab */}
       <div className="mt-2 space-y-1">

@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { Loader2, Camera, User, Calendar, MapPin, AtSign, Mail } from 'lucide-react';
+import { AchievementsSection } from '@/components/profile/AchievementsSection';
 
 const COUNTRIES = [
   'Việt Nam', 'Nhật Bản', 'Hàn Quốc', 'Trung Quốc', 'Thái Lan',
@@ -381,6 +382,9 @@ export default function ProfilePage() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Achievements Section */}
+      <AchievementsSection userId={user.id} />
     </div>
   );
 }
