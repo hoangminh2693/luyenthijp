@@ -1,14 +1,14 @@
 /**
- * LeaderboardPage - Bảng xếp hạng người dùng
- * Hiển thị xếp hạng theo % đúng của từng user theo môn/cấp độ
- * Tạo động lực cho người dùng luyện tập mỗi ngày
+ * LeaderboardPage - Bảng xếp hạng hiện đại
+ * 4 tabs: Tổng hợp, Chính xác cao, Chăm chỉ nhất, Tiến bộ nhanh
+ * Công thức: Điểm = Tỷ lệ đúng (%) × √(Tổng số câu)
  */
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Trophy, Medal, Award, User, Filter, ChevronDown, ChevronRight, 
   BookOpen, Target, TrendingUp, Flame, Star, ArrowRight, Calendar,
-  Zap, Clock
+  Zap, Clock, Sparkles, Crown, Heart
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Breadcrumb } from '@/components/layout/Header';
@@ -30,13 +30,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface Subject {
   id: string;
@@ -53,31 +55,24 @@ interface Level {
   order_index: number | null;
 }
 
-interface Section {
-  id: string;
-  name: string;
-  slug: string;
-  level_id: string;
-}
-
 interface UserStats {
   user_id: string;
   display_name: string;
   avatar_url: string | null;
   total_attempts: number;
   correct_count: number;
-  total_questions_in_db: number;
-  accuracy: number;
-  total_score: number;
-}
-
-interface LevelLeaderboard {
-  level: Level;
-  users: UserStats[];
-  total_questions: number;
+  distinct_correct: number;
+  total_questions_in_level: number;
+  accuracy_percent: number;
+  ranking_score: number;
+  streak_days: number;
+  improvement_percent: number;
+  level_id: string;
+  level_name: string;
 }
 
 type TimeRange = 'week' | 'month' | 'all';
+type LeaderboardType = 'overall' | 'accuracy' | 'diligent' | 'progress';
 
 const LeaderboardPage = () => {
   const { user } = useAuth();
@@ -85,16 +80,15 @@ const LeaderboardPage = () => {
   // Filter states
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [levels, setLevels] = useState<Level[]>([]);
-  const [sections, setSections] = useState<Section[]>([]);
   
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [selectedLevelId, setSelectedLevelId] = useState<string>('all');
   const [timeRange, setTimeRange] = useState<TimeRange>('all');
+  const [activeTab, setActiveTab] = useState<LeaderboardType>('overall');
   
   // Leaderboard data
-  const [levelLeaderboards, setLevelLeaderboards] = useState<LevelLeaderboard[]>([]);
+  const [leaderboardData, setLeaderboardData] = useState<UserStats[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [expandedLevels, setExpandedLevels] = useState<Set<string>>(new Set());
   const [hasSelectedFilter, setHasSelectedFilter] = useState(false);
 
   // Current user stats
@@ -105,15 +99,24 @@ const LeaderboardPage = () => {
   // Load filter data
   useEffect(() => {
     const loadFilterData = async () => {
-      const [subjectsRes, levelsRes, sectionsRes] = await Promise.all([
+      const [subjectsRes, levelsRes] = await Promise.all([
         supabase.from('subjects').select('*').order('name'),
         supabase.from('levels').select('*').order('order_index'),
-        supabase.from('sections').select('*').order('order_index'),
       ]);
 
-      setSubjects(subjectsRes.data || []);
+      const subjectsData = subjectsRes.data || [];
+      setSubjects(subjectsData);
       setLevels(levelsRes.data || []);
-      setSections(sectionsRes.data || []);
+      
+      // Auto-select first subject (likely Japanese)
+      if (subjectsData.length > 0 && !selectedSubjectId) {
+        const japaneseSubject = subjectsData.find(s => 
+          s.name.toLowerCase().includes('nhật') || 
+          s.name.toLowerCase().includes('japanese') ||
+          s.slug.includes('tieng-nhat')
+        );
+        setSelectedSubjectId(japaneseSubject?.id || subjectsData[0].id);
+      }
     };
 
     loadFilterData();
@@ -125,34 +128,24 @@ const LeaderboardPage = () => {
     return levels.filter(l => l.subject_id === selectedSubjectId);
   }, [levels, selectedSubjectId]);
 
-  // Get selected subject
-  const selectedSubject = subjects.find(s => s.id === selectedSubjectId);
-
-  // Toggle level expansion
-  const toggleLevel = (levelId: string) => {
-    setExpandedLevels(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(levelId)) {
-        newSet.delete(levelId);
-      } else {
-        newSet.add(levelId);
-      }
-      return newSet;
-    });
+  // Get tab description
+  const getTabDescription = (tab: LeaderboardType) => {
+    switch (tab) {
+      case 'overall':
+        return 'Xếp hạng dựa trên cả độ chính xác và sự chăm chỉ, đảm bảo công bằng cho mọi người';
+      case 'accuracy':
+        return 'Dành cho người học chắc – làm ít nhất 50 câu với tỷ lệ đúng cao nhất';
+      case 'diligent':
+        return 'Mỗi nỗ lực đều xứng đáng được ghi nhận – xếp theo tổng số câu đã làm';
+      case 'progress':
+        return 'So sánh bạn của hôm nay với chính bạn của ngày hôm qua';
+    }
   };
 
-  // Get time range filter date
-  // Expand all levels by default when data loads
-  useEffect(() => {
-    if (levelLeaderboards.length > 0) {
-      setExpandedLevels(new Set(levelLeaderboards.map(l => l.level.id)));
-    }
-  }, [levelLeaderboards]);
-
-  // Load leaderboard data using the database function
+  // Load leaderboard data
   useEffect(() => {
     if (!selectedSubjectId) {
-      setLevelLeaderboards([]);
+      setLeaderboardData([]);
       setHasSelectedFilter(false);
       return;
     }
@@ -163,171 +156,140 @@ const LeaderboardPage = () => {
       setIsLoading(true);
 
       try {
-        // Call the security definer function to get leaderboard data
-        const { data: leaderboardData, error: leaderboardError } = await supabase
-          .rpc('get_leaderboard_by_level', {
+        const { data, error } = await supabase
+          .rpc('get_enhanced_leaderboard', {
             p_level_id: selectedLevelId !== 'all' ? selectedLevelId : null,
             p_subject_id: selectedSubjectId,
-            p_time_range: timeRange
+            p_time_range: timeRange,
+            p_leaderboard_type: activeTab
           });
 
-        if (leaderboardError) {
-          console.error('Error loading leaderboard:', leaderboardError);
-          setLevelLeaderboards([]);
+        if (error) {
+          console.error('Error loading leaderboard:', error);
+          setLeaderboardData([]);
           setIsLoading(false);
           return;
         }
 
-        if (!leaderboardData || leaderboardData.length === 0) {
-          setLevelLeaderboards([]);
-          setCurrentUserRank(null);
-          setCurrentUserStats(null);
-          setDistanceToTop10(null);
-          setIsLoading(false);
-          return;
-        }
+        const stats: UserStats[] = (data || []).map((row: any) => ({
+          user_id: row.user_id,
+          display_name: row.display_name || 'Người dùng ẩn danh',
+          avatar_url: row.avatar_url,
+          total_attempts: Number(row.total_attempts),
+          correct_count: Number(row.correct_count),
+          distinct_correct: Number(row.distinct_correct),
+          total_questions_in_level: Number(row.total_questions_in_level),
+          accuracy_percent: Number(row.accuracy_percent),
+          ranking_score: Number(row.ranking_score),
+          streak_days: Number(row.streak_days),
+          improvement_percent: Number(row.improvement_percent),
+          level_id: row.level_id,
+          level_name: row.level_name,
+        }));
 
-        // Group data by level
-        const levelMap = new Map<string, {
-          level: Level;
-          users: UserStats[];
-          total_questions: number;
-        }>();
+        setLeaderboardData(stats);
 
-        leaderboardData.forEach((row: any) => {
-          if (!levelMap.has(row.level_id)) {
-            levelMap.set(row.level_id, {
-              level: {
-                id: row.level_id,
-                name: row.level_name,
-                slug: '',
-                subject_id: selectedSubjectId,
-                order_index: row.level_order_index
-              },
-              users: [],
-              total_questions: Number(row.total_questions_in_level)
-            });
-          }
-
-          const levelData = levelMap.get(row.level_id)!;
-          const correctCount = Number(row.distinct_correct);
-          const totalQuestions = Number(row.total_questions_in_level);
-          const accuracy = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
-          const totalScore = correctCount * 10 + Math.floor(accuracy);
-
-          levelData.users.push({
-            user_id: row.user_id,
-            display_name: row.display_name || 'Người dùng ẩn danh',
-            avatar_url: row.avatar_url,
-            total_attempts: Number(row.total_attempts),
-            correct_count: correctCount,
-            total_questions_in_db: totalQuestions,
-            accuracy,
-            total_score: totalScore
-          });
-        });
-
-        // Build leaderboards and sort users within each level
-        const leaderboards: LevelLeaderboard[] = [];
-        let foundCurrentUser = false;
-        let currentUserOverallRank: number | null = null;
-        let currentUserOverallStats: UserStats | null = null;
-
-        levelMap.forEach((levelData) => {
-          // Sort users by score (desc), accuracy (desc), attempts (asc)
-          levelData.users.sort((a, b) => {
-            if (b.total_score !== a.total_score) return b.total_score - a.total_score;
-            if (b.accuracy !== a.accuracy) return b.accuracy - a.accuracy;
-            return a.total_attempts - b.total_attempts;
-          });
-
-          // Find current user rank
-          if (user && !foundCurrentUser) {
-            const userIndex = levelData.users.findIndex(u => u.user_id === user.id);
-            if (userIndex !== -1) {
-              foundCurrentUser = true;
-              currentUserOverallRank = userIndex + 1;
-              currentUserOverallStats = levelData.users[userIndex];
-              
-              // Calculate distance to top 10
-              if (userIndex >= 10 && levelData.users.length > 10) {
-                const top10LastScore = levelData.users[9].total_score;
-                setDistanceToTop10(top10LastScore - levelData.users[userIndex].total_score);
-              } else {
-                setDistanceToTop10(null);
-              }
+        // Find current user
+        if (user) {
+          const userIndex = stats.findIndex(u => u.user_id === user.id);
+          if (userIndex !== -1) {
+            setCurrentUserRank(userIndex + 1);
+            setCurrentUserStats(stats[userIndex]);
+            
+            if (userIndex >= 10 && stats.length > 10) {
+              const top10Score = stats[9].ranking_score;
+              setDistanceToTop10(Math.ceil(top10Score - stats[userIndex].ranking_score));
+            } else {
+              setDistanceToTop10(null);
             }
+          } else {
+            setCurrentUserRank(null);
+            setCurrentUserStats(null);
+            setDistanceToTop10(null);
           }
-
-          leaderboards.push({
-            level: levelData.level,
-            users: levelData.users.slice(0, 20),
-            total_questions: levelData.total_questions
-          });
-        });
-
-        // Sort leaderboards by level order
-        leaderboards.sort((a, b) => {
-          const orderA = a.level.order_index ?? 0;
-          const orderB = b.level.order_index ?? 0;
-          return orderA - orderB;
-        });
-
-        setLevelLeaderboards(leaderboards);
-        setCurrentUserRank(currentUserOverallRank);
-        setCurrentUserStats(currentUserOverallStats);
+        }
       } catch (err) {
         console.error('Error loading leaderboard:', err);
-        setLevelLeaderboards([]);
+        setLeaderboardData([]);
       } finally {
         setIsLoading(false);
       }
     };
 
     loadLeaderboard();
-  }, [selectedSubjectId, selectedLevelId, timeRange, user]);
+  }, [selectedSubjectId, selectedLevelId, timeRange, activeTab, user]);
 
-  // Render rank badge - using semantic design tokens
+  // Render rank badge
   const renderRankBadge = (rank: number) => {
     if (rank === 1) {
       return (
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-warning text-warning-foreground shadow-lg">
-          <Trophy className="h-5 w-5" />
+        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 text-white shadow-lg shadow-amber-500/30">
+          <Crown className="h-5 w-5" />
         </div>
       );
     }
     if (rank === 2) {
       return (
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground shadow-lg">
+        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-slate-300 to-slate-400 text-white shadow-lg">
           <Medal className="h-5 w-5" />
         </div>
       );
     }
     if (rank === 3) {
       return (
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-secondary-foreground shadow-lg">
+        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-amber-600 to-amber-700 text-white shadow-lg">
           <Award className="h-5 w-5" />
         </div>
       );
     }
     return (
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground text-sm font-bold">
+      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground text-sm font-bold">
         {rank}
       </div>
     );
   };
 
-  // Get time range label
-  const getTimeRangeLabel = (range: TimeRange) => {
-    switch (range) {
-      case 'week': return 'Tuần này';
-      case 'month': return 'Tháng này';
-      case 'all': return 'Tất cả thời gian';
+  // Get motivational message for current user
+  const getMotivationalMessage = () => {
+    if (!currentUserStats || !currentUserRank) return null;
+    
+    if (currentUserRank <= 3) {
+      return { icon: Crown, text: 'Tuyệt vời! Bạn đang ở Top 3! 🎉', color: 'text-yellow-500' };
     }
+    if (currentUserRank <= 10) {
+      return { icon: Star, text: `Xuất sắc! Bạn đang Top ${currentUserRank}! ⭐`, color: 'text-primary' };
+    }
+    if (distanceToTop10 && distanceToTop10 > 0) {
+      const questionsNeeded = Math.ceil(distanceToTop10 / 10);
+      return { 
+        icon: Target, 
+        text: `Bạn chỉ cần thêm khoảng ${questionsNeeded} câu đúng nữa để vào Top 10!`, 
+        color: 'text-primary' 
+      };
+    }
+    return { icon: Flame, text: 'Tiếp tục luyện tập để cải thiện thứ hạng!', color: 'text-orange-500' };
   };
 
+  const motivationalMessage = getMotivationalMessage();
+
+  // Group data by level for display
+  const groupedByLevel = useMemo(() => {
+    const map = new Map<string, UserStats[]>();
+    leaderboardData.forEach(item => {
+      if (!map.has(item.level_id)) {
+        map.set(item.level_id, []);
+      }
+      map.get(item.level_id)!.push(item);
+    });
+    return Array.from(map.entries()).map(([levelId, users]) => ({
+      level_id: levelId,
+      level_name: users[0]?.level_name || 'Unknown',
+      users: users.slice(0, 20)
+    }));
+  }, [leaderboardData]);
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
       <div className="container py-8">
         {/* Breadcrumb */}
         <div className="mb-6">
@@ -340,75 +302,84 @@ const LeaderboardPage = () => {
         </div>
 
         {/* Header */}
-        <div className="mb-8 text-center">
-          <div className="mb-4 inline-flex items-center justify-center rounded-full bg-warning/20 p-4">
-            <Trophy className="h-10 w-10 text-warning" />
+        <div className="mb-10 text-center">
+          <div className="mb-4 inline-flex items-center justify-center">
+            <div className="relative">
+              <div className="absolute inset-0 animate-pulse rounded-full bg-yellow-400/20 blur-xl"></div>
+              <div className="relative rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 p-4 shadow-lg shadow-amber-500/30">
+                <Trophy className="h-10 w-10 text-white" />
+              </div>
+            </div>
           </div>
           <h1 className="mb-3 text-3xl font-bold text-foreground md:text-4xl">
             Bảng xếp hạng
           </h1>
-          <p className="mx-auto max-w-2xl text-muted-foreground">
-            Cạnh tranh lành mạnh, tiến bộ mỗi ngày. Hãy luyện tập đều đặn để chinh phục vị trí cao nhất!
+          <p className="mx-auto max-w-2xl text-muted-foreground text-lg">
+            Cạnh tranh lành mạnh – Tiến bộ mỗi ngày – Mỗi nỗ lực đều được ghi nhận
           </p>
         </div>
 
         {/* Motivation Cards */}
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="rounded-lg bg-primary/20 p-2">
-                <Flame className="h-5 w-5 text-primary" />
+          <Card className="group border-0 bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-950/30 dark:to-amber-950/20 shadow-md hover:shadow-lg transition-all duration-300">
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="rounded-xl bg-gradient-to-br from-yellow-400 to-amber-500 p-3 shadow-md group-hover:scale-110 transition-transform">
+                <Trophy className="h-6 w-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Luyện tập mỗi ngày</p>
-                <p className="font-semibold text-foreground">Tiến bộ vượt trội</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Mục tiêu</p>
+                <p className="font-semibold text-foreground">Chinh phục Top 10</p>
+                <p className="text-sm text-muted-foreground">Nhận vinh danh</p>
               </div>
             </CardContent>
           </Card>
           
-          <Card className="border-warning/20 bg-gradient-to-br from-warning/5 to-warning/10">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="rounded-lg bg-warning/20 p-2">
-                <Star className="h-5 w-5 text-warning" />
+          <Card className="group border-0 bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/20 shadow-md hover:shadow-lg transition-all duration-300">
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="rounded-xl bg-gradient-to-br from-orange-500 to-red-500 p-3 shadow-md group-hover:scale-110 transition-transform">
+                <Flame className="h-6 w-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Chinh phục Top 10</p>
-                <p className="font-semibold text-foreground">Nhận vinh danh</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Thói quen</p>
+                <p className="font-semibold text-foreground">Luyện tập mỗi ngày</p>
+                <p className="text-sm text-muted-foreground">Tiến bộ vượt trội</p>
               </div>
             </CardContent>
           </Card>
           
-          <Card className="border-success/20 bg-gradient-to-br from-success/5 to-success/10">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="rounded-lg bg-success/20 p-2">
-                <TrendingUp className="h-5 w-5 text-success" />
+          <Card className="group border-0 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/20 shadow-md hover:shadow-lg transition-all duration-300">
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 p-3 shadow-md group-hover:scale-110 transition-transform">
+                <TrendingUp className="h-6 w-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Theo dõi tiến độ</p>
-                <p className="font-semibold text-foreground">Cải thiện liên tục</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Theo dõi</p>
+                <p className="font-semibold text-foreground">Theo dõi tiến độ</p>
+                <p className="text-sm text-muted-foreground">Cải thiện liên tục</p>
               </div>
             </CardContent>
           </Card>
           
-          <Card className="border-accent/30 bg-gradient-to-br from-accent/10 to-accent/5">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="rounded-lg bg-accent/30 p-2">
-                <Target className="h-5 w-5 text-accent-foreground" />
+          <Card className="group border-0 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/20 shadow-md hover:shadow-lg transition-all duration-300">
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 p-3 shadow-md group-hover:scale-110 transition-transform">
+                <Target className="h-6 w-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Mục tiêu rõ ràng</p>
-                <p className="font-semibold text-foreground">Đạt điểm cao</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Kết quả</p>
+                <p className="font-semibold text-foreground">Mục tiêu rõ ràng</p>
+                <p className="text-sm text-muted-foreground">Đạt điểm cao</p>
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Filters */}
-        <Card className="mb-8">
+        <Card className="mb-8 border-0 shadow-md">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Filter className="h-5 w-5 text-primary" />
-              Chọn bộ lọc để xem xếp hạng
+              Bộ lọc xếp hạng
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -438,7 +409,7 @@ const LeaderboardPage = () => {
 
               {/* Level Filter */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Cấp độ / Phần</label>
+                <label className="text-sm font-medium text-foreground">Cấp độ</label>
                 <Select 
                   value={selectedLevelId} 
                   onValueChange={setSelectedLevelId}
@@ -466,22 +437,22 @@ const LeaderboardPage = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="all">
+                      <div className="flex items-center gap-2">
+                        <Zap className="h-4 w-4" />
+                        Tất cả thời gian
+                      </div>
+                    </SelectItem>
                     <SelectItem value="week">
                       <div className="flex items-center gap-2">
                         <Clock className="h-4 w-4" />
-                        Tuần này
+                        7 ngày gần nhất
                       </div>
                     </SelectItem>
                     <SelectItem value="month">
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4" />
-                        Tháng này
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="all">
-                      <div className="flex items-center gap-2">
-                        <Zap className="h-4 w-4" />
-                        Tất cả thời gian
+                        30 ngày gần nhất
                       </div>
                     </SelectItem>
                   </SelectContent>
@@ -491,9 +462,349 @@ const LeaderboardPage = () => {
           </CardContent>
         </Card>
 
+        {/* Current User Stats Card */}
+        {hasSelectedFilter && currentUserStats && (
+          <Card className="mb-6 border-0 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent shadow-md overflow-hidden">
+            <CardContent className="p-5 sm:p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    {renderRankBadge(currentUserRank || 0)}
+                    {currentUserRank && currentUserRank <= 10 && (
+                      <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-yellow-400 flex items-center justify-center">
+                        <Star className="h-2.5 w-2.5 text-white" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Thứ hạng của bạn</p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {currentUserStats.display_name}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+                      <Badge variant="secondary" className="bg-primary/10 text-primary">
+                        {currentUserStats.ranking_score.toFixed(0)} điểm
+                      </Badge>
+                      <span className="text-muted-foreground">
+                        {currentUserStats.correct_count}/{currentUserStats.total_attempts} đúng
+                      </span>
+                      <Badge variant="outline" className="text-success border-success/30">
+                        {currentUserStats.accuracy_percent.toFixed(1)}%
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col gap-2 sm:items-end">
+                  {motivationalMessage && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <motivationalMessage.icon className={`h-4 w-4 ${motivationalMessage.color}`} />
+                      <span className="text-muted-foreground">{motivationalMessage.text}</span>
+                    </div>
+                  )}
+                  <Button asChild size="sm" className="bg-gradient-to-r from-primary to-primary/80">
+                    <Link to="/subjects">
+                      <Zap className="mr-2 h-4 w-4" />
+                      Luyện thêm ngay
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Progress bar */}
+              {currentUserRank && currentUserRank > 10 && distanceToTop10 && (
+                <div className="mt-4">
+                  <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                    <span>Tiến độ đến Top 10</span>
+                    <span>Còn {distanceToTop10} điểm</span>
+                  </div>
+                  <Progress value={Math.min(90, 100 - (distanceToTop10 / 10))} className="h-2" />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Motivation for users not on leaderboard */}
+        {hasSelectedFilter && !currentUserStats && user && !isLoading && leaderboardData.length > 0 && (
+          <Card className="mb-6 border-0 bg-gradient-to-r from-orange-500/10 to-amber-500/5 shadow-md">
+            <CardContent className="flex flex-col items-center gap-4 p-6 text-center sm:flex-row sm:text-left">
+              <div className="rounded-full bg-gradient-to-br from-orange-400 to-amber-500 p-4 shadow-lg">
+                <Sparkles className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-foreground">
+                  Bạn chưa có trong bảng xếp hạng này
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Hãy làm bài thi ngay để xuất hiện và cạnh tranh với mọi người nhé! 💪
+                </p>
+              </div>
+              <Button asChild className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600">
+                <Link to="/subjects">
+                  Bắt đầu luyện đề
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Leaderboard Tabs */}
+        {hasSelectedFilter && (
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LeaderboardType)} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 h-auto gap-1 p-1 bg-muted/50">
+              <TabsTrigger 
+                value="overall" 
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-primary/80 data-[state=active]:text-primary-foreground py-3"
+              >
+                <Trophy className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Tổng hợp</span>
+                <span className="sm:hidden">Tổng</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="accuracy"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-500 data-[state=active]:text-white py-3"
+              >
+                <Target className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Chính xác</span>
+                <span className="sm:hidden">Xác</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="diligent"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-red-500 data-[state=active]:text-white py-3"
+              >
+                <Flame className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Chăm chỉ</span>
+                <span className="sm:hidden">Chăm</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="progress"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white py-3"
+              >
+                <TrendingUp className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Tiến bộ</span>
+                <span className="sm:hidden">Tiến</span>
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Tab description */}
+            <div className="mt-4 mb-6 p-3 rounded-lg bg-muted/50 text-center">
+              <p className="text-sm text-muted-foreground">
+                {getTabDescription(activeTab)}
+              </p>
+            </div>
+
+            {/* Loading State */}
+            {isLoading && (
+              <div className="flex items-center justify-center py-16">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+                  <p className="text-muted-foreground">Đang tải bảng xếp hạng...</p>
+                </div>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {!isLoading && leaderboardData.length === 0 && (
+              <Card className="border-0 shadow-md">
+                <CardContent className="py-16 text-center">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                    <User className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="mb-2 text-lg font-semibold text-foreground">
+                    Chưa có dữ liệu xếp hạng
+                  </h3>
+                  <p className="mx-auto mb-6 max-w-md text-muted-foreground">
+                    {activeTab === 'accuracy' 
+                      ? 'Chưa có ai làm đủ 50 câu trong khoảng thời gian này. Hãy là người đầu tiên!'
+                      : 'Chưa có ai làm bài thi trong khoảng thời gian này. Hãy là người đầu tiên!'}
+                  </p>
+                  <Button asChild className="bg-gradient-to-r from-primary to-primary/80">
+                    <Link to="/subjects">
+                      <BookOpen className="mr-2 h-4 w-4" />
+                      Bắt đầu luyện đề ngay
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Leaderboard Content */}
+            {!isLoading && leaderboardData.length > 0 && (
+              <div className="space-y-6">
+                {groupedByLevel.map((group) => (
+                  <Card key={group.level_id} className="border-0 shadow-md overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent pb-4">
+                      <CardTitle className="flex items-center gap-3">
+                        <div className="rounded-lg bg-primary/10 p-2">
+                          <Trophy className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <span className="text-lg">{group.level_name}</span>
+                          <p className="text-sm font-normal text-muted-foreground mt-0.5">
+                            {group.users.length} người tham gia
+                          </p>
+                        </div>
+                      </CardTitle>
+                    </CardHeader>
+                    
+                    <CardContent className="p-0">
+                      {/* Top 3 Podium */}
+                      {group.users.length >= 3 && (
+                        <div className="grid gap-4 p-6 sm:grid-cols-3 bg-gradient-to-b from-muted/50 to-transparent">
+                          {/* Second Place */}
+                          <div className="order-1 sm:order-1">
+                            <TopUserCard 
+                              user={group.users[1]} 
+                              rank={2} 
+                              isCurrentUser={user?.id === group.users[1].user_id}
+                              activeTab={activeTab}
+                            />
+                          </div>
+                          {/* First Place */}
+                          <div className="order-0 sm:order-2 sm:-mt-4">
+                            <TopUserCard 
+                              user={group.users[0]} 
+                              rank={1} 
+                              isCurrentUser={user?.id === group.users[0].user_id}
+                              activeTab={activeTab}
+                            />
+                          </div>
+                          {/* Third Place */}
+                          <div className="order-2 sm:order-3">
+                            <TopUserCard 
+                              user={group.users[2]} 
+                              rank={3} 
+                              isCurrentUser={user?.id === group.users[2].user_id}
+                              activeTab={activeTab}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Table for remaining users */}
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+                            <TableHead className="w-[70px] text-center">Hạng</TableHead>
+                            <TableHead>Người dùng</TableHead>
+                            <TableHead className="w-[100px] text-center">
+                              {activeTab === 'overall' ? 'Điểm XH' : 
+                               activeTab === 'accuracy' ? 'Tỷ lệ đúng' :
+                               activeTab === 'diligent' ? 'Tổng câu' : 'Tiến bộ'}
+                            </TableHead>
+                            <TableHead className="w-[100px] text-center hidden sm:table-cell">Tổng câu</TableHead>
+                            <TableHead className="w-[100px] text-center hidden md:table-cell">Tỷ lệ đúng</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {group.users.slice(group.users.length >= 3 ? 3 : 0).map((item, index) => {
+                            const rank = group.users.length >= 3 ? index + 4 : index + 1;
+                            const isCurrentUser = user?.id === item.user_id;
+
+                            return (
+                              <TableRow
+                                key={item.user_id}
+                                className={isCurrentUser ? 'bg-primary/5 border-l-4 border-l-primary' : ''}
+                              >
+                                <TableCell className="text-center">
+                                  <div className="flex justify-center">
+                                    {renderRankBadge(rank)}
+                                  </div>
+                                </TableCell>
+
+                                <TableCell>
+                                  <div className="flex items-center gap-3">
+                                    <Avatar className="h-10 w-10">
+                                      <AvatarImage src={item.avatar_url || undefined} />
+                                      <AvatarFallback className="bg-primary/10 text-primary">
+                                        <User className="h-5 w-5" />
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <p className="font-medium text-foreground flex items-center gap-2">
+                                        {item.display_name}
+                                        {isCurrentUser && (
+                                          <Badge variant="outline" className="text-xs">Bạn</Badge>
+                                        )}
+                                      </p>
+                                      {item.streak_days > 0 && activeTab === 'diligent' && (
+                                        <p className="text-xs text-orange-500 flex items-center gap-1">
+                                          <Flame className="h-3 w-3" />
+                                          {item.streak_days} ngày hoạt động
+                                        </p>
+                                      )}
+                                      <p className="text-xs text-muted-foreground sm:hidden">
+                                        {item.total_attempts} câu • {item.accuracy_percent.toFixed(1)}%
+                                      </p>
+                                    </div>
+                                  </div>
+                                </TableCell>
+
+                                <TableCell className="text-center">
+                                  {activeTab === 'overall' && (
+                                    <span className="font-semibold text-primary">
+                                      {item.ranking_score.toFixed(0)}
+                                    </span>
+                                  )}
+                                  {activeTab === 'accuracy' && (
+                                    <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/20">
+                                      {item.accuracy_percent.toFixed(1)}%
+                                    </Badge>
+                                  )}
+                                  {activeTab === 'diligent' && (
+                                    <span className="font-semibold text-orange-500">
+                                      {item.total_attempts}
+                                    </span>
+                                  )}
+                                  {activeTab === 'progress' && (
+                                    <Badge className={`${
+                                      item.improvement_percent > 0 
+                                        ? 'bg-green-500/10 text-green-600' 
+                                        : item.improvement_percent < 0
+                                        ? 'bg-red-500/10 text-red-600'
+                                        : 'bg-muted text-muted-foreground'
+                                    }`}>
+                                      {item.improvement_percent > 0 ? '+' : ''}{item.improvement_percent.toFixed(1)}%
+                                    </Badge>
+                                  )}
+                                </TableCell>
+
+                                <TableCell className="text-center hidden sm:table-cell">
+                                  <span className="text-muted-foreground">{item.total_attempts}</span>
+                                </TableCell>
+
+                                <TableCell className="text-center hidden md:table-cell">
+                                  <Badge
+                                    variant="secondary"
+                                    className={`${
+                                      item.accuracy_percent >= 80
+                                        ? 'bg-success/10 text-success'
+                                        : item.accuracy_percent >= 60
+                                        ? 'bg-warning/10 text-warning'
+                                        : 'bg-muted text-muted-foreground'
+                                    }`}
+                                  >
+                                    {item.accuracy_percent.toFixed(1)}%
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </Tabs>
+        )}
+
         {/* Prompt to select filter */}
         {!hasSelectedFilter && (
-          <Card className="border-dashed">
+          <Card className="border-dashed border-2 shadow-none">
             <CardContent className="py-16 text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
                 <BookOpen className="h-8 w-8 text-muted-foreground" />
@@ -509,314 +820,24 @@ const LeaderboardPage = () => {
           </Card>
         )}
 
-        {/* Current User Stats Card */}
-        {hasSelectedFilter && currentUserStats && (
-          <Card className="mb-6 border-primary/30 bg-gradient-to-r from-primary/5 to-transparent">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground text-xl font-bold">
-                    #{currentUserRank}
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Thứ hạng của bạn</p>
-                    <p className="text-lg font-semibold text-foreground">
-                      {currentUserStats.display_name}
-                    </p>
-                    <div className="mt-1 flex items-center gap-3 text-sm">
-                      <span className="text-muted-foreground">
-                        {currentUserStats.correct_count}/{currentUserStats.total_questions_in_db} câu đúng
-                      </span>
-                      <Badge variant="secondary" className="bg-primary/10 text-primary">
-                        {currentUserStats.accuracy.toFixed(1)}%
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex flex-col gap-2 sm:items-end">
-                  {distanceToTop10 !== null && distanceToTop10 > 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      Còn <span className="font-semibold text-primary">{distanceToTop10} điểm</span> để vào Top 10
-                    </p>
-                  )}
-                  {currentUserRank && currentUserRank <= 10 && (
-                    <Badge className="bg-warning text-warning-foreground">
-                      <Star className="mr-1 h-3 w-3" />
-                      Top 10
-                    </Badge>
-                  )}
-                  <Button asChild size="sm">
-                    <Link to="/subjects">
-                      <Zap className="mr-2 h-4 w-4" />
-                      Luyện thêm ngay
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-              
-              {/* Progress to next milestone */}
-              {currentUserRank && currentUserRank > 10 && (
-                <div className="mt-4">
-                  <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-                    <span>Tiến độ đến Top 10</span>
-                    <span>{Math.max(0, 100 - (distanceToTop10 || 0))}%</span>
-                  </div>
-                  <Progress value={Math.max(0, 100 - (distanceToTop10 || 0))} className="h-2" />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Motivation Message */}
-        {hasSelectedFilter && !currentUserStats && user && !isLoading && levelLeaderboards.length > 0 && (
-          <Card className="mb-6 border-warning/30 bg-gradient-to-r from-warning/5 to-transparent">
-            <CardContent className="flex flex-col items-center gap-4 p-6 text-center sm:flex-row sm:text-left">
-              <div className="rounded-full bg-warning/20 p-3">
-                <TrendingUp className="h-6 w-6 text-warning" />
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-foreground">
-                  Bạn chưa có trong bảng xếp hạng này
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Hãy làm bài thi ngay để xuất hiện và cạnh tranh với mọi người!
-                </p>
-              </div>
-              <Button asChild>
-                <Link to="/subjects">
-                  Bắt đầu luyện đề
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Leaderboards by Level */}
-        {hasSelectedFilter && (
-          <>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-16">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                  <p className="text-muted-foreground">Đang tải bảng xếp hạng...</p>
-                </div>
-              </div>
-            ) : levelLeaderboards.length === 0 ? (
-              <Card>
-                <CardContent className="py-16 text-center">
-                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-                    <User className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                  <h3 className="mb-2 text-lg font-semibold text-foreground">
-                    Chưa có dữ liệu xếp hạng
-                  </h3>
-                  <p className="mx-auto mb-6 max-w-md text-muted-foreground">
-                    Chưa có ai làm bài thi trong {getTimeRangeLabel(timeRange).toLowerCase()} cho môn học này. 
-                    Hãy là người đầu tiên!
-                  </p>
-                  <Button asChild>
-                    <Link to="/subjects">
-                      <BookOpen className="mr-2 h-4 w-4" />
-                      Bắt đầu luyện đề ngay
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {levelLeaderboards.map((lb) => (
-                  <Collapsible
-                    key={lb.level.id}
-                    open={expandedLevels.has(lb.level.id)}
-                    onOpenChange={() => toggleLevel(lb.level.id)}
-                  >
-                    <Card>
-                      <CollapsibleTrigger className="flex w-full items-center justify-between p-4 hover:bg-muted/50 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/10">
-                            <Trophy className="h-6 w-6 text-primary" />
-                          </div>
-                          <div className="text-left">
-                            <h3 className="text-lg font-semibold text-foreground">{lb.level.name}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {lb.users.length} người tham gia • {lb.total_questions} câu hỏi
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <Badge variant="secondary" className="hidden sm:inline-flex">
-                            Top {Math.min(lb.users.length, 20)}
-                          </Badge>
-                          {expandedLevels.has(lb.level.id) ? (
-                            <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                          ) : (
-                            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                          )}
-                        </div>
-                      </CollapsibleTrigger>
-
-                      <CollapsibleContent>
-                        <div className="border-t border-border">
-                          {/* Top 3 Highlight */}
-                          {lb.users.length >= 3 && (
-                            <div className="grid gap-3 p-4 sm:grid-cols-3 bg-gradient-to-b from-muted/30 to-transparent">
-                              {lb.users.slice(0, 3).map((item, index) => {
-                                const rank = index + 1;
-                                const isCurrentUser = user?.id === item.user_id;
-                                const bgColors = [
-                                  'from-warning/20 to-warning/5 border-warning/30',
-                                  'from-muted/40 to-muted/20 border-muted-foreground/30',
-                                  'from-warning/15 to-warning/5 border-warning/25',
-                                ];
-                                
-                                return (
-                                  <div 
-                                    key={item.user_id}
-                                    className={`relative rounded-xl border bg-gradient-to-br p-4 ${bgColors[index]} ${isCurrentUser ? 'ring-2 ring-primary' : ''}`}
-                                  >
-                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                                      {renderRankBadge(rank)}
-                                    </div>
-                                    <div className="mt-4 text-center">
-                                      {item.avatar_url ? (
-                                        <img
-                                          src={item.avatar_url}
-                                          alt={item.display_name}
-                                          className="mx-auto h-12 w-12 rounded-full object-cover"
-                                        />
-                                      ) : (
-                                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                                          <User className="h-6 w-6" />
-                                        </div>
-                                      )}
-                                      <p className="mt-2 font-semibold text-foreground truncate">
-                                        {item.display_name}
-                                        {isCurrentUser && (
-                                          <Badge variant="outline" className="ml-1 text-xs">Bạn</Badge>
-                                        )}
-                                      </p>
-                                      <p className="text-sm text-muted-foreground">
-                                        {item.total_score} điểm
-                                      </p>
-                                      <Badge variant="secondary" className="mt-2">
-                                        {item.accuracy.toFixed(1)}%
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                          
-                          {/* Table for remaining users */}
-                          <Table>
-                            <TableHeader>
-                              <TableRow className="bg-muted/30 hover:bg-muted/30">
-                                <TableHead className="w-[80px] text-center">Hạng</TableHead>
-                                <TableHead>Người dùng</TableHead>
-                                <TableHead className="w-[100px] text-center hidden sm:table-cell">Điểm</TableHead>
-                                <TableHead className="w-[100px] text-center hidden sm:table-cell">Số đề</TableHead>
-                                <TableHead className="w-[120px] text-center">Tỷ lệ đúng</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {lb.users.slice(lb.users.length >= 3 ? 3 : 0).map((item, index) => {
-                                const rank = lb.users.length >= 3 ? index + 4 : index + 1;
-                                const isCurrentUser = user?.id === item.user_id;
-
-                                return (
-                                  <TableRow
-                                    key={item.user_id}
-                                    className={isCurrentUser ? 'bg-primary/5 border-l-4 border-l-primary' : ''}
-                                  >
-                                    <TableCell className="text-center">
-                                      <div className="flex justify-center">
-                                        {renderRankBadge(rank)}
-                                      </div>
-                                    </TableCell>
-
-                                    <TableCell>
-                                      <div className="flex items-center gap-3">
-                                        {item.avatar_url ? (
-                                          <img
-                                            src={item.avatar_url}
-                                            alt={item.display_name}
-                                            className="h-10 w-10 rounded-full object-cover"
-                                          />
-                                        ) : (
-                                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                                            <User className="h-5 w-5" />
-                                          </div>
-                                        )}
-                                        <div>
-                                          <p className="font-medium text-foreground">
-                                            {item.display_name}
-                                            {isCurrentUser && (
-                                              <Badge variant="outline" className="ml-2 text-xs">Bạn</Badge>
-                                            )}
-                                          </p>
-                                          <p className="text-xs text-muted-foreground sm:hidden">
-                                            {item.total_score} điểm • {item.correct_count}/{item.total_questions_in_db}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    </TableCell>
-
-                                    <TableCell className="text-center hidden sm:table-cell">
-                                      <span className="font-semibold text-foreground">{item.total_score}</span>
-                                    </TableCell>
-
-                                    <TableCell className="text-center hidden sm:table-cell">
-                                      <span className="text-muted-foreground">
-                                        {item.correct_count}/{item.total_questions_in_db}
-                                      </span>
-                                    </TableCell>
-
-                                    <TableCell className="text-center">
-                                      <Badge
-                                        variant="secondary"
-                                        className={`${
-                                          item.accuracy >= 80
-                                            ? 'bg-success/10 text-success hover:bg-success/20'
-                                            : item.accuracy >= 60
-                                            ? 'bg-warning/10 text-warning hover:bg-warning/20'
-                                            : 'bg-destructive/10 text-destructive hover:bg-destructive/20'
-                                        }`}
-                                      >
-                                        {item.accuracy.toFixed(1)}%
-                                      </Badge>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      </CollapsibleContent>
-                    </Card>
-                  </Collapsible>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-
         {/* CTA Section */}
         {hasSelectedFilter && !isLoading && (
-          <Card className="mt-8 border-primary/20 bg-gradient-to-r from-primary/5 via-transparent to-primary/5">
+          <Card className="mt-8 border-0 bg-gradient-to-r from-primary/10 via-transparent to-primary/10 shadow-md">
             <CardContent className="flex flex-col items-center gap-4 py-8 text-center sm:flex-row sm:justify-between sm:text-left">
-              <div>
-                <h3 className="text-lg font-semibold text-foreground">
-                  Sẵn sàng cải thiện thứ hạng?
-                </h3>
-                <p className="text-muted-foreground">
-                  Mỗi bài luyện tập đều giúp bạn tiến gần hơn đến mục tiêu!
-                </p>
+              <div className="flex items-center gap-4">
+                <div className="rounded-full bg-primary/10 p-3">
+                  <Heart className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground">
+                    Sẵn sàng cải thiện thứ hạng?
+                  </h3>
+                  <p className="text-muted-foreground">
+                    Mỗi bài luyện tập đều giúp bạn tiến gần hơn đến mục tiêu!
+                  </p>
+                </div>
               </div>
-              <Button asChild size="lg">
+              <Button asChild size="lg" className="bg-gradient-to-r from-primary to-primary/80">
                 <Link to="/subjects">
                   <BookOpen className="mr-2 h-5 w-5" />
                   Bắt đầu luyện đề ngay
@@ -827,10 +848,104 @@ const LeaderboardPage = () => {
         )}
 
         {/* Info Footer */}
-        {!isLoading && hasSelectedFilter && levelLeaderboards.length > 0 && (
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            Xếp hạng dựa trên tổng điểm (số câu đúng × 10 + % chính xác). Chỉ hiển thị người dùng đã đăng nhập.
+        {!isLoading && hasSelectedFilter && leaderboardData.length > 0 && (
+          <div className="mt-8 text-center">
+            <Card className="inline-block border-0 bg-muted/50">
+              <CardContent className="py-4 px-6">
+                <p className="text-sm text-muted-foreground">
+                  <strong className="text-foreground">Công thức tính điểm:</strong>{' '}
+                  Điểm = Tỷ lệ đúng (%) × √(Tổng số câu đã làm)
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Công thức này đảm bảo cân bằng giữa độ chính xác và sự chăm chỉ
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Top 3 User Card Component
+interface TopUserCardProps {
+  user: UserStats;
+  rank: number;
+  isCurrentUser: boolean;
+  activeTab: LeaderboardType;
+}
+
+const TopUserCard = ({ user, rank, isCurrentUser, activeTab }: TopUserCardProps) => {
+  const bgColors = {
+    1: 'from-yellow-100 to-amber-100 dark:from-yellow-950/50 dark:to-amber-950/40 border-yellow-300 dark:border-yellow-700',
+    2: 'from-slate-100 to-gray-100 dark:from-slate-900/50 dark:to-gray-900/40 border-slate-300 dark:border-slate-700',
+    3: 'from-amber-100 to-orange-100 dark:from-amber-950/50 dark:to-orange-950/40 border-amber-400 dark:border-amber-800',
+  };
+
+  const icons = {
+    1: <Crown className="h-5 w-5 text-yellow-500" />,
+    2: <Medal className="h-5 w-5 text-slate-500" />,
+    3: <Award className="h-5 w-5 text-amber-600" />,
+  };
+
+  return (
+    <div 
+      className={`relative rounded-2xl border-2 bg-gradient-to-br p-5 text-center transition-all hover:shadow-lg ${
+        bgColors[rank as keyof typeof bgColors]
+      } ${isCurrentUser ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+    >
+      {/* Rank Icon */}
+      <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+        <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-white dark:bg-background shadow-lg border-2 ${
+          rank === 1 ? 'border-yellow-400' : rank === 2 ? 'border-slate-400' : 'border-amber-500'
+        }`}>
+          {icons[rank as keyof typeof icons]}
+        </div>
+      </div>
+
+      {/* Avatar */}
+      <div className="mt-4 flex justify-center">
+        <Avatar className={`${rank === 1 ? 'h-16 w-16' : 'h-14 w-14'} ring-4 ring-white dark:ring-background shadow-lg`}>
+          <AvatarImage src={user.avatar_url || undefined} />
+          <AvatarFallback className="bg-primary/10 text-primary text-lg">
+            <User className="h-6 w-6" />
+          </AvatarFallback>
+        </Avatar>
+      </div>
+
+      {/* User Info */}
+      <p className="mt-3 font-semibold text-foreground truncate">
+        {user.display_name}
+        {isCurrentUser && (
+          <Badge variant="outline" className="ml-1 text-xs">Bạn</Badge>
+        )}
+      </p>
+
+      {/* Stats based on tab */}
+      <div className="mt-2 space-y-1">
+        {activeTab === 'overall' && (
+          <p className="text-2xl font-bold text-primary">{user.ranking_score.toFixed(0)}</p>
+        )}
+        {activeTab === 'accuracy' && (
+          <p className="text-2xl font-bold text-green-600">{user.accuracy_percent.toFixed(1)}%</p>
+        )}
+        {activeTab === 'diligent' && (
+          <p className="text-2xl font-bold text-orange-500">{user.total_attempts}</p>
+        )}
+        {activeTab === 'progress' && (
+          <p className={`text-2xl font-bold ${user.improvement_percent >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+            {user.improvement_percent > 0 ? '+' : ''}{user.improvement_percent.toFixed(1)}%
           </p>
+        )}
+        <p className="text-sm text-muted-foreground">
+          {user.total_attempts} câu • {user.accuracy_percent.toFixed(1)}% đúng
+        </p>
+        {user.streak_days > 0 && activeTab === 'diligent' && (
+          <div className="flex items-center justify-center gap-1 text-sm text-orange-500">
+            <Flame className="h-4 w-4" />
+            {user.streak_days} ngày hoạt động
+          </div>
         )}
       </div>
     </div>
