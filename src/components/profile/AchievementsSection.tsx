@@ -11,12 +11,15 @@ import {
   type Achievement,
   type UserStatsForAchievements 
 } from '@/components/ui/AchievementBadge';
+import { ShareableAchievementCard } from './ShareableAchievementCard';
 
 interface AchievementsSectionProps {
   userId: string;
+  displayName?: string;
+  avatarUrl?: string;
 }
 
-export function AchievementsSection({ userId }: AchievementsSectionProps) {
+export function AchievementsSection({ userId, displayName, avatarUrl }: AchievementsSectionProps) {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<UserStatsForAchievements | null>(null);
@@ -107,12 +110,22 @@ export function AchievementsSection({ userId }: AchievementsSectionProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-yellow-500" />
+            <Trophy className="h-5 w-5 text-amber-500" />
             <CardTitle className="text-lg">Thành tích</CardTitle>
           </div>
-          <span className="text-sm text-muted-foreground">
-            {earnedCount}/{totalCount} đạt được
-          </span>
+          <div className="flex items-center gap-2">
+            {stats && earnedCount > 0 && (
+              <ShareableAchievementCard
+                achievements={achievements}
+                stats={stats}
+                displayName={displayName || 'Người dùng'}
+                avatarUrl={avatarUrl}
+              />
+            )}
+            <span className="text-sm text-muted-foreground">
+              {earnedCount}/{totalCount} đạt được
+            </span>
+          </div>
         </div>
         <CardDescription>
           Huy hiệu ghi nhận những mốc quan trọng trong hành trình học tập của bạn

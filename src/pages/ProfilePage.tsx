@@ -384,7 +384,11 @@ export default function ProfilePage() {
       </Card>
 
       {/* Achievements Section */}
-      <AchievementsSection userId={user.id} />
+      <AchievementsSection 
+        userId={user.id} 
+        displayName={displayName || nickname || 'Người dùng'}
+        avatarUrl={avatarUrl}
+      />
     </div>
   );
 }
