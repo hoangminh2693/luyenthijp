@@ -1,11 +1,11 @@
 import { useParams, Navigate, Link } from 'react-router-dom';
-import { Play, Loader2 } from 'lucide-react';
+import { Play, Loader2, Headphones } from 'lucide-react';
 import { getExamsBySection } from '@/data/quizData';
 import { ExamCard } from '@/components/ui/ExamCard';
 import { Breadcrumb } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { useSubjectBySlug, useLevelBySlug, useSectionBySlug } from '@/hooks/useSections';
-import { useQuestionCount } from '@/hooks/useQuestions';
+import { useQuestionCount, useListeningExams } from '@/hooks/useQuestions';
 
 /**
  * ExamsPage - Trang danh sách đề thi theo phần
@@ -22,7 +22,13 @@ const ExamsPage = () => {
   const { data: level, isLoading: loadingLevel } = useLevelBySlug(subject?.id, levelSlug);
   const { data: section, isLoading: loadingSection } = useSectionBySlug(level?.id, sectionSlug);
   const { data: totalQuestions = 0 } = useQuestionCount(section?.id);
-
+  
+  // Kiểm tra xem có phải phần nghe không
+  const isListeningSection = section?.fixed_exam_mode ?? false;
+  const { data: listeningExams = [] } = useListeningExams(
+    isListeningSection ? section?.id : undefined
+  );
+  
   const isLoading = loadingSubject || loadingLevel || loadingSection;
 
   // Loading state
@@ -49,6 +55,11 @@ const ExamsPage = () => {
 
   // Lấy danh sách đề thi của phần (từ hardcoded data - có thể migrate sau)
   const exams = getExamsBySection(section.id);
+  
+  // Số liệu cho phần nghe
+  const listeningQuestionCount = listeningExams.length > 0 
+    ? Math.round(listeningExams.reduce((sum, e) => sum + e.questionCount, 0) / listeningExams.length)
+    : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -76,16 +87,25 @@ const ExamsPage = () => {
                 {section.name}
               </h1>
               <p className="text-muted-foreground">
-                {subject.name} - {level.name} | {totalQuestions} câu hỏi
+                {subject.name} - {level.name} | {isListeningSection ? `${listeningExams.length} đề nghe` : `${totalQuestions} câu hỏi`}
               </p>
             </div>
           </div>
           
-          {/* Start quiz button */}
+          {/* Start quiz button - thay đổi icon và text cho phần nghe */}
           <Link to={`/start/${subject.slug}/${level.slug}/${section.slug}`}>
             <Button size="lg" className="gap-2">
-              <Play className="h-5 w-5" />
-              Làm bài ngay
+              {isListeningSection ? (
+                <>
+                  <Headphones className="h-5 w-5" />
+                  Làm đề nghe
+                </>
+              ) : (
+                <>
+                  <Play className="h-5 w-5" />
+                  Làm bài ngay
+                </>
+              )}
             </Button>
           </Link>
         </div>

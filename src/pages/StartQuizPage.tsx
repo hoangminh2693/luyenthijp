@@ -2,6 +2,10 @@
  * StartQuizPage - Trang cấu hình trước khi bắt đầu làm bài
  * Bao gồm giới thiệu chi tiết về kỳ thi và cho phép chọn số lượng câu hỏi
  * Yêu cầu đăng nhập trước khi làm bài
+ * 
+ * Logic tách riêng cho phần 聴解:
+ * - fixed_exam_mode = true: Không chọn số lượng, làm theo đề nghe hoàn chỉnh
+ * - Các phần khác: Cho phép random và chọn số lượng như bình thường
  */
 import { useState, useEffect } from 'react';
 import { useParams, Navigate, useNavigate, Link } from 'react-router-dom';
@@ -16,13 +20,15 @@ import {
   CheckCircle,
   Info,
   Lightbulb,
-  LogIn
+  LogIn,
+  Headphones
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/layout/Header';
 import { QuestionCountSelector } from '@/components/quiz/QuestionCountSelector';
+import { ListeningExamSelector } from '@/components/quiz/ListeningExamSelector';
 import { useSubjectBySlug, useLevelBySlug, useSectionBySlug } from '@/hooks/useSections';
-import { useQuestionCount } from '@/hooks/useQuestions';
+import { useQuestionCount, useListeningExams } from '@/hooks/useQuestions';
 import { useAuth } from '@/contexts/AuthContext';
 
 const QUESTION_COUNTS = [5, 10, 20, 50];
@@ -127,19 +133,25 @@ const StartQuizPage = () => {
   const { data: level, isLoading: loadingLevel } = useLevelBySlug(subject?.id, levelSlug);
   const { data: section, isLoading: loadingSection } = useSectionBySlug(level?.id, sectionSlug);
   const { data: totalQuestions = 0, isLoading: loadingCount } = useQuestionCount(section?.id);
+  
+  // Fetch listening exams nếu là phần nghe (fixed_exam_mode)
+  const isListeningSection = section?.fixed_exam_mode ?? false;
+  const { data: listeningExams = [], isLoading: loadingListening } = useListeningExams(
+    isListeningSection ? section?.id : undefined
+  );
 
   // State
   const [questionCount, setQuestionCount] = useState<number>(5);
 
-  // Set default count based on available questions
+  // Set default count based on available questions (chỉ cho các phần không phải nghe)
   useEffect(() => {
-    if (totalQuestions > 0) {
+    if (!isListeningSection && totalQuestions > 0) {
       const defaultCount = QUESTION_COUNTS.find((c) => c <= totalQuestions) || totalQuestions;
       setQuestionCount(Math.min(defaultCount, totalQuestions));
     }
-  }, [totalQuestions]);
+  }, [totalQuestions, isListeningSection]);
 
-  const isLoading = authLoading || loadingSubject || loadingLevel || loadingSection || loadingCount;
+  const isLoading = authLoading || loadingSubject || loadingLevel || loadingSection || loadingCount || (isListeningSection && loadingListening);
 
   // Loading state
   if (isLoading) {
@@ -188,11 +200,24 @@ const StartQuizPage = () => {
   }
 
   const handleStartQuiz = () => {
-    navigate(`/quiz/${subjectSlug}/${levelSlug}/${sectionSlug}?count=${questionCount}`);
+    if (isListeningSection) {
+      // Phần nghe: dùng mode=listening để QuizPage biết cần load đề nghe
+      navigate(`/quiz/${subjectSlug}/${levelSlug}/${sectionSlug}?mode=listening`);
+    } else {
+      // Các phần khác: truyền số lượng câu hỏi như bình thường
+      navigate(`/quiz/${subjectSlug}/${levelSlug}/${sectionSlug}?count=${questionCount}`);
+    }
   };
 
-  // Tính thời gian ước tính (1.5 phút / câu)
-  const estimatedMinutes = Math.ceil(questionCount * 1.5);
+  // Tính thời gian ước tính
+  // Phần nghe: 2 phút/câu (vì phải nghe audio)
+  // Phần khác: 1.5 phút/câu
+  const listeningQuestionCount = listeningExams.length > 0 
+    ? Math.round(listeningExams.reduce((sum, e) => sum + e.questionCount, 0) / listeningExams.length)
+    : 0;
+  const estimatedMinutes = isListeningSection 
+    ? Math.ceil(listeningQuestionCount * 2)
+    : Math.ceil(questionCount * 1.5);
 
   // Lấy thông tin giới thiệu
   const introduction = getExamIntroduction(subjectSlug, levelSlug, section.name);
@@ -230,32 +255,41 @@ const StartQuizPage = () => {
                 </p>
               </div>
 
-              {/* Stats */}
-              <div className="mb-8 grid grid-cols-2 gap-4">
-                <div className="flex items-center gap-3 rounded-lg bg-muted/30 p-4">
-                  <HelpCircle className="h-5 w-5 text-primary flex-shrink-0" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Tổng câu hỏi</p>
-                    <p className="font-semibold text-foreground">{totalQuestions} câu</p>
+              {/* Stats - ẩn nếu là phần nghe vì đã hiển thị trong ListeningExamSelector */}
+              {!isListeningSection && (
+                <div className="mb-8 grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3 rounded-lg bg-muted/30 p-4">
+                    <HelpCircle className="h-5 w-5 text-primary flex-shrink-0" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Tổng câu hỏi</p>
+                      <p className="font-semibold text-foreground">{totalQuestions} câu</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 rounded-lg bg-muted/30 p-4">
+                    <Clock className="h-5 w-5 text-primary flex-shrink-0" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Thời gian ước tính</p>
+                      <p className="font-semibold text-foreground">~{estimatedMinutes} phút</p>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 rounded-lg bg-muted/30 p-4">
-                  <Clock className="h-5 w-5 text-primary flex-shrink-0" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Thời gian ước tính</p>
-                    <p className="font-semibold text-foreground">~{estimatedMinutes} phút</p>
-                  </div>
-                </div>
-              </div>
+              )}
 
-              {/* Question count selector */}
+              {/* Question count selector hoặc Listening exam selector */}
               <div className="mb-8">
-                <QuestionCountSelector
-                  counts={QUESTION_COUNTS}
-                  selectedCount={questionCount}
-                  maxAvailable={totalQuestions}
-                  onSelect={setQuestionCount}
-                />
+                {isListeningSection ? (
+                  <ListeningExamSelector
+                    totalExams={listeningExams.length}
+                    questionCount={listeningQuestionCount}
+                  />
+                ) : (
+                  <QuestionCountSelector
+                    counts={QUESTION_COUNTS}
+                    selectedCount={questionCount}
+                    maxAvailable={totalQuestions}
+                    onSelect={setQuestionCount}
+                  />
+                )}
               </div>
 
               {/* Start button */}
@@ -263,15 +297,28 @@ const StartQuizPage = () => {
                 onClick={handleStartQuiz}
                 size="lg"
                 className="w-full gap-2"
-                disabled={totalQuestions === 0}
+                disabled={isListeningSection ? listeningExams.length === 0 : totalQuestions === 0}
               >
-                <Play className="h-5 w-5" />
-                Bắt đầu làm bài ({questionCount} câu)
+                {isListeningSection ? (
+                  <Headphones className="h-5 w-5" />
+                ) : (
+                  <Play className="h-5 w-5" />
+                )}
+                {isListeningSection 
+                  ? 'Bắt đầu làm đề nghe'
+                  : `Bắt đầu làm bài (${questionCount} câu)`
+                }
               </Button>
 
-              {totalQuestions === 0 && (
+              {!isListeningSection && totalQuestions === 0 && (
                 <p className="mt-4 text-center text-sm text-muted-foreground">
                   Chưa có câu hỏi nào cho phần này. Vui lòng quay lại sau.
+                </p>
+              )}
+              
+              {isListeningSection && listeningExams.length === 0 && (
+                <p className="mt-4 text-center text-sm text-muted-foreground">
+                  Chưa có đề nghe nào cho phần này. Vui lòng quay lại sau.
                 </p>
               )}
             </div>

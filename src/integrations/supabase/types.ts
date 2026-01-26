@@ -223,8 +223,11 @@ export type Database = {
       }
       sections: {
         Row: {
+          allow_count_selection: boolean
+          allow_random: boolean
           created_at: string
           description: string | null
+          fixed_exam_mode: boolean
           icon: string | null
           id: string
           level_id: string
@@ -233,8 +236,11 @@ export type Database = {
           slug: string
         }
         Insert: {
+          allow_count_selection?: boolean
+          allow_random?: boolean
           created_at?: string
           description?: string | null
+          fixed_exam_mode?: boolean
           icon?: string | null
           id?: string
           level_id: string
@@ -243,8 +249,11 @@ export type Database = {
           slug: string
         }
         Update: {
+          allow_count_selection?: boolean
+          allow_random?: boolean
           created_at?: string
           description?: string | null
+          fixed_exam_mode?: boolean
           icon?: string | null
           id?: string
           level_id?: string

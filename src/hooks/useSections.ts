@@ -9,6 +9,10 @@ export interface Section {
   icon: string | null;
   level_id: string;
   order_index: number | null;
+  // Cấu hình logic làm bài - cho phép mở rộng linh hoạt cho các môn học khác
+  allow_random: boolean;
+  allow_count_selection: boolean;
+  fixed_exam_mode: boolean;
 }
 
 export interface Level {
