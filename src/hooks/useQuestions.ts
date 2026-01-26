@@ -188,3 +188,127 @@ export function useQuestionCount(sectionId: string | undefined) {
     enabled: !!sectionId,
   });
 }
+
+// Interface cho đề nghe (listening exam)
+export interface ListeningExam {
+  audioUrl: string;
+  questions: Question[];
+  questionCount: number;
+}
+
+// Hook lấy danh sách các đề nghe (nhóm theo audio_url) cho phần 聴解
+export function useListeningExams(sectionId: string | undefined) {
+  return useQuery({
+    queryKey: ['listening-exams', sectionId],
+    queryFn: async () => {
+      if (!sectionId) return [];
+      
+      // Lấy tất cả câu hỏi có audio_url từ section này
+      const { data, error } = await supabase
+        .from('questions_safe')
+        .select('*')
+        .eq('section_id', sectionId)
+        .not('audio_url', 'is', null);
+      
+      if (error) throw error;
+      
+      const questions = data as DbQuestionSafe[] || [];
+      
+      // Nhóm theo audio_url - mỗi audio = 1 đề nghe
+      const examsByAudio = new Map<string, DbQuestionSafe[]>();
+      
+      for (const q of questions) {
+        if (!q.audio_url) continue;
+        
+        if (!examsByAudio.has(q.audio_url)) {
+          examsByAudio.set(q.audio_url, []);
+        }
+        examsByAudio.get(q.audio_url)!.push(q);
+      }
+      
+      // Chuyển đổi thành mảng ListeningExam
+      const exams: ListeningExam[] = [];
+      
+      for (const [audioUrl, examQuestions] of examsByAudio) {
+        const grouped = groupQuestionsWithChildrenSafe(examQuestions);
+        const questionCount = grouped.reduce((total, q) => {
+          if (q.subQuestions && q.subQuestions.length > 0) {
+            return total + q.subQuestions.length;
+          }
+          return total + 1;
+        }, 0);
+        
+        exams.push({
+          audioUrl,
+          questions: grouped,
+          questionCount,
+        });
+      }
+      
+      return exams;
+    },
+    enabled: !!sectionId,
+  });
+}
+
+// Hook lấy 1 đề nghe ngẫu nhiên cho phần 聴解
+export function useRandomListeningExam(sectionId: string | undefined, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['listening-exam', 'random', sectionId],
+    queryFn: async () => {
+      if (!sectionId) return null;
+      
+      // Lấy tất cả câu hỏi có audio_url từ section này
+      const { data, error } = await supabase
+        .from('questions_safe')
+        .select('*')
+        .eq('section_id', sectionId)
+        .not('audio_url', 'is', null);
+      
+      if (error) throw error;
+      
+      const questions = data as DbQuestionSafe[] || [];
+      
+      // Nhóm theo audio_url
+      const examsByAudio = new Map<string, DbQuestionSafe[]>();
+      
+      for (const q of questions) {
+        if (!q.audio_url) continue;
+        
+        if (!examsByAudio.has(q.audio_url)) {
+          examsByAudio.set(q.audio_url, []);
+        }
+        examsByAudio.get(q.audio_url)!.push(q);
+      }
+      
+      // Random chọn 1 audio
+      const audioUrls = Array.from(examsByAudio.keys());
+      if (audioUrls.length === 0) return null;
+      
+      const randomAudioUrl = audioUrls[Math.floor(Math.random() * audioUrls.length)];
+      const examQuestions = examsByAudio.get(randomAudioUrl)!;
+      
+      // Nhóm câu hỏi cha con và giữ nguyên thứ tự (không shuffle cho phần nghe)
+      const grouped = groupQuestionsWithChildrenSafe(examQuestions);
+      
+      const questionCount = grouped.reduce((total, q) => {
+        if (q.subQuestions && q.subQuestions.length > 0) {
+          return total + q.subQuestions.length;
+        }
+        return total + 1;
+      }, 0);
+      
+      return {
+        audioUrl: randomAudioUrl,
+        questions: grouped,
+        questionCount,
+      } as ListeningExam;
+    },
+    enabled: !!sectionId && enabled,
+    staleTime: Infinity,
+    gcTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+  });
+}

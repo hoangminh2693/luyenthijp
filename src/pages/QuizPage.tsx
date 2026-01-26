@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useParams, Navigate, Link, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Send, Loader2 } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, Headphones, Play, Pause, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
 import { QuizProgress } from '@/components/quiz/QuizProgress';
@@ -8,14 +8,24 @@ import { ResultSummary } from '@/components/quiz/ResultSummary';
 import { Breadcrumb } from '@/components/layout/Header';
 import { useQuestionHistory } from '@/hooks/useQuestionHistory';
 import { useSubjectBySlug, useLevelBySlug, useSectionBySlug } from '@/hooks/useSections';
-import { useRandomQuestions, type Question } from '@/hooks/useQuestions';
+import { useRandomQuestions, useRandomListeningExam, type Question } from '@/hooks/useQuestions';
 import { type QuizResult } from '@/data/quizData';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 /**
  * QuizPage - Trang làm bài thi
- * Mode random: /quiz/:subjectSlug/:levelSlug/:sectionSlug?count=N
+ * 
+ * Hai mode:
+ * 1. Random questions: /quiz/:subjectSlug/:levelSlug/:sectionSlug?count=N
+ *    - Dùng cho 文字・語彙, 文法, 読解
+ *    - Random N câu từ ngân hàng câu hỏi
+ * 
+ * 2. Listening exam: /quiz/:subjectSlug/:levelSlug/:sectionSlug?mode=listening
+ *    - Dùng cho 聴解
+ *    - Random 1 đề nghe hoàn chỉnh (1 audio + các câu hỏi liên quan)
+ *    - Không shuffle câu hỏi, giữ nguyên thứ tự
+ * 
  * SECURE: Correct answers are only revealed after server-side submission
  */
 const QuizPage = () => {
@@ -25,6 +35,8 @@ const QuizPage = () => {
     sectionSlug?: string;
   }>();
   const [searchParams] = useSearchParams();
+  const mode = searchParams.get('mode');
+  const isListeningMode = mode === 'listening';
   const questionCount = parseInt(searchParams.get('count') || '10', 10);
   
   // State quản lý bài thi
@@ -37,6 +49,10 @@ const QuizPage = () => {
   const [revealedAnswers, setRevealedAnswers] = useState<Record<string, { correctOption: string; explanation?: string }>>({});
   const questionRefs = useRef<(HTMLDivElement | null)[]>([]);
   
+  // Audio player state cho phần nghe
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  
   // Question history hook
   const { getQuestionStats } = useQuestionHistory();
 
@@ -44,14 +60,32 @@ const QuizPage = () => {
   const { data: subject, isLoading: loadingSubject } = useSubjectBySlug(subjectSlug);
   const { data: level, isLoading: loadingLevel } = useLevelBySlug(subject?.id, levelSlug);
   const { data: section, isLoading: loadingSection } = useSectionBySlug(level?.id, sectionSlug);
-  const { data: questions = [], isLoading: loadingQuestions } = useRandomQuestions(section?.id, questionCount);
+  
+  // Fetch câu hỏi dựa theo mode
+  const { data: randomQuestions = [], isLoading: loadingRandomQuestions } = useRandomQuestions(
+    !isListeningMode ? section?.id : undefined, 
+    questionCount
+  );
+  const { data: listeningExam, isLoading: loadingListeningExam } = useRandomListeningExam(
+    isListeningMode ? section?.id : undefined,
+    isListeningMode
+  );
+  
+  // Chọn questions dựa theo mode
+  const questions = useMemo(() => {
+    if (isListeningMode && listeningExam) {
+      return listeningExam.questions;
+    }
+    return randomQuestions;
+  }, [isListeningMode, listeningExam, randomQuestions]);
 
   // Scroll to top khi component mount
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [sectionSlug]);
 
-  const isLoading = loadingSubject || loadingLevel || loadingSection || loadingQuestions;
+  const isLoading = loadingSubject || loadingLevel || loadingSection || 
+    (isListeningMode ? loadingListeningExam : loadingRandomQuestions);
 
   // Loading state
   if (isLoading) {
@@ -206,8 +240,22 @@ const QuizPage = () => {
   // Back URL
   const backUrl = `/subjects/${subjectSlug}/${levelSlug}/${sectionSlug}`;
 
-  // Title
-  const pageTitle = `${section.name} - ${questionCount} câu`;
+  // Title - khác nhau cho từng mode
+  const pageTitle = isListeningMode 
+    ? `${section.name} - Đề nghe` 
+    : `${section.name} - ${questionCount} câu`;
+
+  // Audio toggle cho phần nghe
+  const toggleAudio = () => {
+    if (audioRef.current) {
+      if (isAudioPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsAudioPlaying(!isAudioPlaying);
+    }
+  };
 
   // Questions already have correct format from useRandomQuestions
   const mappedQuestions = questions;
@@ -223,7 +271,7 @@ const QuizPage = () => {
               { label: subject.name, href: `/subjects/${subject.slug}` },
               { label: level.name, href: `/subjects/${subject.slug}/${level.slug}` },
               { label: section.name, href: backUrl },
-              { label: 'Làm bài' },
+              { label: isListeningMode ? 'Làm đề nghe' : 'Làm bài' },
             ]}
           />
         </div>
@@ -242,10 +290,46 @@ const QuizPage = () => {
               {pageTitle}
             </h1>
             <p className="text-muted-foreground">
-              {questions.length} câu hỏi
+              {totalQuestionCount} câu hỏi
+              {isListeningMode && ' • Đề nghe hoàn chỉnh'}
             </p>
           </div>
         </div>
+
+        {/* Audio Player cho phần nghe - hiển thị đầu trang */}
+        {isListeningMode && listeningExam?.audioUrl && !isSubmitted && (
+          <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-4">
+            <div className="flex items-center gap-4">
+              <Button
+                type="button"
+                variant="default"
+                size="icon"
+                onClick={toggleAudio}
+                className="h-12 w-12 shrink-0 rounded-full"
+              >
+                {isAudioPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
+              </Button>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <Headphones className="h-5 w-5 text-primary" />
+                  <span className="font-medium text-foreground">Audio đề nghe</span>
+                </div>
+                <audio
+                  ref={audioRef}
+                  src={listeningExam.audioUrl}
+                  controls
+                  className="w-full h-10"
+                  onPlay={() => setIsAudioPlaying(true)}
+                  onPause={() => setIsAudioPlaying(false)}
+                  onEnded={() => setIsAudioPlaying(false)}
+                />
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              💡 Bạn có thể phát lại audio nhiều lần trong khi làm bài. Tuy nhiên, trong kỳ thi thật, audio chỉ được phát một lần.
+            </p>
+          </div>
+        )}
 
         {/* Main content */}
         <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
