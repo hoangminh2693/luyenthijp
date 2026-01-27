@@ -485,7 +485,12 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       const cell = clickedCellRef.current;
       if (!cell) return;
 
-      const cellContent = cell.innerHTML.trim();
+      // Get text content to check if cell is effectively empty
+      const textContent = cell.textContent?.trim() || '';
+      const isEmptyCell = !textContent || textContent === '\u00A0'; // \u00A0 is &nbsp;
+      
+      // Only keep original HTML if it has actual content
+      const cellContent = isEmptyCell ? '' : cell.innerHTML.trim();
       
       // Create a nested table inside the cell
       const cellStyle = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 30px;';
@@ -494,8 +499,8 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       for (let r = 0; r < rows; r++) {
         nestedTableHtml += '<tr>';
         for (let c = 0; c < cols; c++) {
-          // Put original content in the first cell only
-          const content = (r === 0 && c === 0 && cellContent && cellContent !== '&nbsp;') 
+          // Put original content in the first cell only (if not empty)
+          const content = (r === 0 && c === 0 && cellContent) 
             ? cellContent 
             : '&nbsp;';
           nestedTableHtml += `<td style="${cellStyle}">${content}</td>`;
