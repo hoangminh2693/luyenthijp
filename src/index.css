@@ -218,3 +218,24 @@
 .stagger-3 { animation-delay: 0.3s; }
 .stagger-4 { animation-delay: 0.4s; }
 .stagger-5 { animation-delay: 0.5s; }
+
+/* Responsive images in rich text content */
+.prose img,
+[dangerouslySetInnerHTML] img,
+.rich-text-content img {
+  max-width: 100%;
+  height: auto;
+  max-height: 20rem;
+  object-fit: contain;
+  margin: 0.5rem auto;
+  display: block;
+  border-radius: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .prose img,
+  [dangerouslySetInnerHTML] img,
+  .rich-text-content img {
+    max-height: 12rem;
+  }
+}
