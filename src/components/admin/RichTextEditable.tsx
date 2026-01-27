@@ -480,60 +480,34 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       setSplitDialogOpen(true);
     }, []);
 
-    // Split cell into multiple cells
+    // Split cell by creating a nested table inside the cell
     const splitCell = React.useCallback((rows: number, cols: number) => {
       const cell = clickedCellRef.current;
-      const table = findTable(cell);
-      if (!cell || !table) return;
+      if (!cell) return;
 
-      const cellContent = cell.innerHTML;
-      const parentRow = cell.closest('tr');
-      if (!parentRow) return;
-
-      const cellIndex = Array.from(parentRow.cells).indexOf(cell);
-      const rowIndex = Array.from(table.rows).indexOf(parentRow);
-
-      // For horizontal split (cols > 1)
-      if (cols > 1) {
-        cell.colSpan = 1;
-        for (let c = 1; c < cols; c++) {
-          const td = document.createElement('td');
-          td.style.cssText = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 40px;';
-          td.innerHTML = '&nbsp;';
-          cell.parentNode?.insertBefore(td, cell.nextSibling);
+      const cellContent = cell.innerHTML.trim();
+      
+      // Create a nested table inside the cell
+      const cellStyle = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 30px;';
+      let nestedTableHtml = '<table style="border-collapse: collapse; width: 100%; margin: 0;">';
+      
+      for (let r = 0; r < rows; r++) {
+        nestedTableHtml += '<tr>';
+        for (let c = 0; c < cols; c++) {
+          // Put original content in the first cell only
+          const content = (r === 0 && c === 0 && cellContent && cellContent !== '&nbsp;') 
+            ? cellContent 
+            : '&nbsp;';
+          nestedTableHtml += `<td style="${cellStyle}">${content}</td>`;
         }
+        nestedTableHtml += '</tr>';
       }
+      nestedTableHtml += '</table>';
 
-      // For vertical split (rows > 1)
-      if (rows > 1) {
-        cell.rowSpan = 1;
-        
-        for (let r = 1; r < rows; r++) {
-          // Get or create the row below
-          let targetRow = table.rows[rowIndex + r];
-          if (!targetRow) {
-            targetRow = document.createElement('tr');
-            table.appendChild(targetRow);
-          }
-          
-          // Insert cells at the correct position
-          const td = document.createElement('td');
-          td.style.cssText = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 40px;';
-          td.innerHTML = '&nbsp;';
-          if (cols > 1) td.colSpan = cols;
-          
-          // Find where to insert
-          const targetCell = targetRow.cells[cellIndex];
-          if (targetCell) {
-            targetRow.insertBefore(td, targetCell);
-          } else {
-            targetRow.appendChild(td);
-          }
-        }
-      }
-
-      // Keep original content in first cell
-      cell.innerHTML = cellContent;
+      // Replace cell content with nested table
+      cell.innerHTML = nestedTableHtml;
+      // Remove padding from parent cell to make nested table fit nicely
+      cell.style.padding = '0';
 
       setSplitDialogOpen(false);
       setTimeout(emitChange, 0);
