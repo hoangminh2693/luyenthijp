@@ -200,7 +200,7 @@ export function QuestionCard({
             <img 
               src={question.image_url} 
               alt="Question image" 
-              className="max-h-64 rounded-lg object-contain border border-border"
+              className="w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl h-auto max-h-48 sm:max-h-64 md:max-h-80 rounded-lg object-contain border border-border mx-auto"
             />
           </div>
         )}
