@@ -1,7 +1,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { sanitizeRichText } from "@/lib/richText";
-import { Bold, Italic, Underline, Table, Plus, Minus, Columns, Rows, Merge, SplitSquareHorizontal, Trash2 } from "lucide-react";
+import { Bold, Italic, Underline, Table, Plus, Minus, Columns, Rows, Merge, SplitSquareHorizontal, Trash2, Undo } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,6 +19,7 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { toast } from "@/hooks/use-toast";
 
 export type RichTextEditableProps = {
   value: string;
@@ -29,12 +30,21 @@ export type RichTextEditableProps = {
   showToolbar?: boolean;
 };
 
+// Cell selection state
+interface CellSelection {
+  startRow: number;
+  startCol: number;
+  endRow: number;
+  endCol: number;
+  table: HTMLTableElement;
+}
+
 /**
- * RichTextEditable
- * - contentEditable div để paste giữ định dạng (bold/underline/italic)
- * - sanitize HTML trước khi lưu state
- * - toolbar với các nút bold/italic/underline/table
- * - context menu để chỉnh sửa bảng (hợp ô, tách ô, thêm/xóa hàng/cột)
+ * RichTextEditable - Excel-like Table Editor
+ * - Multi-cell selection with visual borders
+ * - Clear merge/split functionality
+ * - Excel/Sheets paste support
+ * - Context menu for table operations
  */
 export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditableProps>(
   ({ value, onChange, placeholder, className, onFocus, showToolbar = true }, ref) => {
@@ -44,16 +54,18 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
     const [splitDialogOpen, setSplitDialogOpen] = React.useState(false);
     const [tableSize, setTableSize] = React.useState({ rows: 2, cols: 2 });
     const [splitSize, setSplitSize] = React.useState({ rows: 2, cols: 1 });
-    // Store selection range before opening dialog
     const savedSelectionRef = React.useRef<Range | null>(null);
-    // Store clicked cell for context menu actions
     const clickedCellRef = React.useRef<HTMLTableCellElement | null>(null);
-    // Track if we're inside a table for context menu
     const [isInTable, setIsInTable] = React.useState(false);
+    
+    // Multi-cell selection state
+    const [cellSelection, setCellSelection] = React.useState<CellSelection | null>(null);
+    const [isSelecting, setIsSelecting] = React.useState(false);
+    const selectionStartRef = React.useRef<{ row: number; col: number; table: HTMLTableElement } | null>(null);
 
     React.useImperativeHandle(ref, () => innerRef.current as HTMLDivElement);
 
-    // Sync từ state vào DOM khi không focus (tránh nhảy caret)
+    // Sync từ state vào DOM khi không focus
     React.useEffect(() => {
       const el = innerRef.current;
       if (!el) return;
@@ -63,6 +75,50 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       }
     }, [value]);
 
+    // Update selection highlighting
+    React.useEffect(() => {
+      const el = innerRef.current;
+      if (!el) return;
+
+      // Clear all selection highlights
+      el.querySelectorAll('[data-selected="true"]').forEach(cell => {
+        (cell as HTMLElement).removeAttribute('data-selected');
+        (cell as HTMLElement).style.outline = '';
+        (cell as HTMLElement).style.background = '';
+      });
+
+      if (!cellSelection) return;
+
+      const { table, startRow, startCol, endRow, endCol } = cellSelection;
+      const minRow = Math.min(startRow, endRow);
+      const maxRow = Math.max(startRow, endRow);
+      const minCol = Math.min(startCol, endCol);
+      const maxCol = Math.max(startCol, endCol);
+
+      const rows = Array.from(table.rows);
+      rows.forEach((row, rowIndex) => {
+        if (rowIndex < minRow || rowIndex > maxRow) return;
+        
+        let currentCol = 0;
+        Array.from(row.cells).forEach(cell => {
+          const cellColSpan = cell.colSpan || 1;
+          const cellRowSpan = cell.rowSpan || 1;
+          
+          // Check if this cell is within selection range
+          const cellEndCol = currentCol + cellColSpan - 1;
+          const cellEndRow = rowIndex + cellRowSpan - 1;
+          
+          if (currentCol <= maxCol && cellEndCol >= minCol && rowIndex <= maxRow && cellEndRow >= minRow) {
+            cell.setAttribute('data-selected', 'true');
+            cell.style.outline = '2px solid hsl(var(--primary))';
+            cell.style.background = 'hsl(var(--primary) / 0.1)';
+          }
+          
+          currentCol += cellColSpan;
+        });
+      });
+    }, [cellSelection]);
+
     const emitChange = React.useCallback(() => {
       const el = innerRef.current;
       if (!el) return;
@@ -70,17 +126,74 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       onChange(sanitized);
     }, [onChange]);
 
+    // ============= PASTE HANDLING (Excel/Sheets) =============
     const handlePaste = React.useCallback(
       (e: React.ClipboardEvent<HTMLDivElement>) => {
         const html = e.clipboardData.getData("text/html");
         const text = e.clipboardData.getData("text/plain");
 
-        // Ưu tiên HTML để giữ định dạng
+        // Check if pasting into a table cell
+        const sel = window.getSelection();
+        const anchorNode = sel?.anchorNode;
+        const cell = anchorNode instanceof HTMLElement 
+          ? anchorNode.closest('td, th')
+          : anchorNode?.parentElement?.closest('td, th');
+
+        // If pasting tabular data (from Excel/Sheets) into an existing table
+        if (cell && text && text.includes('\t')) {
+          e.preventDefault();
+          
+          const table = cell.closest('table');
+          if (!table) return;
+
+          const lines = text.split('\n').filter(l => l.trim());
+          if (lines.length === 0) return;
+
+          // Get starting position
+          const { row: startRow, col: startCol } = getCellPosition(cell as HTMLTableCellElement);
+          const rows = Array.from(table.rows);
+
+          lines.forEach((line, lineIdx) => {
+            const rowIdx = startRow + lineIdx;
+            if (rowIdx >= rows.length) {
+              // Add new row if needed
+              const newRow = document.createElement('tr');
+              const colCount = lines[0].split('\t').length;
+              for (let i = 0; i < Math.max(colCount, startCol + lines[0].split('\t').length); i++) {
+                const td = document.createElement('td');
+                td.style.cssText = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 40px;';
+                td.innerHTML = '&nbsp;';
+                newRow.appendChild(td);
+              }
+              table.appendChild(newRow);
+            }
+
+            const cols = line.split('\t');
+            cols.forEach((content, colIdx) => {
+              const targetCol = startCol + colIdx;
+              const targetRow = table.rows[rowIdx];
+              if (!targetRow) return;
+
+              let currentCol = 0;
+              for (let i = 0; i < targetRow.cells.length; i++) {
+                if (currentCol === targetCol) {
+                  targetRow.cells[i].innerHTML = content.trim() || '&nbsp;';
+                  break;
+                }
+                currentCol += targetRow.cells[i].colSpan || 1;
+              }
+            });
+          });
+
+          setTimeout(emitChange, 0);
+          return;
+        }
+
+        // Standard HTML/text paste
         if (html) {
           e.preventDefault();
           const safe = sanitizeRichText(html);
           document.execCommand("insertHTML", false, safe);
-          // chờ DOM cập nhật rồi emit
           setTimeout(emitChange, 0);
           return;
         }
@@ -105,7 +218,6 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       [emitChange]
     );
 
-    // Generate table HTML
     const generateTableHtml = React.useCallback((rows: number, cols: number) => {
       const cellStyle = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 40px;';
       let html = '<table style="border-collapse: collapse; width: 100%;">';
@@ -120,7 +232,6 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       return html;
     }, []);
 
-    // Save current selection before opening dialog
     const saveSelection = React.useCallback(() => {
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0) {
@@ -128,14 +239,12 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       }
     }, []);
 
-    // Restore selection and insert table
     const insertTable = React.useCallback((rows: number, cols: number) => {
       const el = innerRef.current;
       if (!el) return;
       
       el.focus();
       
-      // Restore selection if we have one
       if (savedSelectionRef.current) {
         const sel = window.getSelection();
         if (sel) {
@@ -162,20 +271,18 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
     }, [onFocus]);
 
     const handleBlur = React.useCallback(() => {
-      // Delay để cho phép click vào toolbar hoặc dialog
       setTimeout(() => {
         const el = innerRef.current;
         if (!el) return;
-        // Keep focused if dialog is open
         if (tableDialogOpen || splitDialogOpen) return;
         if (!el.contains(document.activeElement)) {
           setIsFocused(false);
+          setCellSelection(null);
         }
       }, 150);
       emitChange();
     }, [emitChange, tableDialogOpen, splitDialogOpen]);
 
-    // Keyboard shortcuts for formatting
     const handleKeyDown = React.useCallback(
       (e: React.KeyboardEvent<HTMLDivElement>) => {
         if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
@@ -198,25 +305,27 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
               break;
           }
         }
+        
+        // Escape to clear selection
+        if (e.key === 'Escape' && cellSelection) {
+          setCellSelection(null);
+        }
       },
-      [applyFormat, openTableDialog]
+      [applyFormat, openTableDialog, cellSelection]
     );
 
-    // ============= TABLE EDITING FUNCTIONS =============
+    // ============= TABLE HELPERS =============
 
-    // Find the table cell that contains the target
     const findTableCell = (target: EventTarget | null): HTMLTableCellElement | null => {
       if (!target || !(target instanceof HTMLElement)) return null;
       return target.closest('td, th') as HTMLTableCellElement | null;
     };
 
-    // Find the table that contains the cell
     const findTable = (cell: HTMLTableCellElement | null): HTMLTableElement | null => {
       if (!cell) return null;
       return cell.closest('table') as HTMLTableElement | null;
     };
 
-    // Get cell position in table (accounting for colspan/rowspan)
     const getCellPosition = (cell: HTMLTableCellElement): { row: number; col: number } => {
       const table = findTable(cell);
       if (!table) return { row: 0, col: 0 };
@@ -243,14 +352,71 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       return { row: rowIndex, col: colIndex };
     };
 
-    // Handle context menu open - check if we're in a table
+    // ============= MULTI-CELL SELECTION =============
+
+    const handleMouseDown = React.useCallback((e: React.MouseEvent) => {
+      const cell = findTableCell(e.target);
+      if (!cell) {
+        setCellSelection(null);
+        return;
+      }
+
+      const table = findTable(cell);
+      if (!table) return;
+
+      const pos = getCellPosition(cell);
+      selectionStartRef.current = { ...pos, table };
+      setIsSelecting(true);
+      
+      // Single cell selection on mousedown
+      setCellSelection({
+        startRow: pos.row,
+        startCol: pos.col,
+        endRow: pos.row,
+        endCol: pos.col,
+        table
+      });
+    }, []);
+
+    const handleMouseMove = React.useCallback((e: React.MouseEvent) => {
+      if (!isSelecting || !selectionStartRef.current) return;
+
+      const cell = findTableCell(e.target);
+      if (!cell) return;
+
+      const table = findTable(cell);
+      if (table !== selectionStartRef.current.table) return;
+
+      const pos = getCellPosition(cell);
+      
+      setCellSelection({
+        startRow: selectionStartRef.current.row,
+        startCol: selectionStartRef.current.col,
+        endRow: pos.row,
+        endCol: pos.col,
+        table
+      });
+    }, [isSelecting]);
+
+    const handleMouseUp = React.useCallback(() => {
+      setIsSelecting(false);
+    }, []);
+
+    // Global mouseup listener
+    React.useEffect(() => {
+      const handleGlobalMouseUp = () => setIsSelecting(false);
+      document.addEventListener('mouseup', handleGlobalMouseUp);
+      return () => document.removeEventListener('mouseup', handleGlobalMouseUp);
+    }, []);
+
     const handleContextMenu = React.useCallback((e: React.MouseEvent) => {
       const cell = findTableCell(e.target);
       clickedCellRef.current = cell;
       setIsInTable(!!cell);
     }, []);
 
-    // Add row above
+    // ============= ROW OPERATIONS =============
+
     const addRowAbove = React.useCallback(() => {
       const cell = clickedCellRef.current;
       const table = findTable(cell);
@@ -273,7 +439,6 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       setTimeout(emitChange, 0);
     }, [emitChange]);
 
-    // Add row below
     const addRowBelow = React.useCallback(() => {
       const cell = clickedCellRef.current;
       const table = findTable(cell);
@@ -296,7 +461,26 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       setTimeout(emitChange, 0);
     }, [emitChange]);
 
-    // Add column left
+    const deleteRow = React.useCallback(() => {
+      const cell = clickedCellRef.current;
+      const table = findTable(cell);
+      if (!cell || !table) return;
+
+      const row = cell.closest('tr');
+      if (!row) return;
+
+      if (table.rows.length <= 1) {
+        toast({ title: "Không thể xóa", description: "Bảng cần ít nhất 1 hàng", variant: "destructive" });
+        return;
+      }
+
+      row.remove();
+      setCellSelection(null);
+      setTimeout(emitChange, 0);
+    }, [emitChange]);
+
+    // ============= COLUMN OPERATIONS =============
+
     const addColumnLeft = React.useCallback(() => {
       const cell = clickedCellRef.current;
       const table = findTable(cell);
@@ -318,7 +502,6 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
           }
           currentCol += cells[i].colSpan || 1;
           if (currentCol > col) {
-            // We're inside a colspan cell
             cells[i].colSpan = (cells[i].colSpan || 1) + 1;
             break;
           }
@@ -328,7 +511,6 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       setTimeout(emitChange, 0);
     }, [emitChange]);
 
-    // Add column right
     const addColumnRight = React.useCallback(() => {
       const cell = clickedCellRef.current;
       const table = findTable(cell);
@@ -354,7 +536,6 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
             break;
           }
           if (currentCol < targetCol && currentCol + cellSpan > targetCol) {
-            // We're inside a colspan cell
             cells[i].colSpan = cellSpan + 1;
             inserted = true;
             break;
@@ -362,7 +543,6 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
           currentCol += cellSpan;
         }
         
-        // If we didn't insert yet, add at the end
         if (!inserted) {
           const td = document.createElement('td');
           td.style.cssText = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 40px;';
@@ -374,27 +554,17 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       setTimeout(emitChange, 0);
     }, [emitChange]);
 
-    // Delete row
-    const deleteRow = React.useCallback(() => {
-      const cell = clickedCellRef.current;
-      const table = findTable(cell);
-      if (!cell || !table) return;
-
-      const row = cell.closest('tr');
-      if (!row) return;
-
-      // Don't delete if it's the last row
-      if (table.rows.length <= 1) return;
-
-      row.remove();
-      setTimeout(emitChange, 0);
-    }, [emitChange]);
-
-    // Delete column
     const deleteColumn = React.useCallback(() => {
       const cell = clickedCellRef.current;
       const table = findTable(cell);
       if (!cell || !table) return;
+
+      // Check if this is the last column
+      const firstRow = table.rows[0];
+      if (firstRow && firstRow.cells.length <= 1) {
+        toast({ title: "Không thể xóa", description: "Bảng cần ít nhất 1 cột", variant: "destructive" });
+        return;
+      }
 
       const { col } = getCellPosition(cell);
       
@@ -413,7 +583,6 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
             break;
           }
           if (currentCol < col && currentCol + cellSpan > col) {
-            // We're inside a colspan cell
             cells[i].colSpan = cellSpan - 1;
             break;
           }
@@ -421,85 +590,253 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
         }
       });
 
+      setCellSelection(null);
       setTimeout(emitChange, 0);
     }, [emitChange]);
 
-    // Merge selected cells (simplified - merges with right cell)
-    const mergeCellRight = React.useCallback(() => {
+    // ============= MERGE OPERATIONS =============
+
+    // Get selected cells info
+    const getSelectedCellsInfo = React.useCallback(() => {
+      if (!cellSelection) return null;
+
+      const { table, startRow, startCol, endRow, endCol } = cellSelection;
+      const minRow = Math.min(startRow, endRow);
+      const maxRow = Math.max(startRow, endRow);
+      const minCol = Math.min(startCol, endCol);
+      const maxCol = Math.max(startCol, endCol);
+
+      const selectedCells: HTMLTableCellElement[] = [];
+      const rows = Array.from(table.rows);
+
+      rows.forEach((row, rowIndex) => {
+        if (rowIndex < minRow || rowIndex > maxRow) return;
+        
+        let currentCol = 0;
+        Array.from(row.cells).forEach(cell => {
+          const cellColSpan = cell.colSpan || 1;
+          const cellEndCol = currentCol + cellColSpan - 1;
+          
+          if (currentCol <= maxCol && cellEndCol >= minCol) {
+            selectedCells.push(cell);
+          }
+          
+          currentCol += cellColSpan;
+        });
+      });
+
+      return {
+        cells: selectedCells,
+        minRow,
+        maxRow,
+        minCol,
+        maxCol,
+        rowCount: maxRow - minRow + 1,
+        colCount: maxCol - minCol + 1
+      };
+    }, [cellSelection]);
+
+    // Merge selected cells horizontally (by columns)
+    const mergeHorizontal = React.useCallback(() => {
+      const info = getSelectedCellsInfo();
+      if (!info || info.colCount < 2 || !cellSelection) {
+        toast({ title: "Chọn ít nhất 2 cột", description: "Để hợp ô theo hàng, hãy chọn nhiều ô trên cùng 1 hàng", variant: "destructive" });
+        return;
+      }
+
+      const { table } = cellSelection;
+      const { minRow, maxRow, minCol, maxCol } = info;
+      const rows = Array.from(table.rows);
+
+      for (let r = minRow; r <= maxRow; r++) {
+        const row = rows[r];
+        if (!row) continue;
+
+        let currentCol = 0;
+        const cells = Array.from(row.cells);
+        let firstCellInRange: HTMLTableCellElement | null = null;
+        let combinedContent: string[] = [];
+        let totalColSpan = 0;
+        const cellsToRemove: HTMLTableCellElement[] = [];
+
+        for (const cell of cells) {
+          const cellSpan = cell.colSpan || 1;
+          const cellEndCol = currentCol + cellSpan - 1;
+
+          if (currentCol >= minCol && cellEndCol <= maxCol) {
+            if (!firstCellInRange) {
+              firstCellInRange = cell;
+            } else {
+              cellsToRemove.push(cell);
+            }
+            const content = cell.innerHTML.trim();
+            if (content && content !== '&nbsp;') {
+              combinedContent.push(content);
+            }
+            totalColSpan += cellSpan;
+          }
+
+          currentCol += cellSpan;
+        }
+
+        if (firstCellInRange && totalColSpan > 1) {
+          firstCellInRange.colSpan = totalColSpan;
+          firstCellInRange.innerHTML = combinedContent.join(' ') || '&nbsp;';
+          cellsToRemove.forEach(c => c.remove());
+        }
+      }
+
+      setCellSelection(null);
+      setTimeout(emitChange, 0);
+      toast({ title: "Đã hợp ô", description: "Các ô đã được hợp theo hàng" });
+    }, [cellSelection, getSelectedCellsInfo, emitChange]);
+
+    // Merge selected cells vertically (by rows)
+    const mergeVertical = React.useCallback(() => {
+      const info = getSelectedCellsInfo();
+      if (!info || info.rowCount < 2 || !cellSelection) {
+        toast({ title: "Chọn ít nhất 2 hàng", description: "Để hợp ô theo cột, hãy chọn nhiều ô trên cùng 1 cột", variant: "destructive" });
+        return;
+      }
+
+      const { table } = cellSelection;
+      const { minRow, maxRow, minCol, maxCol } = info;
+      const rows = Array.from(table.rows);
+
+      // For each column in range
+      for (let c = minCol; c <= maxCol; c++) {
+        let firstCellInRange: HTMLTableCellElement | null = null;
+        let combinedContent: string[] = [];
+        let totalRowSpan = 0;
+        const cellsToRemove: HTMLTableCellElement[] = [];
+
+        for (let r = minRow; r <= maxRow; r++) {
+          const row = rows[r];
+          if (!row) continue;
+
+          let currentCol = 0;
+          for (const cell of Array.from(row.cells)) {
+            const cellSpan = cell.colSpan || 1;
+            
+            if (currentCol === c) {
+              if (!firstCellInRange) {
+                firstCellInRange = cell;
+              } else {
+                cellsToRemove.push(cell);
+              }
+              const content = cell.innerHTML.trim();
+              if (content && content !== '&nbsp;') {
+                combinedContent.push(content);
+              }
+              totalRowSpan += cell.rowSpan || 1;
+              break;
+            }
+            
+            currentCol += cellSpan;
+          }
+        }
+
+        if (firstCellInRange && totalRowSpan > 1) {
+          firstCellInRange.rowSpan = totalRowSpan;
+          firstCellInRange.innerHTML = combinedContent.join('<br>') || '&nbsp;';
+          cellsToRemove.forEach(c => c.remove());
+        }
+      }
+
+      setCellSelection(null);
+      setTimeout(emitChange, 0);
+      toast({ title: "Đã hợp ô", description: "Các ô đã được hợp theo cột" });
+    }, [cellSelection, getSelectedCellsInfo, emitChange]);
+
+    // Unmerge/split a merged cell back to individual cells
+    const unmergeCells = React.useCallback(() => {
       const cell = clickedCellRef.current;
       if (!cell) return;
 
-      const nextCell = cell.nextElementSibling as HTMLTableCellElement;
-      if (!nextCell) return;
+      const colSpan = cell.colSpan || 1;
+      const rowSpan = cell.rowSpan || 1;
 
-      // Merge content and increase colspan
-      const content1 = cell.innerHTML.trim();
-      const content2 = nextCell.innerHTML.trim();
-      cell.innerHTML = content1 + (content1 && content2 ? ' ' : '') + content2;
-      cell.colSpan = (cell.colSpan || 1) + (nextCell.colSpan || 1);
-      nextCell.remove();
-
-      setTimeout(emitChange, 0);
-    }, [emitChange]);
-
-    // Merge with cell below
-    const mergeCellBelow = React.useCallback(() => {
-      const cell = clickedCellRef.current;
-      const table = findTable(cell);
-      if (!cell || !table) return;
-
-      const { row, col } = getCellPosition(cell);
-      const rows = Array.from(table.rows);
-      
-      if (row + 1 >= rows.length) return;
-
-      // Find the cell below
-      const nextRow = rows[row + 1];
-      let currentCol = 0;
-      const cells = Array.from(nextRow.cells);
-      
-      for (let i = 0; i < cells.length; i++) {
-        if (currentCol === col) {
-          // Merge content and increase rowspan
-          const content1 = cell.innerHTML.trim();
-          const content2 = cells[i].innerHTML.trim();
-          cell.innerHTML = content1 + (content1 && content2 ? '<br>' : '') + content2;
-          cell.rowSpan = (cell.rowSpan || 1) + (cells[i].rowSpan || 1);
-          cells[i].remove();
-          break;
-        }
-        currentCol += cells[i].colSpan || 1;
+      if (colSpan === 1 && rowSpan === 1) {
+        toast({ title: "Ô chưa được hợp", description: "Ô này không cần tách", variant: "destructive" });
+        return;
       }
 
+      const table = findTable(cell);
+      if (!table) return;
+
+      const { row: startRow, col: startCol } = getCellPosition(cell);
+      const rows = Array.from(table.rows);
+      const content = cell.innerHTML;
+
+      // Reset the original cell
+      cell.colSpan = 1;
+      cell.rowSpan = 1;
+      cell.innerHTML = content;
+
+      // Add cells to fill the colspan in the same row
+      for (let c = 1; c < colSpan; c++) {
+        const newCell = document.createElement('td');
+        newCell.style.cssText = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 40px;';
+        newCell.innerHTML = '&nbsp;';
+        cell.after(newCell);
+      }
+
+      // Add cells to fill the rowspan in subsequent rows
+      for (let r = 1; r < rowSpan; r++) {
+        const targetRow = rows[startRow + r];
+        if (!targetRow) continue;
+
+        // Find position to insert
+        let currentCol = 0;
+        let insertBefore: HTMLTableCellElement | null = null;
+        
+        for (const existingCell of Array.from(targetRow.cells)) {
+          if (currentCol >= startCol) {
+            insertBefore = existingCell;
+            break;
+          }
+          currentCol += existingCell.colSpan || 1;
+        }
+
+        for (let c = 0; c < colSpan; c++) {
+          const newCell = document.createElement('td');
+          newCell.style.cssText = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 40px;';
+          newCell.innerHTML = '&nbsp;';
+          
+          if (insertBefore) {
+            targetRow.insertBefore(newCell, insertBefore);
+          } else {
+            targetRow.appendChild(newCell);
+          }
+        }
+      }
+
+      setCellSelection(null);
       setTimeout(emitChange, 0);
+      toast({ title: "Đã tách ô", description: "Ô đã được tách về trạng thái ban đầu" });
     }, [emitChange]);
 
-    // Open split dialog
+    // Open split dialog for nested table
     const openSplitDialog = React.useCallback(() => {
-      setSplitSize({ rows: 2, cols: 1 });
+      setSplitSize({ rows: 2, cols: 2 });
       setSplitDialogOpen(true);
     }, []);
 
-    // Split cell by creating a nested table inside the cell
+    // Split cell into nested table
     const splitCell = React.useCallback((rows: number, cols: number) => {
       const cell = clickedCellRef.current;
       if (!cell) return;
 
-      // Get text content to check if cell is effectively empty
       const textContent = cell.textContent?.trim() || '';
-      const isEmptyCell = !textContent || textContent === '\u00A0'; // \u00A0 is &nbsp;
-      
-      // Only keep original HTML if it has actual content
+      const isEmptyCell = !textContent || textContent === '\u00A0';
       const cellContent = isEmptyCell ? '' : cell.innerHTML.trim();
       
-      // Create a nested table inside the cell
       const cellStyle = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 30px;';
       let nestedTableHtml = '<table style="border-collapse: collapse; width: 100%; margin: 0;">';
       
       for (let r = 0; r < rows; r++) {
         nestedTableHtml += '<tr>';
         for (let c = 0; c < cols; c++) {
-          // Put original content in the first cell only (if not empty)
           const content = (r === 0 && c === 0 && cellContent) 
             ? cellContent 
             : '&nbsp;';
@@ -509,24 +846,31 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       }
       nestedTableHtml += '</table>';
 
-      // Replace cell content with nested table
       cell.innerHTML = nestedTableHtml;
-      // Remove padding from parent cell to make nested table fit nicely
       cell.style.padding = '0';
 
       setSplitDialogOpen(false);
       setTimeout(emitChange, 0);
     }, [emitChange]);
 
-    // Delete table
     const deleteTable = React.useCallback(() => {
       const cell = clickedCellRef.current;
       const table = findTable(cell);
       if (!table) return;
 
       table.remove();
+      setCellSelection(null);
       setTimeout(emitChange, 0);
     }, [emitChange]);
+
+    // Check if current selection can be merged
+    const canMergeHorizontal = cellSelection && Math.abs(cellSelection.endCol - cellSelection.startCol) >= 1;
+    const canMergeVertical = cellSelection && Math.abs(cellSelection.endRow - cellSelection.startRow) >= 1;
+    const hasSelection = cellSelection && (canMergeHorizontal || canMergeVertical);
+
+    // Check if clicked cell is merged
+    const isMergedCell = clickedCellRef.current && 
+      ((clickedCellRef.current.colSpan || 1) > 1 || (clickedCellRef.current.rowSpan || 1) > 1);
 
     return (
       <div className="relative">
@@ -573,7 +917,6 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
               <Underline className="h-3.5 w-3.5" />
             </Button>
             
-            {/* Table insert button */}
             <Button
               type="button"
               variant="ghost"
@@ -587,6 +930,50 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
             >
               <Table className="h-3.5 w-3.5" />
             </Button>
+
+            {/* Merge buttons when cells are selected */}
+            {hasSelection && (
+              <>
+                <div className="w-px bg-border mx-1" />
+                {canMergeHorizontal && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      mergeHorizontal();
+                    }}
+                    title="Hợp ô theo hàng"
+                  >
+                    <Merge className="h-3.5 w-3.5 rotate-90" />
+                  </Button>
+                )}
+                {canMergeVertical && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      mergeVertical();
+                    }}
+                    title="Hợp ô theo cột"
+                  >
+                    <Merge className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Selection info badge */}
+        {hasSelection && (
+          <div className="absolute -top-8 right-0 z-10 rounded-md border border-border bg-popover px-2 py-1 text-xs shadow-md">
+            Đã chọn: {Math.abs(cellSelection!.endRow - cellSelection!.startRow) + 1} hàng × {Math.abs(cellSelection!.endCol - cellSelection!.startCol) + 1} cột
           </div>
         )}
 
@@ -602,21 +989,23 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
               onPaste={handlePaste}
               onKeyDown={handleKeyDown}
               onContextMenu={handleContextMenu}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
               data-placeholder={placeholder || ""}
               className={cn(
                 "min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                // placeholder
                 "empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground empty:before:pointer-events-none",
-                // Table styles
                 "[&_table]:border-collapse [&_table]:w-full [&_td]:border [&_td]:border-border [&_td]:p-1 [&_th]:border [&_th]:border-border [&_th]:p-1 [&_th]:font-medium",
+                // Table cursor
+                "[&_td]:cursor-cell [&_th]:cursor-cell",
                 showToolbar && isFocused && "mt-8",
                 className
               )}
             />
           </ContextMenuTrigger>
           
-          {/* Context Menu for Table Editing */}
-          <ContextMenuContent className="w-56 bg-popover">
+          <ContextMenuContent className="w-64 bg-popover">
             {isInTable ? (
               <>
                 {/* Row operations */}
@@ -667,26 +1056,45 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
 
                 <ContextMenuSeparator />
 
-                {/* Merge operations */}
-                <ContextMenuSub>
-                  <ContextMenuSubTrigger className="flex items-center gap-2">
-                    <Merge className="h-4 w-4" />
-                    <span>Hợp ô</span>
-                  </ContextMenuSubTrigger>
-                  <ContextMenuSubContent className="bg-popover">
-                    <ContextMenuItem onClick={mergeCellRight} className="flex items-center gap-2">
-                      <span>Hợp với ô bên phải</span>
-                    </ContextMenuItem>
-                    <ContextMenuItem onClick={mergeCellBelow} className="flex items-center gap-2">
-                      <span>Hợp với ô bên dưới</span>
-                    </ContextMenuItem>
-                  </ContextMenuSubContent>
-                </ContextMenuSub>
+                {/* Merge operations - only show when multiple cells selected */}
+                {hasSelection && (
+                  <>
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger className="flex items-center gap-2">
+                        <Merge className="h-4 w-4" />
+                        <span>Hợp ô ({Math.abs(cellSelection!.endRow - cellSelection!.startRow) + 1}×{Math.abs(cellSelection!.endCol - cellSelection!.startCol) + 1})</span>
+                      </ContextMenuSubTrigger>
+                      <ContextMenuSubContent className="bg-popover">
+                        {canMergeHorizontal && (
+                          <ContextMenuItem onClick={mergeHorizontal} className="flex items-center gap-2">
+                            <Merge className="h-4 w-4 rotate-90" />
+                            <span>Hợp ô theo hàng (ngang)</span>
+                          </ContextMenuItem>
+                        )}
+                        {canMergeVertical && (
+                          <ContextMenuItem onClick={mergeVertical} className="flex items-center gap-2">
+                            <Merge className="h-4 w-4" />
+                            <span>Hợp ô theo cột (dọc)</span>
+                          </ContextMenuItem>
+                        )}
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
+                    <ContextMenuSeparator />
+                  </>
+                )}
 
-                {/* Split cell */}
+                {/* Unmerge - only show for merged cells */}
+                {isMergedCell && (
+                  <ContextMenuItem onClick={unmergeCells} className="flex items-center gap-2">
+                    <Undo className="h-4 w-4" />
+                    <span>Bỏ hợp ô (tách về ban đầu)</span>
+                  </ContextMenuItem>
+                )}
+
+                {/* Split cell into nested table */}
                 <ContextMenuItem onClick={openSplitDialog} className="flex items-center gap-2">
                   <SplitSquareHorizontal className="h-4 w-4" />
-                  <span>Tách ô...</span>
+                  <span>Chia ô thành bảng con...</span>
                 </ContextMenuItem>
 
                 <ContextMenuSeparator />
@@ -773,7 +1181,7 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
         <Dialog open={splitDialogOpen} onOpenChange={setSplitDialogOpen}>
           <DialogContent className="sm:max-w-[280px]">
             <DialogHeader>
-              <DialogTitle>Tách ô</DialogTitle>
+              <DialogTitle>Chia ô thành bảng con</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-2">
               <div className="grid grid-cols-2 gap-4">
@@ -807,7 +1215,7 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
-                Tách ô hiện tại thành {splitSize.rows} hàng × {splitSize.cols} cột
+                Chia ô thành bảng {splitSize.rows} hàng × {splitSize.cols} cột bên trong
               </p>
               <Button
                 type="button"
@@ -815,7 +1223,7 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
                 onClick={() => splitCell(splitSize.rows, splitSize.cols)}
                 disabled={splitSize.rows === 1 && splitSize.cols === 1}
               >
-                Tách ô
+                Chia ô
               </Button>
             </div>
           </DialogContent>
