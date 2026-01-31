@@ -1,9 +1,15 @@
-import { useState, useRef } from 'react';
-import { Check, X, Lightbulb, Play, Pause, Volume2 } from 'lucide-react';
-import type { Question } from '@/hooks/useQuestions';
+/**
+ * ListeningQuestionCard - Component hiển thị câu hỏi nghe theo format JLPT
+ * 
+ * Hỗ trợ 3 loại câu hỏi:
+ * - standard: Hiển thị đầy đủ nội dung câu hỏi + đáp án text
+ * - audio_only: Chỉ hiển thị số thứ tự ①②③④ (câu hỏi và đáp án trong audio)
+ * - image_based: Hiển thị hình ảnh + số thứ tự
+ */
+import { Check, X, Lightbulb } from 'lucide-react';
+import type { Question, ListeningQuestionType } from '@/hooks/useQuestions';
 import { cn } from '@/lib/utils';
 import { QuestionHistoryBadge } from './QuestionHistoryBadge';
-import { Button } from '@/components/ui/button';
 
 // Ký hiệu số thứ tự kiểu Nhật
 const OPTION_SYMBOLS: Record<string, string> = {
@@ -13,12 +19,7 @@ const OPTION_SYMBOLS: Record<string, string> = {
   D: '④',
 };
 
-/**
- * QuestionCard Component - Hiển thị một câu hỏi trắc nghiệm
- * Hỗ trợ hình ảnh, âm thanh và câu hỏi con
- * Hỗ trợ nhiều loại câu hỏi: standard, audio_only, image_based
- */
-interface QuestionCardProps {
+interface ListeningQuestionCardProps {
   question: Question;
   questionNumber: number;
   selectedAnswer: string | null;
@@ -34,57 +35,8 @@ interface QuestionCardProps {
   onSelectSubAnswer?: (subQuestionId: string, answer: string) => void;
 }
 
-function AudioPlayer({ src }: { src: string }) {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-
-  const togglePlay = () => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-3">
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        onClick={togglePlay}
-        className="h-10 w-10 shrink-0"
-      >
-        {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-      </Button>
-      <audio
-        ref={audioRef}
-        src={src}
-        onEnded={() => setIsPlaying(false)}
-        className="hidden"
-      />
-      <div className="flex-1">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Volume2 className="h-4 w-4" />
-          <span>Nghe audio</span>
-        </div>
-        <audio
-          src={src}
-          controls
-          className="mt-1 w-full h-8"
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
-        />
-      </div>
-    </div>
-  );
-}
-
-// Component hiển thị option cho audio_only type (chỉ số thứ tự)
-function AudioOnlyOptionButton({
+// Component hiển thị option cho audio_only type
+function AudioOnlyOption({
   option,
   isSelected,
   isCorrect,
@@ -137,7 +89,8 @@ function AudioOnlyOptionButton({
   );
 }
 
-function OptionButton({
+// Component hiển thị option với text đầy đủ
+function TextOption({
   option,
   text,
   isSelected,
@@ -198,7 +151,7 @@ function OptionButton({
         ) : showResult && isSelected && !isCorrect ? (
           <X className="h-4 w-4" />
         ) : (
-          OPTION_SYMBOLS[option] || option
+          OPTION_SYMBOLS[option]
         )}
       </span>
 
@@ -235,14 +188,14 @@ function QuestionOptions({
   const optionCount = question.optionCount || 4;
   
   // Tạo danh sách options dựa vào số lượng
-  const optionKeys = (['A', 'B', 'C', 'D'] as const).slice(0, optionCount);
+  const optionKeys = ['A', 'B', 'C', 'D'].slice(0, optionCount) as ('A' | 'B' | 'C' | 'D')[];
 
   // TYPE_B: audio_only - chỉ hiển thị số thứ tự
   if (questionType === 'audio_only') {
     return (
       <div className="flex flex-wrap gap-3 justify-center py-4">
         {optionKeys.map((option) => (
-          <AudioOnlyOptionButton
+          <AudioOnlyOption
             key={option}
             option={option}
             isSelected={selectedAnswer === option}
@@ -256,7 +209,8 @@ function QuestionOptions({
     );
   }
 
-  // standard / image_based - hiển thị đầy đủ text nếu có
+  // TYPE_C: image_based - hiển thị hình ảnh nếu có, còn lại như standard
+  // TYPE_A: standard - hiển thị đầy đủ text
   return (
     <div className="space-y-3">
       {optionKeys.map((option) => {
@@ -265,7 +219,7 @@ function QuestionOptions({
         if (!optionText || optionText.trim() === '') {
           return (
             <div key={option} className="flex justify-start">
-              <AudioOnlyOptionButton
+              <AudioOnlyOption
                 option={option}
                 isSelected={selectedAnswer === option}
                 isCorrect={showResult && option === question.correctOption}
@@ -278,7 +232,7 @@ function QuestionOptions({
         }
         
         return (
-          <OptionButton
+          <TextOption
             key={option}
             option={option}
             text={optionText}
@@ -294,7 +248,7 @@ function QuestionOptions({
   );
 }
 
-export function QuestionCard({
+export function ListeningQuestionCard({
   question,
   questionNumber,
   selectedAnswer,
@@ -304,7 +258,7 @@ export function QuestionCard({
   historyStats,
   subAnswers = {},
   onSelectSubAnswer,
-}: QuestionCardProps) {
+}: ListeningQuestionCardProps) {
   const questionType = question.questionType || 'standard';
   const hasSubQuestions = question.subQuestions && question.subQuestions.length > 0;
   
@@ -342,8 +296,9 @@ export function QuestionCard({
         </div>
       </div>
 
-      {/* Media section */}
+      {/* Content area */}
       <div className="pl-11 space-y-3">
+        {/* Image - hiển thị cho tất cả loại nếu có */}
         {question.image_url && (
           <div className="mb-4">
             <img 
@@ -351,12 +306,6 @@ export function QuestionCard({
               alt="Question image" 
               className="w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl h-auto max-h-48 sm:max-h-64 md:max-h-80 rounded-lg object-contain border border-border mx-auto"
             />
-          </div>
-        )}
-
-        {question.audio_url && (
-          <div className="mb-4">
-            <AudioPlayer src={question.audio_url} />
           </div>
         )}
 

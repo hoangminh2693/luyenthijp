@@ -65,13 +65,16 @@ interface Section {
   order_index?: number;
 }
 
+// Loại câu hỏi nghe theo format JLPT
+type ListeningQuestionType = 'standard' | 'audio_only' | 'image_based';
+
 interface QuestionRow {
   id: string;
   content: string;
   option_a: string;
   option_b: string;
-  option_c: string;
-  option_d: string;
+  option_c: string | null;
+  option_d: string | null;
   correct_option: string;
   explanation: string | null;
   section_id: string;
@@ -79,13 +82,20 @@ interface QuestionRow {
   parent_id?: string | null;
   image_url?: string | null;
   audio_url?: string | null;
+  question_type?: ListeningQuestionType | null;
+  option_count?: number | null;
 }
 
 interface ParentQuestionRow extends QuestionRow {
   subQuestions?: QuestionRow[];
 }
 
-type EditQuestionForm = Partial<QuestionRow> & { subQuestions?: SubQuestion[]; newSectionId?: string };
+type EditQuestionForm = Partial<QuestionRow> & { 
+  subQuestions?: SubQuestion[]; 
+  newSectionId?: string;
+  question_type?: ListeningQuestionType;
+  option_count?: number;
+};
 
 const stripHtml = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -368,22 +378,26 @@ const ManageQuestionsPage = () => {
       content: question.content,
       option_a: question.option_a,
       option_b: question.option_b,
-      option_c: question.option_c,
-      option_d: question.option_d,
+      option_c: question.option_c || '',
+      option_d: question.option_d || '',
       correct_option: question.correct_option,
       explanation: question.explanation || '',
       image_url: question.image_url || undefined,
       audio_url: question.audio_url || undefined,
       newSectionId: question.section_id,
+      question_type: question.question_type || 'standard',
+      option_count: question.option_count || 4,
       subQuestions: (question.subQuestions ?? []).map((sq) => ({
         id: sq.id,
         content: sq.content,
         option_a: sq.option_a,
         option_b: sq.option_b,
-        option_c: sq.option_c,
-        option_d: sq.option_d,
+        option_c: sq.option_c || '',
+        option_d: sq.option_d || '',
         correct_option: sq.correct_option,
         explanation: sq.explanation || '',
+        question_type: sq.question_type || 'standard',
+        option_count: sq.option_count || 4,
       })),
     });
 
@@ -406,10 +420,12 @@ const ManageQuestionsPage = () => {
           content: sq.content,
           option_a: sq.option_a,
           option_b: sq.option_b,
-          option_c: sq.option_c,
-          option_d: sq.option_d,
+          option_c: sq.option_c || '',
+          option_d: sq.option_d || '',
           correct_option: sq.correct_option,
           explanation: sq.explanation || '',
+          question_type: sq.question_type || 'standard',
+          option_count: sq.option_count || 4,
         })),
       }));
     } catch (err) {
@@ -462,6 +478,11 @@ const ManageQuestionsPage = () => {
       // Determine target section (possibly changed)
       const targetSectionId = editForm.newSectionId || editingQuestion.section_id;
 
+      // Determine option count - handle nullable option_c/option_d based on option_count
+      const optionCount = editForm.option_count || 4;
+      const optionC = optionCount >= 3 ? sanitizeRichText(editForm.option_c || '') : null;
+      const optionD = optionCount >= 4 ? sanitizeRichText(editForm.option_d || '') : null;
+
       // 1) Update parent
       const { error: parentErr } = await supabase
         .from('questions')
@@ -469,13 +490,15 @@ const ManageQuestionsPage = () => {
           content: sanitizeRichText(editForm.content || ''),
           option_a: sanitizeRichText(editForm.option_a || ''),
           option_b: sanitizeRichText(editForm.option_b || ''),
-          option_c: sanitizeRichText(editForm.option_c || ''),
-          option_d: sanitizeRichText(editForm.option_d || ''),
+          option_c: optionC,
+          option_d: optionD,
           correct_option: (editForm.correct_option || 'A') as string,
           explanation: safeExplanation,
           image_url: newImageUrl,
           audio_url: newAudioUrl,
           section_id: targetSectionId,
+          question_type: editForm.question_type || 'standard',
+          option_count: optionCount,
         })
         .eq('id', editingQuestion.id);
 
@@ -844,21 +867,31 @@ const ManageQuestionsPage = () => {
                       <div className="min-w-0 flex-1">
                         <div
                           className="mb-2 text-sm font-medium text-foreground"
-                          dangerouslySetInnerHTML={{ __html: q.content }}
+                          dangerouslySetInnerHTML={{ __html: q.content || '<em class="text-muted-foreground">Câu hỏi trong audio</em>' }}
                         />
                         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                          {/* Hiển thị loại câu hỏi nếu không phải standard */}
+                          {q.question_type && q.question_type !== 'standard' && (
+                            <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-xs font-medium">
+                              {q.question_type === 'audio_only' ? '🎧 Audio Only' : '🖼️ Image Based'}
+                            </span>
+                          )}
                           <span className={q.correct_option === 'A' ? 'text-success font-medium' : ''}>
-                            A: <span dangerouslySetInnerHTML={{ __html: q.option_a }} />
+                            ①: <span dangerouslySetInnerHTML={{ __html: q.option_a || '—' }} />
                           </span>
                           <span className={q.correct_option === 'B' ? 'text-success font-medium' : ''}>
-                            B: <span dangerouslySetInnerHTML={{ __html: q.option_b }} />
+                            ②: <span dangerouslySetInnerHTML={{ __html: q.option_b || '—' }} />
                           </span>
-                          <span className={q.correct_option === 'C' ? 'text-success font-medium' : ''}>
-                            C: <span dangerouslySetInnerHTML={{ __html: q.option_c }} />
-                          </span>
-                          <span className={q.correct_option === 'D' ? 'text-success font-medium' : ''}>
-                            D: <span dangerouslySetInnerHTML={{ __html: q.option_d }} />
-                          </span>
+                          {(q.option_count ?? 4) >= 3 && (
+                            <span className={q.correct_option === 'C' ? 'text-success font-medium' : ''}>
+                              ③: <span dangerouslySetInnerHTML={{ __html: q.option_c || '—' }} />
+                            </span>
+                          )}
+                          {(q.option_count ?? 4) >= 4 && (
+                            <span className={q.correct_option === 'D' ? 'text-success font-medium' : ''}>
+                              ④: <span dangerouslySetInnerHTML={{ __html: q.option_d || '—' }} />
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex gap-1">
@@ -916,6 +949,52 @@ const ManageQuestionsPage = () => {
                     />
                   </div>
 
+                  {/* Question type settings for listening sections */}
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-4">
+                    <h4 className="font-medium text-sm text-foreground flex items-center gap-2">
+                      🎧 Cài đặt loại câu hỏi (cho phần nghe)
+                    </h4>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-xs text-muted-foreground">Loại câu hỏi</label>
+                        <Select
+                          value={editForm.question_type || 'standard'}
+                          onValueChange={(v) => setEditForm((prev) => ({ ...prev, question_type: v as ListeningQuestionType }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="standard">Standard (đầy đủ text)</SelectItem>
+                            <SelectItem value="audio_only">Audio Only (chỉ ①②③④)</SelectItem>
+                            <SelectItem value="image_based">Image Based (chọn theo hình)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs text-muted-foreground">Số lượng đáp án</label>
+                        <Select
+                          value={String(editForm.option_count || 4)}
+                          onValueChange={(v) => setEditForm((prev) => ({ ...prev, option_count: parseInt(v, 10) }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="2">2 đáp án</SelectItem>
+                            <SelectItem value="3">3 đáp án</SelectItem>
+                            <SelectItem value="4">4 đáp án</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      <strong>Standard:</strong> Hiển thị câu hỏi + đáp án text •{' '}
+                      <strong>Audio Only:</strong> Câu hỏi/đáp án trong audio, chỉ hiển thị ①②③④ •{' '}
+                      <strong>Image Based:</strong> Chọn đáp án theo hình
+                    </p>
+                  </div>
+
                   {hasSubQuestions ? (
                     <SubQuestionInput
                       subQuestions={editForm.subQuestions || []}
@@ -926,37 +1005,41 @@ const ManageQuestionsPage = () => {
                     <>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div>
-                          <label className="mb-1 block text-sm font-medium">Đáp án A</label>
+                          <label className="mb-1 block text-sm font-medium">Đáp án A (①)</label>
                           <RichTextEditable
                             value={editForm.option_a || ''}
                             onChange={(v) => setEditForm((prev) => ({ ...prev, option_a: v }))}
-                            placeholder="Đáp án A"
+                            placeholder={editForm.question_type === 'audio_only' ? '(Để trống nếu trong audio)' : 'Đáp án A'}
                           />
                         </div>
                         <div>
-                          <label className="mb-1 block text-sm font-medium">Đáp án B</label>
+                          <label className="mb-1 block text-sm font-medium">Đáp án B (②)</label>
                           <RichTextEditable
                             value={editForm.option_b || ''}
                             onChange={(v) => setEditForm((prev) => ({ ...prev, option_b: v }))}
-                            placeholder="Đáp án B"
+                            placeholder={editForm.question_type === 'audio_only' ? '(Để trống nếu trong audio)' : 'Đáp án B'}
                           />
                         </div>
-                        <div>
-                          <label className="mb-1 block text-sm font-medium">Đáp án C</label>
-                          <RichTextEditable
-                            value={editForm.option_c || ''}
-                            onChange={(v) => setEditForm((prev) => ({ ...prev, option_c: v }))}
-                            placeholder="Đáp án C"
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-1 block text-sm font-medium">Đáp án D</label>
-                          <RichTextEditable
-                            value={editForm.option_d || ''}
-                            onChange={(v) => setEditForm((prev) => ({ ...prev, option_d: v }))}
-                            placeholder="Đáp án D"
-                          />
-                        </div>
+                        {(editForm.option_count || 4) >= 3 && (
+                          <div>
+                            <label className="mb-1 block text-sm font-medium">Đáp án C (③)</label>
+                            <RichTextEditable
+                              value={editForm.option_c || ''}
+                              onChange={(v) => setEditForm((prev) => ({ ...prev, option_c: v }))}
+                              placeholder={editForm.question_type === 'audio_only' ? '(Để trống nếu trong audio)' : 'Đáp án C'}
+                            />
+                          </div>
+                        )}
+                        {(editForm.option_count || 4) >= 4 && (
+                          <div>
+                            <label className="mb-1 block text-sm font-medium">Đáp án D (④)</label>
+                            <RichTextEditable
+                              value={editForm.option_d || ''}
+                              onChange={(v) => setEditForm((prev) => ({ ...prev, option_d: v }))}
+                              placeholder={editForm.question_type === 'audio_only' ? '(Để trống nếu trong audio)' : 'Đáp án D'}
+                            />
+                          </div>
+                        )}
                       </div>
 
                       <div>
@@ -969,10 +1052,14 @@ const ManageQuestionsPage = () => {
                             <SelectValue placeholder="Chọn đáp án đúng" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="A">A</SelectItem>
-                            <SelectItem value="B">B</SelectItem>
-                            <SelectItem value="C">C</SelectItem>
-                            <SelectItem value="D">D</SelectItem>
+                            <SelectItem value="A">① A</SelectItem>
+                            <SelectItem value="B">② B</SelectItem>
+                            {(editForm.option_count || 4) >= 3 && (
+                              <SelectItem value="C">③ C</SelectItem>
+                            )}
+                            {(editForm.option_count || 4) >= 4 && (
+                              <SelectItem value="D">④ D</SelectItem>
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
