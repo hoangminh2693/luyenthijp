@@ -166,6 +166,14 @@ const ImportQuestionsPage = () => {
     setSelectedSectionId('');
   }, [selectedLevelId]);
 
+  // Reset form data when section changes
+  useEffect(() => {
+    setTableQuestions([]);
+    setParsedQuestions([]);
+    setFile(null);
+    setImportResult(null);
+  }, [selectedSectionId]);
+
   // Filter levels and sections based on selection
   const filteredLevels = levels.filter(l => l.subject_id === selectedSubjectId);
   const filteredSections = subjectHasLevels
