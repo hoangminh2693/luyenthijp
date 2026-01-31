@@ -55,21 +55,45 @@ interface Section {
 }
 
 function isValidTableQuestion(q: TableQuestion): boolean {
+  const optionCount = q.option_count ?? 4;
+  const questionType = q.question_type ?? 'standard';
+  
+  // For audio_only questions with sub-questions, only need audio
+  if (questionType === 'audio_only' && q.subQuestions && q.subQuestions.length > 0) {
+    return q.subQuestions.some(sq => {
+      const sqType = sq.question_type ?? 'standard';
+      if (sqType === 'audio_only') return !!sq.correct_option;
+      const sqCount = sq.option_count ?? 4;
+      const hasReqOpts = !!sq.option_a && !!sq.option_b && 
+        (sqCount < 3 || !!sq.option_c) && (sqCount < 4 || !!sq.option_d);
+      return !!sq.content && hasReqOpts && !!sq.correct_option;
+    });
+  }
+  
+  // For audio_only without sub-questions
+  if (questionType === 'audio_only') {
+    return !!q.correct_option;
+  }
+  
+  // For standard/image_based, content is required
   if (!q.content) return false;
 
-  const hasDirectAnswer =
-    !!q.option_a && !!q.option_b && !!q.option_c && !!q.option_d && !!q.correct_option;
+  // Check direct answer based on option_count
+  const hasRequiredOptions = 
+    !!q.option_a && !!q.option_b && 
+    (optionCount < 3 || !!q.option_c) && 
+    (optionCount < 4 || !!q.option_d);
+  
+  const hasDirectAnswer = hasRequiredOptions && !!q.correct_option;
 
-  const hasValidSubQuestions =
-    (q.subQuestions ?? []).some(
-      (sq) =>
-        !!sq.content &&
-        !!sq.option_a &&
-        !!sq.option_b &&
-        !!sq.option_c &&
-        !!sq.option_d &&
-        !!sq.correct_option
-    );
+  const hasValidSubQuestions = (q.subQuestions ?? []).some(sq => {
+    const sqType = sq.question_type ?? 'standard';
+    if (sqType === 'audio_only') return !!sq.correct_option;
+    const sqCount = sq.option_count ?? 4;
+    const hasReqOpts = !!sq.option_a && !!sq.option_b && 
+      (sqCount < 3 || !!sq.option_c) && (sqCount < 4 || !!sq.option_d);
+    return !!sq.content && hasReqOpts && !!sq.correct_option;
+  });
 
   return hasDirectAnswer || hasValidSubQuestions;
 }
@@ -291,12 +315,14 @@ const ImportQuestionsPage = () => {
             content: sanitizeRichText(q.content),
             option_a: sanitizeRichText(q.option_a || ''),
             option_b: sanitizeRichText(q.option_b || ''),
-            option_c: sanitizeRichText(q.option_c || ''),
-            option_d: sanitizeRichText(q.option_d || ''),
+            option_c: sanitizeRichText(q.option_c || '') || null,
+            option_d: sanitizeRichText(q.option_d || '') || null,
             correct_option: q.correct_option || 'A',
             explanation: safeExplanation,
             image_url: (q as TableQuestion).image_url || null,
             audio_url: (q as TableQuestion).audio_url || null,
+            question_type: (q as TableQuestion).question_type || 'standard',
+            option_count: (q as TableQuestion).option_count || 4,
           })
           .select('id')
           .single();
@@ -311,10 +337,12 @@ const ImportQuestionsPage = () => {
               content: sanitizeRichText(sq.content),
               option_a: sanitizeRichText(sq.option_a),
               option_b: sanitizeRichText(sq.option_b),
-              option_c: sanitizeRichText(sq.option_c),
-              option_d: sanitizeRichText(sq.option_d),
+              option_c: sanitizeRichText(sq.option_c || '') || null,
+              option_d: sanitizeRichText(sq.option_d || '') || null,
               correct_option: sq.correct_option,
               explanation: sq.explanation ? sanitizeRichText(sq.explanation) : null,
+              question_type: sq.question_type || 'standard',
+              option_count: sq.option_count || 4,
             });
           }
         }

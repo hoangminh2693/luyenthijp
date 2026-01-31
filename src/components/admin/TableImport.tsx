@@ -32,6 +32,8 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 
+export type ListeningQuestionType = 'standard' | 'audio_only' | 'image_based';
+
 export interface TableQuestion {
   content: string;
   option_a: string;
@@ -43,6 +45,9 @@ export interface TableQuestion {
   image_url?: string;
   audio_url?: string;
   subQuestions?: SubQuestion[];
+  // Listening question support
+  question_type?: ListeningQuestionType;
+  option_count?: number; // 2-4
 }
 
 interface TableImportProps {
@@ -60,9 +65,63 @@ const emptyQuestion: TableQuestion = {
   image_url: undefined,
   audio_url: undefined,
   subQuestions: [],
+  question_type: 'standard',
+  option_count: 4,
 };
 
 type ActiveCell = { index: number; field: keyof TableQuestion } | null;
+
+// Helper to check if sub-question is valid based on option_count
+function isValidSubQuestion(sq: SubQuestion): boolean {
+  const optionCount = sq.option_count ?? 4;
+  const questionType = sq.question_type ?? 'standard';
+  
+  // For audio_only type, no text content needed for options
+  if (questionType === 'audio_only') {
+    return !!sq.correct_option;
+  }
+  
+  // Check required options based on option_count
+  const hasRequiredOptions = 
+    !!sq.option_a && 
+    !!sq.option_b && 
+    (optionCount < 3 || !!sq.option_c) && 
+    (optionCount < 4 || !!sq.option_d);
+  
+  return !!sq.content && hasRequiredOptions && !!sq.correct_option;
+}
+
+// Check if table question is valid based on question_type and option_count
+function isValidTableQuestion(q: TableQuestion): boolean {
+  const optionCount = q.option_count ?? 4;
+  const questionType = q.question_type ?? 'standard';
+  
+  // For audio_only questions with sub-questions, only need audio
+  if (questionType === 'audio_only' && q.subQuestions && q.subQuestions.length > 0) {
+    return q.subQuestions.some(isValidSubQuestion);
+  }
+  
+  // For audio_only without sub-questions
+  if (questionType === 'audio_only') {
+    return !!q.correct_option;
+  }
+  
+  // For standard/image_based, content is required
+  if (!q.content) return false;
+
+  // Check direct answer based on option_count
+  const hasRequiredOptions = 
+    !!q.option_a && 
+    !!q.option_b && 
+    (optionCount < 3 || !!q.option_c) && 
+    (optionCount < 4 || !!q.option_d);
+  
+  const hasDirectAnswer = hasRequiredOptions && !!q.correct_option;
+
+  const hasValidSubQuestions = (q.subQuestions ?? []).some(isValidSubQuestion);
+
+  return hasDirectAnswer || hasValidSubQuestions;
+}
 
 /**
  * Loại bỏ số thứ tự ở đầu câu hỏi (ví dụ: "1. Câu hỏi", "2) Nội dung", "3- Text")
@@ -95,10 +154,15 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
 
   const updateQuestion = useCallback(
     (index: number, field: keyof TableQuestion, value: string | SubQuestion[] | undefined) => {
-      const updated = [...questions];
+    const updated = [...questions];
+    // Handle option_count specially - convert to number
+    if (field === 'option_count' && typeof value === 'string') {
+      updated[index] = { ...updated[index], [field]: parseInt(value, 10) };
+    } else {
       updated[index] = { ...updated[index], [field]: value };
-      setQuestions(updated);
-      onQuestionsChange(updated);
+    }
+    setQuestions(updated);
+    onQuestionsChange(updated);
     },
     [questions, onQuestionsChange]
   );
@@ -363,6 +427,42 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                   {/* Expanded content */}
                   <CollapsibleContent>
                     <div className="border-t border-border p-4 space-y-4">
+                      {/* Question Type & Option Count (for listening sections) */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-foreground mb-2 block">Loại câu hỏi</label>
+                          <Select 
+                            value={q.question_type || 'standard'} 
+                            onValueChange={(value) => updateQuestion(index, 'question_type', value as ListeningQuestionType)}
+                          >
+                            <SelectTrigger className="text-sm">
+                              <SelectValue placeholder="Chọn loại" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="standard">Chuẩn (có text đáp án)</SelectItem>
+                              <SelectItem value="audio_only">Chỉ nghe (①②③④)</SelectItem>
+                              <SelectItem value="image_based">Chọn theo hình ảnh</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-foreground mb-2 block">Số đáp án</label>
+                          <Select 
+                            value={String(q.option_count || 4)} 
+                            onValueChange={(value) => updateQuestion(index, 'option_count', value)}
+                          >
+                            <SelectTrigger className="text-sm">
+                              <SelectValue placeholder="Số đáp án" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="2">2 đáp án</SelectItem>
+                              <SelectItem value="3">3 đáp án</SelectItem>
+                              <SelectItem value="4">4 đáp án</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
                       {/* Media uploads */}
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -400,7 +500,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                               <RichTextEditable
                                 ref={(el) => setCellRef(index, 'option_a', el)}
                                 value={q.option_a}
-                                placeholder="Đáp án A"
+                                placeholder={q.question_type === 'audio_only' ? '(có thể để trống)' : 'Đáp án A'}
                                 onFocus={() => setActiveCell({ index, field: 'option_a' })}
                                 onChange={(v) => updateQuestion(index, 'option_a', v)}
                               />
@@ -410,31 +510,35 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                               <RichTextEditable
                                 ref={(el) => setCellRef(index, 'option_b', el)}
                                 value={q.option_b}
-                                placeholder="Đáp án B"
+                                placeholder={q.question_type === 'audio_only' ? '(có thể để trống)' : 'Đáp án B'}
                                 onFocus={() => setActiveCell({ index, field: 'option_b' })}
                                 onChange={(v) => updateQuestion(index, 'option_b', v)}
                               />
                             </div>
-                            <div>
-                              <label className="text-xs text-muted-foreground">Đáp án C</label>
-                              <RichTextEditable
-                                ref={(el) => setCellRef(index, 'option_c', el)}
-                                value={q.option_c}
-                                placeholder="Đáp án C"
-                                onFocus={() => setActiveCell({ index, field: 'option_c' })}
-                                onChange={(v) => updateQuestion(index, 'option_c', v)}
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs text-muted-foreground">Đáp án D</label>
-                              <RichTextEditable
-                                ref={(el) => setCellRef(index, 'option_d', el)}
-                                value={q.option_d}
-                                placeholder="Đáp án D"
-                                onFocus={() => setActiveCell({ index, field: 'option_d' })}
-                                onChange={(v) => updateQuestion(index, 'option_d', v)}
-                              />
-                            </div>
+                            {(q.option_count ?? 4) >= 3 && (
+                              <div>
+                                <label className="text-xs text-muted-foreground">Đáp án C</label>
+                                <RichTextEditable
+                                  ref={(el) => setCellRef(index, 'option_c', el)}
+                                  value={q.option_c}
+                                  placeholder={q.question_type === 'audio_only' ? '(có thể để trống)' : 'Đáp án C'}
+                                  onFocus={() => setActiveCell({ index, field: 'option_c' })}
+                                  onChange={(v) => updateQuestion(index, 'option_c', v)}
+                                />
+                              </div>
+                            )}
+                            {(q.option_count ?? 4) >= 4 && (
+                              <div>
+                                <label className="text-xs text-muted-foreground">Đáp án D</label>
+                                <RichTextEditable
+                                  ref={(el) => setCellRef(index, 'option_d', el)}
+                                  value={q.option_d}
+                                  placeholder={q.question_type === 'audio_only' ? '(có thể để trống)' : 'Đáp án D'}
+                                  onFocus={() => setActiveCell({ index, field: 'option_d' })}
+                                  onChange={(v) => updateQuestion(index, 'option_d', v)}
+                                />
+                              </div>
+                            )}
                           </div>
                           <div className="grid grid-cols-[120px_1fr] gap-3">
                             <div>
@@ -446,8 +550,8 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                                 <SelectContent>
                                   <SelectItem value="A">A</SelectItem>
                                   <SelectItem value="B">B</SelectItem>
-                                  <SelectItem value="C">C</SelectItem>
-                                  <SelectItem value="D">D</SelectItem>
+                                  {(q.option_count ?? 4) >= 3 && <SelectItem value="C">C</SelectItem>}
+                                  {(q.option_count ?? 4) >= 4 && <SelectItem value="D">D</SelectItem>}
                                 </SelectContent>
                               </Select>
                             </div>
