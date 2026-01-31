@@ -162,9 +162,13 @@ export type Database = {
           image_url: string | null
           option_a: string
           option_b: string
-          option_c: string
-          option_d: string
+          option_c: string | null
+          option_count: number | null
+          option_d: string | null
           parent_id: string | null
+          question_type:
+            | Database["public"]["Enums"]["listening_question_type"]
+            | null
           section_id: string
         }
         Insert: {
@@ -177,9 +181,13 @@ export type Database = {
           image_url?: string | null
           option_a: string
           option_b: string
-          option_c: string
-          option_d: string
+          option_c?: string | null
+          option_count?: number | null
+          option_d?: string | null
           parent_id?: string | null
+          question_type?:
+            | Database["public"]["Enums"]["listening_question_type"]
+            | null
           section_id: string
         }
         Update: {
@@ -192,9 +200,13 @@ export type Database = {
           image_url?: string | null
           option_a?: string
           option_b?: string
-          option_c?: string
-          option_d?: string
+          option_c?: string | null
+          option_count?: number | null
+          option_d?: string | null
           parent_id?: string | null
+          question_type?:
+            | Database["public"]["Enums"]["listening_question_type"]
+            | null
           section_id?: string
         }
         Relationships: [
@@ -353,8 +365,12 @@ export type Database = {
           option_a: string | null
           option_b: string | null
           option_c: string | null
+          option_count: number | null
           option_d: string | null
           parent_id: string | null
+          question_type:
+            | Database["public"]["Enums"]["listening_question_type"]
+            | null
           section_id: string | null
         }
         Insert: {
@@ -366,8 +382,12 @@ export type Database = {
           option_a?: string | null
           option_b?: string | null
           option_c?: string | null
+          option_count?: number | null
           option_d?: string | null
           parent_id?: string | null
+          question_type?:
+            | Database["public"]["Enums"]["listening_question_type"]
+            | null
           section_id?: string | null
         }
         Update: {
@@ -379,8 +399,12 @@ export type Database = {
           option_a?: string | null
           option_b?: string | null
           option_c?: string | null
+          option_count?: number | null
           option_d?: string | null
           parent_id?: string | null
+          question_type?:
+            | Database["public"]["Enums"]["listening_question_type"]
+            | null
           section_id?: string | null
         }
         Relationships: [
@@ -463,6 +487,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      listening_question_type: "standard" | "audio_only" | "image_based"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -591,6 +616,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      listening_question_type: ["standard", "audio_only", "image_based"],
     },
   },
 } as const

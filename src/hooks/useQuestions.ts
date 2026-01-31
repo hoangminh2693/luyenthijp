@@ -1,14 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+// Loại câu hỏi nghe theo format JLPT
+export type ListeningQuestionType = 'standard' | 'audio_only' | 'image_based';
+
 export interface Question {
   id: string;
   content: string;
   options: {
     A: string;
     B: string;
-    C: string;
-    D: string;
+    C?: string; // Nullable cho câu 3 đáp án
+    D?: string; // Nullable cho câu 3 đáp án
   };
   correctOption?: 'A' | 'B' | 'C' | 'D'; // Optional - only available after submission
   explanation?: string; // Optional - only available after submission
@@ -17,6 +20,9 @@ export interface Question {
   audio_url?: string;
   parent_id?: string;
   subQuestions?: Question[]; // Câu hỏi con
+  // Thông tin loại câu hỏi nghe
+  questionType?: ListeningQuestionType;
+  optionCount?: number; // Số lượng đáp án (2-4)
 }
 
 // Safe question from view (no correct_option, no explanation)
@@ -25,12 +31,14 @@ interface DbQuestionSafe {
   content: string;
   option_a: string;
   option_b: string;
-  option_c: string;
-  option_d: string;
+  option_c: string | null;
+  option_d: string | null;
   section_id: string;
   image_url: string | null;
   audio_url: string | null;
   parent_id: string | null;
+  question_type: ListeningQuestionType | null;
+  option_count: number | null;
 }
 
 // Full question (for admin - includes answers)
@@ -39,45 +47,53 @@ interface DbQuestion {
   content: string;
   option_a: string;
   option_b: string;
-  option_c: string;
-  option_d: string;
+  option_c: string | null;
+  option_d: string | null;
   correct_option: string;
   explanation: string | null;
   section_id: string;
   image_url: string | null;
   audio_url: string | null;
   parent_id: string | null;
+  question_type: ListeningQuestionType | null;
+  option_count: number | null;
 }
 
 // Chuyển đổi dữ liệu từ database (safe view - không có đáp án)
 function mapDbQuestionSafe(dbQuestion: DbQuestionSafe): Question {
+  const optionCount = dbQuestion.option_count ?? 4;
+  
   return {
     id: dbQuestion.id,
     content: dbQuestion.content,
     options: {
       A: dbQuestion.option_a,
       B: dbQuestion.option_b,
-      C: dbQuestion.option_c,
-      D: dbQuestion.option_d,
+      C: optionCount >= 3 ? (dbQuestion.option_c || '') : undefined,
+      D: optionCount >= 4 ? (dbQuestion.option_d || '') : undefined,
     },
     // correctOption and explanation NOT included - revealed only after submission
     section_id: dbQuestion.section_id,
     image_url: dbQuestion.image_url || undefined,
     audio_url: dbQuestion.audio_url || undefined,
     parent_id: dbQuestion.parent_id || undefined,
+    questionType: dbQuestion.question_type || 'standard',
+    optionCount: optionCount,
   };
 }
 
 // Chuyển đổi dữ liệu từ database (full - có đáp án, cho admin)
 function mapDbQuestion(dbQuestion: DbQuestion): Question {
+  const optionCount = dbQuestion.option_count ?? 4;
+  
   return {
     id: dbQuestion.id,
     content: dbQuestion.content,
     options: {
       A: dbQuestion.option_a,
       B: dbQuestion.option_b,
-      C: dbQuestion.option_c,
-      D: dbQuestion.option_d,
+      C: optionCount >= 3 ? (dbQuestion.option_c || '') : undefined,
+      D: optionCount >= 4 ? (dbQuestion.option_d || '') : undefined,
     },
     correctOption: dbQuestion.correct_option as 'A' | 'B' | 'C' | 'D',
     explanation: dbQuestion.explanation || undefined,
@@ -85,6 +101,8 @@ function mapDbQuestion(dbQuestion: DbQuestion): Question {
     image_url: dbQuestion.image_url || undefined,
     audio_url: dbQuestion.audio_url || undefined,
     parent_id: dbQuestion.parent_id || undefined,
+    questionType: dbQuestion.question_type || 'standard',
+    optionCount: optionCount,
   };
 }
 

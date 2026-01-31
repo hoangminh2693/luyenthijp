@@ -2,9 +2,10 @@
  * SubQuestionInput - Component nhập câu hỏi con (sub-questions)
  * Dùng cho đề bài có nhiều câu hỏi nhỏ
  * Hỗ trợ paste từ Excel/Sheets
+ * Hỗ trợ các loại câu hỏi nghe (audio_only, image_based)
  */
 import { useCallback, useState } from 'react';
-import { Plus, Trash2, Copy, Check, X } from 'lucide-react';
+import { Plus, Trash2, Copy, Check, X, Headphones } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { RichTextEditable } from '@/components/admin/RichTextEditable';
@@ -16,6 +17,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+// Loại câu hỏi nghe theo format JLPT
+type ListeningQuestionType = 'standard' | 'audio_only' | 'image_based';
+
 export interface SubQuestion {
   id?: string;
   content: string;
@@ -25,6 +29,8 @@ export interface SubQuestion {
   option_d: string;
   correct_option: string;
   explanation: string;
+  question_type?: ListeningQuestionType;
+  option_count?: number;
 }
 
 interface SubQuestionInputProps {
@@ -41,6 +47,8 @@ const emptySubQuestion: SubQuestion = {
   option_d: '',
   correct_option: '',
   explanation: '',
+  question_type: 'standard',
+  option_count: 4,
 };
 
 /**
@@ -62,9 +70,14 @@ export function SubQuestionInput({ subQuestions, onChange, disabled }: SubQuesti
     onChange(subQuestions.filter((_, i) => i !== index));
   }, [subQuestions, onChange]);
 
-  const updateSubQuestion = useCallback((index: number, field: keyof SubQuestion, value: string) => {
+  const updateSubQuestion = useCallback((index: number, field: keyof SubQuestion, value: string | number) => {
     const updated = [...subQuestions];
-    updated[index] = { ...updated[index], [field]: value };
+    // Handle option_count specially - convert string to number
+    if (field === 'option_count') {
+      updated[index] = { ...updated[index], [field]: typeof value === 'string' ? parseInt(value, 10) : value };
+    } else {
+      updated[index] = { ...updated[index], [field]: value };
+    }
     onChange(updated);
   }, [subQuestions, onChange]);
 
@@ -204,45 +217,87 @@ export function SubQuestionInput({ subQuestions, onChange, disabled }: SubQuesti
               <label className="text-xs text-muted-foreground">Nội dung câu hỏi</label>
               <RichTextEditable
                 value={sq.content}
-                placeholder="Nội dung câu hỏi con..."
+                placeholder={sq.question_type === 'audio_only' ? '(Để trống nếu trong audio)' : 'Nội dung câu hỏi con...'}
                 onChange={(v) => updateSubQuestion(index, 'content', v)}
                 className="min-h-[48px]"
               />
             </div>
 
+            {/* Question type settings */}
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-xs text-muted-foreground">Đáp án A</label>
+                <label className="text-xs text-muted-foreground">Loại câu hỏi</label>
+                <Select
+                  value={sq.question_type || 'standard'}
+                  onValueChange={(v) => updateSubQuestion(index, 'question_type', v)}
+                  disabled={disabled}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="standard">Standard</SelectItem>
+                    <SelectItem value="audio_only">Audio Only</SelectItem>
+                    <SelectItem value="image_based">Image Based</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Số đáp án</label>
+                <Select
+                  value={String(sq.option_count || 4)}
+                  onValueChange={(v) => updateSubQuestion(index, 'option_count', v)}
+                  disabled={disabled}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2">2 đáp án</SelectItem>
+                    <SelectItem value="3">3 đáp án</SelectItem>
+                    <SelectItem value="4">4 đáp án</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-muted-foreground">Đáp án A (①)</label>
                 <RichTextEditable
                   value={sq.option_a}
-                  placeholder="A"
+                  placeholder={sq.question_type === 'audio_only' ? '—' : 'A'}
                   onChange={(v) => updateSubQuestion(index, 'option_a', v)}
                 />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Đáp án B</label>
+                <label className="text-xs text-muted-foreground">Đáp án B (②)</label>
                 <RichTextEditable
                   value={sq.option_b}
-                  placeholder="B"
+                  placeholder={sq.question_type === 'audio_only' ? '—' : 'B'}
                   onChange={(v) => updateSubQuestion(index, 'option_b', v)}
                 />
               </div>
-              <div>
-                <label className="text-xs text-muted-foreground">Đáp án C</label>
-                <RichTextEditable
-                  value={sq.option_c}
-                  placeholder="C"
-                  onChange={(v) => updateSubQuestion(index, 'option_c', v)}
-                />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground">Đáp án D</label>
-                <RichTextEditable
-                  value={sq.option_d}
-                  placeholder="D"
-                  onChange={(v) => updateSubQuestion(index, 'option_d', v)}
-                />
-              </div>
+              {(sq.option_count ?? 4) >= 3 && (
+                <div>
+                  <label className="text-xs text-muted-foreground">Đáp án C (③)</label>
+                  <RichTextEditable
+                    value={sq.option_c}
+                    placeholder={sq.question_type === 'audio_only' ? '—' : 'C'}
+                    onChange={(v) => updateSubQuestion(index, 'option_c', v)}
+                  />
+                </div>
+              )}
+              {(sq.option_count ?? 4) >= 4 && (
+                <div>
+                  <label className="text-xs text-muted-foreground">Đáp án D (④)</label>
+                  <RichTextEditable
+                    value={sq.option_d}
+                    placeholder={sq.question_type === 'audio_only' ? '—' : 'D'}
+                    onChange={(v) => updateSubQuestion(index, 'option_d', v)}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-3">
@@ -257,10 +312,14 @@ export function SubQuestionInput({ subQuestions, onChange, disabled }: SubQuesti
                     <SelectValue placeholder="Chọn" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="A">A</SelectItem>
-                    <SelectItem value="B">B</SelectItem>
-                    <SelectItem value="C">C</SelectItem>
-                    <SelectItem value="D">D</SelectItem>
+                    <SelectItem value="A">① A</SelectItem>
+                    <SelectItem value="B">② B</SelectItem>
+                    {(sq.option_count ?? 4) >= 3 && (
+                      <SelectItem value="C">③ C</SelectItem>
+                    )}
+                    {(sq.option_count ?? 4) >= 4 && (
+                      <SelectItem value="D">④ D</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
