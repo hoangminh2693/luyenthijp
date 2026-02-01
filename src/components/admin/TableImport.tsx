@@ -189,16 +189,30 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
   );
 
   // Xử lý paste từ Excel/Sheets (text thuần)
+  // Hỗ trợ 2 định dạng:
+  // 1. Tab-separated: Câu hỏi\tA\tB\tC\tD\tĐáp án\tGiải thích
+  // 2. Multi-line format: Dòng 1 = nội dung + đáp án + đúng, Dòng 2 = giải thích
   const handlePaste = useCallback(() => {
     if (!pasteText.trim()) return;
 
     const lines = pasteText.trim().split('\n');
     const parsed: TableQuestion[] = [];
 
-    lines.forEach((line) => {
-      const values = line.includes('\t') ? line.split('\t') : line.split(',');
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i].trim();
+      if (!line) {
+        i++;
+        continue;
+      }
 
-      if (values.length >= 5) {
+      // Check if this is tab/comma separated format (7 columns)
+      const tabValues = line.split('\t');
+      const commaValues = line.split(',');
+      const values = tabValues.length >= 5 ? tabValues : (commaValues.length >= 5 ? commaValues : null);
+
+      if (values && values.length >= 5) {
+        // Standard Excel format: Câu hỏi | A | B | C | D | Đáp án | Giải thích
         let correctOption = values[5]?.trim().toUpperCase() || '';
         if (correctOption.startsWith('OPTION_')) {
           correctOption = correctOption.replace('OPTION_', '');
@@ -216,8 +230,93 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
           audio_url: undefined,
           subQuestions: [],
         });
+        i++;
+      } else {
+        // Multi-line format for JLPT vocabulary questions
+        // Line format: [keyword][option_a text][option_b text][option_c text][option_d text][correct_option]
+        // Next line: explanation
+        
+        // Extract correct option from end of line (A, B, C, D)
+        const correctMatch = line.match(/([A-D])\s*$/);
+        const correctOption = correctMatch ? correctMatch[1] : '';
+        
+        // Remove the correct option from the end
+        let questionLine = correctMatch ? line.slice(0, -correctMatch[0].length).trim() : line;
+        
+        // Try to parse the format: content with interspersed options
+        // Pattern: keyword + option_a_text + option_b_text + option_c_text + option_d_text
+        // The keyword appears at start of each option to help identify boundaries
+        
+        // Get the first word/phrase as keyword (usually before first real option text)
+        const firstWordMatch = questionLine.match(/^[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\u3400-\u4DBF]+/);
+        const keyword = firstWordMatch ? firstWordMatch[0] : '';
+        
+        let content = '';
+        let option_a = '';
+        let option_b = '';
+        let option_c = '';
+        let option_d = '';
+        
+        if (keyword && questionLine.includes(keyword)) {
+          // Split by keyword occurrences
+          const parts = questionLine.split(new RegExp(`(${keyword})`, 'g')).filter(Boolean);
+          
+          // Reassemble: first occurrence + following text = content with blanks
+          // Subsequent keyword + text pairs = options
+          let keywordCount = 0;
+          let currentOption = '';
+          
+          for (const part of parts) {
+            if (part === keyword) {
+              keywordCount++;
+              if (keywordCount === 1) {
+                content += keyword;
+              }
+            } else {
+              if (keywordCount === 1 && !option_a) {
+                // This is part of the main sentence (after first keyword)
+                content += part;
+              } else if (keywordCount >= 2) {
+                // This is an option
+                const optionText = keyword + part.trim();
+                if (!option_a) option_a = optionText;
+                else if (!option_b) option_b = optionText;
+                else if (!option_c) option_c = optionText;
+                else if (!option_d) option_d = optionText;
+              }
+            }
+          }
+        } else {
+          // Fallback: just use the whole line as content
+          content = questionLine;
+        }
+        
+        // Get explanation from next line (if exists and not another question)
+        let explanation = '';
+        if (i + 1 < lines.length) {
+          const nextLine = lines[i + 1].trim();
+          // Check if next line is explanation (starts with 「 or contains explanation pattern)
+          if (nextLine && (nextLine.startsWith('「') || nextLine.startsWith('(') || nextLine.startsWith('（'))) {
+            explanation = nextLine;
+            i++; // Skip explanation line
+          }
+        }
+        
+        parsed.push({
+          content: removeQuestionNumber(content),
+          option_a,
+          option_b,
+          option_c,
+          option_d,
+          correct_option: ['A', 'B', 'C', 'D'].includes(correctOption) ? correctOption : '',
+          explanation,
+          image_url: undefined,
+          audio_url: undefined,
+          subQuestions: [],
+        });
+        i++;
       }
-    });
+    }
 
     if (parsed.length > 0) {
       setQuestions(parsed);
