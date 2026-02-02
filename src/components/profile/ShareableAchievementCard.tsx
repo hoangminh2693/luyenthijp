@@ -93,34 +93,30 @@ export function ShareableAchievementCard({
     });
   };
 
-  const handleShareFacebook = async () => {
-    const url = encodeURIComponent(window.location.origin);
-    const text = encodeURIComponent(`🏆 Tôi đã đạt được ${earnedAchievements.length} huy hiệu trên Luyện Thi JP! Bạn có muốn thử sức không?`);
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}&quote=${text}`, '_blank', 'width=600,height=400');
-  };
+  const shareText = `🏆 Tôi đã đạt được ${earnedAchievements.length} huy hiệu trên Luyện Thi JP!\n\n📊 Thống kê:\n• ${stats.total_attempts} câu đã làm\n• ${stats.accuracy_percent.toFixed(1)}% độ chính xác\n• ${stats.streak_days} ngày hoạt động\n\nBạn có muốn thử sức không? 👇\n${window.location.origin}`;
 
-  const handleShareTwitter = async () => {
-    const url = encodeURIComponent(window.location.origin);
-    const text = encodeURIComponent(`🏆 Tôi đã đạt được ${earnedAchievements.length} huy hiệu trên Luyện Thi JP!\n\n📊 Thống kê:\n• ${stats.total_attempts} câu đã làm\n• ${stats.accuracy_percent.toFixed(1)}% độ chính xác\n• ${stats.streak_days} ngày hoạt động\n\nBạn có muốn thử sức không? 👇`);
-    window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, '_blank', 'width=600,height=400');
-  };
-
-  const handleCopyLink = async () => {
+  const handleCopyShareText = async () => {
     try {
-      await navigator.clipboard.writeText(window.location.origin);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      await navigator.clipboard.writeText(shareText);
       toast({
         title: 'Đã sao chép!',
-        description: 'Link đã được sao chép vào clipboard.',
+        description: 'Nội dung chia sẻ đã được sao chép. Hãy dán vào bài đăng Facebook/Twitter cùng với ảnh đã tải.',
       });
     } catch {
       toast({
         title: 'Lỗi',
-        description: 'Không thể sao chép link.',
+        description: 'Không thể sao chép nội dung.',
         variant: 'destructive',
       });
     }
+  };
+
+  const handleShareFacebook = () => {
+    window.open('https://www.facebook.com/', '_blank');
+  };
+
+  const handleShareTwitter = () => {
+    window.open('https://twitter.com/compose/tweet', '_blank');
   };
 
   if (earnedAchievements.length === 0) return null;
@@ -228,43 +224,55 @@ export function ShareableAchievementCard({
           </div>
         </div>
 
+        {/* Instructions */}
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+          <p className="text-sm font-medium text-foreground mb-2">📌 Hướng dẫn chia sẻ:</p>
+          <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+            <li>Tải ảnh thành tích về máy</li>
+            <li>Sao chép nội dung chia sẻ</li>
+            <li>Đăng bài lên Facebook/Twitter kèm ảnh</li>
+          </ol>
+        </div>
+
         {/* Share Buttons */}
         <div className="grid grid-cols-2 gap-2">
           <Button
-            variant="outline"
+            variant="default"
             className="gap-2"
             onClick={handleDownload}
             disabled={isGenerating}
           >
             <Download className="h-4 w-4" />
-            {isGenerating ? 'Đang tạo...' : 'Tải ảnh'}
+            {isGenerating ? 'Đang tạo...' : '1. Tải ảnh'}
           </Button>
           <Button
             variant="outline"
             className="gap-2"
-            onClick={handleCopyLink}
+            onClick={handleCopyShareText}
           >
             {copied ? <Check className="h-4 w-4 text-green-500" /> : <Link2 className="h-4 w-4" />}
-            {copied ? 'Đã sao chép' : 'Sao chép link'}
+            {copied ? 'Đã sao chép' : '2. Sao chép nội dung'}
           </Button>
           <Button
-            className="gap-2 bg-[#1877f2] text-white hover:bg-[#1877f2]/90"
+            variant="outline"
+            className="gap-2"
             onClick={handleShareFacebook}
           >
-            <Facebook className="h-4 w-4" />
-            Facebook
+            <Facebook className="h-4 w-4 text-[#1877f2]" />
+            Mở Facebook
           </Button>
           <Button
-            className="gap-2 bg-black text-white hover:bg-black/90"
+            variant="outline"
+            className="gap-2"
             onClick={handleShareTwitter}
           >
             <Twitter className="h-4 w-4" />
-            X (Twitter)
+            Mở X (Twitter)
           </Button>
         </div>
 
         <p className="text-center text-xs text-muted-foreground">
-          Chia sẻ thành tích để khoe với bạn bè và tạo động lực học tập! 🎯
+          Chia sẻ thành tích kèm ảnh để hiển thị đẹp hơn trên mạng xã hội! 🎯
         </p>
       </DialogContent>
     </Dialog>
