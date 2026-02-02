@@ -189,9 +189,13 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
   );
 
   // Xử lý paste từ Excel/Sheets (text thuần)
-  // Hỗ trợ 2 định dạng:
+  // Hỗ trợ 3 định dạng:
   // 1. Tab-separated: Câu hỏi\tA\tB\tC\tD\tĐáp án\tGiải thích
-  // 2. Multi-line format: Dòng 1 = nội dung + đáp án + đúng, Dòng 2 = giải thích
+  // 2. JLPT Kanji format (3 dòng):
+  //    Dòng 1: Câu ví dụ với từ vựng cần test
+  //    Dòng 2: [optionA][optionB][optionC][optionD][correct_option] - các đáp án đọc liền nhau
+  //    Dòng 3: Giải thích (bắt đầu bằng từ vựng + reading)
+  // 3. Legacy multi-line format
   const handlePaste = useCallback(() => {
     if (!pasteText.trim()) return;
 
@@ -232,89 +236,87 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
         });
         i++;
       } else {
-        // Multi-line format for JLPT vocabulary questions
-        // Line format: [keyword][option_a text][option_b text][option_c text][option_d text][correct_option]
-        // Next line: explanation
+        // JLPT Kanji reading format detection:
+        // Line 1: Japanese sentence (example usage)
+        // Line 2: 4 hiragana readings concatenated + correct option (A/B/C/D) at end
+        // Line 3: Explanation with kanji reading
         
-        // Extract correct option from end of line (A, B, C, D)
-        const correctMatch = line.match(/([A-D])\s*$/);
-        const correctOption = correctMatch ? correctMatch[1] : '';
+        // Check if next line looks like concatenated readings ending with A/B/C/D
+        const nextLine = i + 1 < lines.length ? lines[i + 1].trim() : '';
+        const readingsMatch = nextLine.match(/^(.+?)([A-D])\s*$/);
         
-        // Remove the correct option from the end
-        let questionLine = correctMatch ? line.slice(0, -correctMatch[0].length).trim() : line;
-        
-        // Try to parse the format: content with interspersed options
-        // Pattern: keyword + option_a_text + option_b_text + option_c_text + option_d_text
-        // The keyword appears at start of each option to help identify boundaries
-        
-        // Get the first word/phrase as keyword (usually before first real option text)
-        const firstWordMatch = questionLine.match(/^[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\u3400-\u4DBF]+/);
-        const keyword = firstWordMatch ? firstWordMatch[0] : '';
-        
-        let content = '';
-        let option_a = '';
-        let option_b = '';
-        let option_c = '';
-        let option_d = '';
-        
-        if (keyword && questionLine.includes(keyword)) {
-          // Split by keyword occurrences
-          const parts = questionLine.split(new RegExp(`(${keyword})`, 'g')).filter(Boolean);
+        if (readingsMatch) {
+          // This is JLPT format - parse 3 lines
+          const content = line; // Câu ví dụ
+          const readingsString = readingsMatch[1]; // Chuỗi các đáp án đọc liền
+          const correctOption = readingsMatch[2]; // A/B/C/D
           
-          // Reassemble: first occurrence + following text = content with blanks
-          // Subsequent keyword + text pairs = options
-          let keywordCount = 0;
-          let currentOption = '';
+          // Split readings - they are Japanese readings concatenated
+          // Try to split into 4 roughly equal parts (each is a reading option)
+          const readings = splitJapaneseReadings(readingsString);
           
-          for (const part of parts) {
-            if (part === keyword) {
-              keywordCount++;
-              if (keywordCount === 1) {
-                content += keyword;
-              }
+          // Get explanation from line 3
+          let explanation = '';
+          if (i + 2 < lines.length) {
+            const explanationLine = lines[i + 2].trim();
+            // Check if it's an explanation line (contains reading in parentheses or colon)
+            if (explanationLine && (
+              explanationLine.includes('(') || 
+              explanationLine.includes('（') ||
+              explanationLine.includes(':') ||
+              explanationLine.includes('：')
+            )) {
+              explanation = explanationLine;
+              i += 3; // Skip all 3 lines
             } else {
-              if (keywordCount === 1 && !option_a) {
-                // This is part of the main sentence (after first keyword)
-                content += part;
-              } else if (keywordCount >= 2) {
-                // This is an option
-                const optionText = keyword + part.trim();
-                if (!option_a) option_a = optionText;
-                else if (!option_b) option_b = optionText;
-                else if (!option_c) option_c = optionText;
-                else if (!option_d) option_d = optionText;
-              }
+              i += 2; // Skip 2 lines, next line might be new question
+            }
+          } else {
+            i += 2;
+          }
+          
+          parsed.push({
+            content: removeQuestionNumber(content),
+            option_a: readings[0] || '',
+            option_b: readings[1] || '',
+            option_c: readings[2] || '',
+            option_d: readings[3] || '',
+            correct_option: ['A', 'B', 'C', 'D'].includes(correctOption) ? correctOption : '',
+            explanation,
+            image_url: undefined,
+            audio_url: undefined,
+            subQuestions: [],
+          });
+        } else {
+          // Legacy format fallback - just use whole line as content
+          // Get explanation from next line if exists
+          let explanation = '';
+          if (i + 1 < lines.length) {
+            const maybeExplanation = lines[i + 1].trim();
+            if (maybeExplanation && (
+              maybeExplanation.startsWith('「') || 
+              maybeExplanation.startsWith('(') || 
+              maybeExplanation.startsWith('（')
+            )) {
+              explanation = maybeExplanation;
+              i++;
             }
           }
-        } else {
-          // Fallback: just use the whole line as content
-          content = questionLine;
+          
+          parsed.push({
+            content: removeQuestionNumber(line),
+            option_a: '',
+            option_b: '',
+            option_c: '',
+            option_d: '',
+            correct_option: '',
+            explanation,
+            image_url: undefined,
+            audio_url: undefined,
+            subQuestions: [],
+          });
+          i++;
         }
-        
-        // Get explanation from next line (if exists and not another question)
-        let explanation = '';
-        if (i + 1 < lines.length) {
-          const nextLine = lines[i + 1].trim();
-          // Check if next line is explanation (starts with 「 or contains explanation pattern)
-          if (nextLine && (nextLine.startsWith('「') || nextLine.startsWith('(') || nextLine.startsWith('（'))) {
-            explanation = nextLine;
-            i++; // Skip explanation line
-          }
-        }
-        
-        parsed.push({
-          content: removeQuestionNumber(content),
-          option_a,
-          option_b,
-          option_c,
-          option_d,
-          correct_option: ['A', 'B', 'C', 'D'].includes(correctOption) ? correctOption : '',
-          explanation,
-          image_url: undefined,
-          audio_url: undefined,
-          subQuestions: [],
-        });
-        i++;
       }
     }
 
@@ -325,6 +327,81 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
       setPasteText('');
     }
   }, [pasteText, onQuestionsChange]);
+
+  /**
+   * Split concatenated Japanese readings into 4 options
+   * Example: "きじゅうきちょうきっじゅうきっちょう" -> ["きじゅう", "きちょう", "きっじゅう", "きっちょう"]
+   * 
+   * Strategy: readings often follow patterns with っ (small tsu) or similar sounds
+   * We try to find natural break points
+   */
+  function splitJapaneseReadings(str: string): string[] {
+    if (!str) return ['', '', '', ''];
+    
+    // Try to detect if it's 4 similar readings by length estimation
+    const len = str.length;
+    const avgLen = Math.floor(len / 4);
+    
+    if (avgLen < 2) {
+      // Too short, just split evenly
+      const partLen = Math.ceil(len / 4);
+      return [
+        str.slice(0, partLen),
+        str.slice(partLen, partLen * 2),
+        str.slice(partLen * 2, partLen * 3),
+        str.slice(partLen * 3),
+      ];
+    }
+    
+    // Look for patterns: readings often share a common kanji reading pattern
+    // For JLPT, options are usually variations of similar sounds
+    // E.g., きじゅう・きちょう・きっじゅう・きっちょう
+    
+    // Strategy: find the common prefix length and use that as a guide
+    // First, try to identify a repeating pattern
+    
+    // Simple heuristic: split into 4 roughly equal parts, 
+    // adjusting boundaries to avoid splitting っ, ょ, ゅ, ゃ from their preceding char
+    const smallKana = 'っょゅゃぁぃぅぇぉ';
+    const results: string[] = [];
+    let start = 0;
+    
+    for (let part = 0; part < 4; part++) {
+      const idealEnd = Math.floor((len * (part + 1)) / 4);
+      let end = idealEnd;
+      
+      // Don't split on small kana - include it with previous char
+      while (end < len && smallKana.includes(str[end])) {
+        end++;
+      }
+      
+      // Also check if we're about to leave a small kana orphaned
+      if (end > start && end < len && smallKana.includes(str[end])) {
+        end++;
+      }
+      
+      if (part === 3) {
+        // Last part takes the rest
+        end = len;
+      }
+      
+      results.push(str.slice(start, end));
+      start = end;
+    }
+    
+    // If we ended up with empty parts, redistribute
+    if (results.some(r => !r)) {
+      const partLen = Math.ceil(len / 4);
+      return [
+        str.slice(0, partLen),
+        str.slice(partLen, partLen * 2),
+        str.slice(partLen * 2, partLen * 3),
+        str.slice(partLen * 3),
+      ];
+    }
+    
+    return results;
+  }
 
   const validQuestions = useMemo(
     () =>
