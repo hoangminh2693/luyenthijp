@@ -1,17 +1,31 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, Layers } from 'lucide-react';
-import { getLevelsBySubject, type Subject } from '@/data/quizData';
+import { useLayersBySubject, useCategoriesByLayer } from '@/hooks/useSubjectLayers';
 
 /**
  * SubjectCard Component - Thẻ hiển thị thông tin môn học
+ * Sử dụng hệ thống Layer động thay vì levels cố định
  */
 interface SubjectCardProps {
-  subject: Subject;
+  subject: {
+    id: string;
+    name: string;
+    slug: string;
+    description: string;
+    icon: string;
+  };
   index?: number;
 }
 
 export function SubjectCard({ subject, index = 0 }: SubjectCardProps) {
-  const levels = getLevelsBySubject(subject.id);
+  // Fetch layers và categories của layer đầu tiên
+  const { data: layers = [] } = useLayersBySubject(subject.id);
+  const firstLayer = layers[0];
+  const { data: categories = [] } = useCategoriesByLayer(firstLayer?.id, null);
+  
+  // Hiển thị số lượng items của layer đầu tiên
+  const itemCount = categories.length;
+  const layerName = firstLayer?.name || 'phân loại';
   
   return (
     <Link
@@ -37,10 +51,10 @@ export function SubjectCard({ subject, index = 0 }: SubjectCardProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <Layers className="h-4 w-4" />
-            <span>{levels.length} cấp độ</span>
+            <span>{itemCount} {layerName.toLowerCase()}</span>
           </div>
           <div className="flex items-center gap-1 text-sm font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
-            Xem cấp độ
+            Xem chi tiết
             <ArrowRight className="h-4 w-4" />
           </div>
         </div>

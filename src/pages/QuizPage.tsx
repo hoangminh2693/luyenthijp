@@ -1,43 +1,39 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useParams, Navigate, Link, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Send, Loader2, Headphones, Play, Pause, Volume2 } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, Headphones, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
 import { QuizProgress } from '@/components/quiz/QuizProgress';
 import { ResultSummary } from '@/components/quiz/ResultSummary';
 import { Breadcrumb } from '@/components/layout/Header';
 import { useQuestionHistory } from '@/hooks/useQuestionHistory';
-import { useSubjectBySlug, useLevelBySlug, useSectionBySlug } from '@/hooks/useSections';
+import { useLeafCategory } from '@/hooks/useCategoryPath';
 import { useRandomQuestions, useRandomListeningExam, type Question } from '@/hooks/useQuestions';
 import { type QuizResult } from '@/data/quizData';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
 
 /**
  * QuizPage - Trang làm bài thi
  * 
- * Hai mode:
- * 1. Random questions: /quiz/:subjectSlug/:levelSlug/:sectionSlug?count=N
- *    - Dùng cho 文字・語彙, 文法, 読解
- *    - Random N câu từ ngân hàng câu hỏi
- * 
- * 2. Listening exam: /quiz/:subjectSlug/:levelSlug/:sectionSlug?mode=listening
- *    - Dùng cho 聴解
- *    - Random 1 đề nghe hoàn chỉnh (1 audio + các câu hỏi liên quan)
- *    - Không shuffle câu hỏi, giữ nguyên thứ tự
+ * URL: /quiz/:subjectSlug/*?count=N hoặc ?mode=listening
+ * VD: /quiz/jlpt/n5/moji-goi?count=10
  * 
  * SECURE: Correct answers are only revealed after server-side submission
  */
 const QuizPage = () => {
-  const { subjectSlug, levelSlug, sectionSlug } = useParams<{ 
+  const { subjectSlug, '*': wildcardPath } = useParams<{ 
     subjectSlug?: string;
-    levelSlug?: string;
-    sectionSlug?: string;
+    '*': string;
   }>();
   const [searchParams] = useSearchParams();
   const mode = searchParams.get('mode');
   const isListeningMode = mode === 'listening';
   const questionCount = parseInt(searchParams.get('count') || '10', 10);
+  
+  // Parse category path
+  const categoryPath = wildcardPath || '';
   
   // State quản lý bài thi
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -45,29 +41,52 @@ const QuizPage = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<QuizResult | null>(null);
-  // Store revealed answers after submission
   const [revealedAnswers, setRevealedAnswers] = useState<Record<string, { correctOption: string; explanation?: string }>>({});
   const questionRefs = useRef<(HTMLDivElement | null)[]>([]);
   
-  // Audio player state cho phần nghe
+  // Audio player state
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   
   // Question history hook
   const { getQuestionStats } = useQuestionHistory();
 
-  // Fetch dữ liệu từ Supabase
-  const { data: subject, isLoading: loadingSubject } = useSubjectBySlug(subjectSlug);
-  const { data: level, isLoading: loadingLevel } = useLevelBySlug(subject?.id, levelSlug);
-  const { data: section, isLoading: loadingSection } = useSectionBySlug(level?.id, sectionSlug);
+  // Fetch category data
+  const { 
+    subject, 
+    categories, 
+    leafCategory, 
+    isLoading: loadingPath 
+  } = useLeafCategory(subjectSlug, categoryPath);
+  
+  // Tìm section_id matching để fetch questions (trong giai đoạn chuyển đổi)
+  const { data: matchingSection } = useQuery({
+    queryKey: ['matching-section-for-quiz', leafCategory?.slug],
+    queryFn: async () => {
+      if (!leafCategory) return null;
+      
+      // Tìm section có slug khớp với category
+      const { data } = await supabase
+        .from('sections')
+        .select('id')
+        .eq('slug', leafCategory.slug)
+        .limit(1)
+        .maybeSingle();
+      
+      return data;
+    },
+    enabled: !!leafCategory,
+  });
+  
+  const sectionId = matchingSection?.id;
   
   // Fetch câu hỏi dựa theo mode
   const { data: randomQuestions = [], isLoading: loadingRandomQuestions } = useRandomQuestions(
-    !isListeningMode ? section?.id : undefined, 
+    !isListeningMode ? sectionId : undefined, 
     questionCount
   );
   const { data: listeningExam, isLoading: loadingListeningExam } = useRandomListeningExam(
-    isListeningMode ? section?.id : undefined,
+    isListeningMode ? sectionId : undefined,
     isListeningMode
   );
   
@@ -82,9 +101,9 @@ const QuizPage = () => {
   // Scroll to top khi component mount
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [sectionSlug]);
+  }, [categoryPath]);
 
-  const isLoading = loadingSubject || loadingLevel || loadingSection || 
+  const isLoading = loadingPath || 
     (isListeningMode ? loadingListeningExam : loadingRandomQuestions);
 
   // Loading state
@@ -97,7 +116,7 @@ const QuizPage = () => {
   }
 
   // Nếu không tìm thấy dữ liệu
-  if (!subject || !level || !section) {
+  if (!subject || !leafCategory) {
     return <Navigate to="/subjects" replace />;
   }
 
@@ -107,7 +126,6 @@ const QuizPage = () => {
     setAnswers((prev) => ({ ...prev, [questionId]: answer }));
   };
 
-  // Xử lý chọn đáp án cho câu hỏi con
   const handleSelectSubAnswer = (subQuestionId: string, answer: string) => {
     if (isSubmitted) return;
     setSubAnswers((prev) => ({ ...prev, [subQuestionId]: answer }));
@@ -120,12 +138,10 @@ const QuizPage = () => {
     setIsSubmitting(true);
     
     try {
-      // Collect all answers for submission
       const answersToSubmit: { question_id: string; selected_answer: string }[] = [];
       
       for (const q of questions) {
         if (q.subQuestions && q.subQuestions.length > 0) {
-          // Sub-questions
           for (const subQ of q.subQuestions) {
             if (subAnswers[subQ.id]) {
               answersToSubmit.push({
@@ -135,7 +151,6 @@ const QuizPage = () => {
             }
           }
         } else {
-          // Regular question
           if (answers[q.id]) {
             answersToSubmit.push({
               question_id: q.id,
@@ -145,14 +160,12 @@ const QuizPage = () => {
         }
       }
 
-      // Submit to secure RPC function
       const { data, error } = await supabase.rpc('submit_quiz_answers', {
         p_answers: answersToSubmit,
       });
 
       if (error) throw error;
 
-      // Parse results from server
       const serverResult = data as {
         total_questions: number;
         correct_answers: number;
@@ -167,7 +180,6 @@ const QuizPage = () => {
         }>;
       };
 
-      // Store revealed answers for display
       const revealed: Record<string, { correctOption: string; explanation?: string }> = {};
       const details: { questionId: string; userAnswer: string | null; correctAnswer: string; isCorrect: boolean }[] = [];
       
@@ -197,8 +209,6 @@ const QuizPage = () => {
 
       setResult(quizResult);
       setIsSubmitted(true);
-      
-      // Scroll to top để xem kết quả
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       console.error('Error submitting quiz:', error);
@@ -208,7 +218,6 @@ const QuizPage = () => {
     }
   };
 
-  // Xử lý làm lại bài
   const handleRetry = () => {
     setAnswers({});
     setSubAnswers({});
@@ -217,7 +226,6 @@ const QuizPage = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Scroll đến câu hỏi cụ thể
   const scrollToQuestion = (index: number) => {
     questionRefs.current[index]?.scrollIntoView({
       behavior: 'smooth',
@@ -225,10 +233,8 @@ const QuizPage = () => {
     });
   };
 
-  // Tính tổng số câu đã trả lời (bao gồm câu con)
   const answeredCount = Object.keys(answers).length + Object.keys(subAnswers).length;
   
-  // Tính tổng số câu hỏi thực tế (bao gồm câu con)
   const totalQuestionCount = questions.reduce((total, q) => {
     if (q.subQuestions && q.subQuestions.length > 0) {
       return total + q.subQuestions.length;
@@ -237,15 +243,13 @@ const QuizPage = () => {
   }, 0);
   const questionIds = questions.map((q) => q.id);
   
-  // Back URL
-  const backUrl = `/subjects/${subjectSlug}/${levelSlug}/${sectionSlug}`;
-
-  // Title - khác nhau cho từng mode
+  // Build URLs
+  const backUrl = `/subjects/${subjectSlug}/${categoryPath}`;
   const pageTitle = isListeningMode 
-    ? `${section.name} - Đề nghe` 
-    : `${section.name} - ${questionCount} câu`;
+    ? `${leafCategory.name} - Đề nghe` 
+    : `${leafCategory.name} - ${questionCount} câu`;
 
-  // Audio toggle cho phần nghe
+  // Audio toggle
   const toggleAudio = () => {
     if (audioRef.current) {
       if (isAudioPlaying) {
@@ -257,7 +261,22 @@ const QuizPage = () => {
     }
   };
 
-  // Questions already have correct format from useRandomQuestions
+  // Build breadcrumb
+  const breadcrumbItems: { label: string; href?: string }[] = [
+    { label: 'Chọn môn học', href: '/subjects' },
+    { label: subject.name, href: `/subjects/${subject.slug}` },
+  ];
+  
+  let pathSoFar = '';
+  categories.forEach((cat) => {
+    pathSoFar = pathSoFar ? `${pathSoFar}/${cat.slug}` : cat.slug;
+    breadcrumbItems.push({
+      label: cat.name,
+      href: `/subjects/${subject.slug}/${pathSoFar}`,
+    });
+  });
+  breadcrumbItems.push({ label: isListeningMode ? 'Làm đề nghe' : 'Làm bài' });
+
   const mappedQuestions = questions;
 
   return (
@@ -265,15 +284,7 @@ const QuizPage = () => {
       <div className="container py-8">
         {/* Breadcrumb */}
         <div className="mb-6">
-          <Breadcrumb
-            items={[
-              { label: 'Chọn môn học', href: '/subjects' },
-              { label: subject.name, href: `/subjects/${subject.slug}` },
-              { label: level.name, href: `/subjects/${subject.slug}/${level.slug}` },
-              { label: section.name, href: backUrl },
-              { label: isListeningMode ? 'Làm đề nghe' : 'Làm bài' },
-            ]}
-          />
+          <Breadcrumb items={breadcrumbItems} />
         </div>
 
         {/* Header */}
@@ -296,7 +307,7 @@ const QuizPage = () => {
           </div>
         </div>
 
-        {/* Audio Player cho phần nghe - hiển thị đầu trang */}
+        {/* Audio Player cho phần nghe */}
         {isListeningMode && listeningExam?.audioUrl && !isSubmitted && (
           <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-4">
             <div className="flex items-center gap-4">
@@ -326,7 +337,7 @@ const QuizPage = () => {
               </div>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              💡 Bạn có thể phát lại audio nhiều lần trong khi làm bài. Tuy nhiên, trong kỳ thi thật, audio chỉ được phát một lần.
+              💡 Bạn có thể phát lại audio nhiều lần trong khi làm bài.
             </p>
           </div>
         )}
@@ -335,7 +346,7 @@ const QuizPage = () => {
         <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
           {/* Questions column */}
           <div className="space-y-6">
-            {/* Result summary - hiển thị sau khi nộp bài */}
+            {/* Result summary */}
             {isSubmitted && result && (
               <ResultSummary
                 result={result}
@@ -344,7 +355,6 @@ const QuizPage = () => {
               />
             )}
 
-            {/* Section title for review */}
             {isSubmitted && (
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-semibold text-foreground">
@@ -360,7 +370,6 @@ const QuizPage = () => {
             {mappedQuestions.map((question, index) => {
               const stats = getQuestionStats(question.id);
               
-              // Merge revealed answers into question for display after submission
               const questionWithAnswers: Question = isSubmitted ? {
                 ...question,
                 correctOption: revealedAnswers[question.id]?.correctOption as 'A' | 'B' | 'C' | 'D',
@@ -423,7 +432,7 @@ const QuizPage = () => {
             )}
           </div>
 
-          {/* Sidebar - Progress & Submit */}
+          {/* Sidebar */}
           <div className="hidden lg:block">
             <div className="sticky top-24 space-y-4">
               <QuizProgress
