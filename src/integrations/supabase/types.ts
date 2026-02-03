@@ -14,6 +14,76 @@ export type Database = {
   }
   public: {
     Tables: {
+      categories: {
+        Row: {
+          allow_count_selection: boolean
+          allow_random: boolean
+          created_at: string
+          description: string | null
+          fixed_exam_mode: boolean
+          icon: string | null
+          id: string
+          layer_id: string
+          name: string
+          order_index: number | null
+          parent_id: string | null
+          slug: string
+          subject_id: string
+        }
+        Insert: {
+          allow_count_selection?: boolean
+          allow_random?: boolean
+          created_at?: string
+          description?: string | null
+          fixed_exam_mode?: boolean
+          icon?: string | null
+          id?: string
+          layer_id: string
+          name: string
+          order_index?: number | null
+          parent_id?: string | null
+          slug: string
+          subject_id: string
+        }
+        Update: {
+          allow_count_selection?: boolean
+          allow_random?: boolean
+          created_at?: string
+          description?: string | null
+          fixed_exam_mode?: boolean
+          icon?: string | null
+          id?: string
+          layer_id?: string
+          name?: string
+          order_index?: number | null
+          parent_id?: string | null
+          slug?: string
+          subject_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categories_layer_id_fkey"
+            columns: ["layer_id"]
+            isOneToOne: false
+            referencedRelation: "subject_layers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "categories_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       levels: {
         Row: {
           created_at: string
@@ -154,6 +224,7 @@ export type Database = {
       questions: {
         Row: {
           audio_url: string | null
+          category_id: string | null
           content: string
           correct_option: string
           created_at: string
@@ -173,6 +244,7 @@ export type Database = {
         }
         Insert: {
           audio_url?: string | null
+          category_id?: string | null
           content: string
           correct_option: string
           created_at?: string
@@ -192,6 +264,7 @@ export type Database = {
         }
         Update: {
           audio_url?: string | null
+          category_id?: string | null
           content?: string
           correct_option?: string
           created_at?: string
@@ -210,6 +283,13 @@ export type Database = {
           section_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "questions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "questions_parent_id_fkey"
             columns: ["parent_id"]
@@ -279,6 +359,44 @@ export type Database = {
             columns: ["level_id"]
             isOneToOne: false
             referencedRelation: "levels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subject_layers: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          order_index: number
+          required: boolean
+          slug: string
+          subject_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          order_index?: number
+          required?: boolean
+          slug: string
+          subject_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          order_index?: number
+          required?: boolean
+          slug?: string
+          subject_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subject_layers_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
             referencedColumns: ["id"]
           },
         ]

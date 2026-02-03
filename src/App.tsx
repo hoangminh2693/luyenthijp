@@ -8,8 +8,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import Index from "./pages/Index";
 import SubjectsPage from "./pages/SubjectsPage";
-import LevelsPage from "./pages/LevelsPage";
-import SectionsPage from "./pages/SectionsPage";
+import DynamicCategoryPage from "./pages/DynamicCategoryPage";
 import ExamsPage from "./pages/ExamsPage";
 import QuizPage from "./pages/QuizPage";
 import StartQuizPage from "./pages/StartQuizPage";
@@ -32,6 +31,11 @@ const queryClient = new QueryClient();
 /**
  * App Component - Component gốc của ứng dụng
  * Quản lý routing và layout chung
+ * 
+ * ROUTING MỚI với Layer động:
+ * - /subjects/:subjectSlug/* → DynamicCategoryPage (xử lý tất cả layers)
+ * - /start/:subjectSlug/*   → StartQuizPage (cấu hình trước khi làm bài)
+ * - /quiz/:subjectSlug/*    → QuizPage (làm bài)
  */
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -63,20 +67,18 @@ const App = () => (
                 {/* Thống kê học tập */}
                 <Route path="/statistics" element={<StatisticsPage />} />
                 
-                {/* Danh sách cấp độ theo môn */}
-                <Route path="/subjects/:subjectSlug" element={<LevelsPage />} />
+                {/* Dynamic Category Pages - xử lý tất cả layers của môn học */}
+                <Route path="/subjects/:subjectSlug" element={<DynamicCategoryPage />} />
+                <Route path="/subjects/:subjectSlug/*" element={<DynamicCategoryPage />} />
                 
-                {/* Danh sách phần theo cấp độ */}
-                <Route path="/subjects/:subjectSlug/:levelSlug" element={<SectionsPage />} />
+                {/* Danh sách đề thi (nếu cần - fallback) */}
+                <Route path="/exams/:subjectSlug/*" element={<ExamsPage />} />
                 
-                {/* Danh sách đề thi theo phần */}
-                <Route path="/subjects/:subjectSlug/:levelSlug/:sectionSlug" element={<ExamsPage />} />
+                {/* Trang cấu hình trước khi làm bài - wildcard để hỗ trợ nhiều layer */}
+                <Route path="/start/:subjectSlug/*" element={<StartQuizPage />} />
                 
-                {/* Trang cấu hình trước khi làm bài */}
-                <Route path="/start/:subjectSlug/:levelSlug/:sectionSlug" element={<StartQuizPage />} />
-                
-                {/* Trang làm bài thi mới (random questions) */}
-                <Route path="/quiz/:subjectSlug/:levelSlug/:sectionSlug" element={<QuizPage />} />
+                {/* Trang làm bài thi - wildcard để hỗ trợ nhiều layer */}
+                <Route path="/quiz/:subjectSlug/*" element={<QuizPage />} />
                 
                 {/* Trang làm bài thi cũ (theo đề) */}
                 <Route path="/exam/:examId" element={<QuizPage />} />
