@@ -11,9 +11,12 @@ import {
   Target,
   Sparkles,
   Shield,
-  Smartphone
+  Smartphone,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useSubjects, useLayersBySubject, useCategoriesByLayer } from "@/hooks/useSubjectLayers";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * Index Page - Trang chủ của ứng dụng luyện đề thi
@@ -53,12 +56,8 @@ const Index = () => {
     },
   ];
 
-  const examTypes = [
-    { name: "JLPT", description: "Kỳ thi năng lực Nhật ngữ", levels: "N5 - N1" },
-    { name: "BJT", description: "Tiếng Nhật thương mại", levels: "J5 - J1+" },
-    { name: "宅建", description: "Chứng chỉ bất động sản", levels: "Cơ bản - Nâng cao" },
-    { name: "Khác", description: "Các chứng chỉ nghề nghiệp", levels: "Đa cấp độ" },
-  ];
+  // Fetch subjects từ database
+  const { data: subjects = [], isLoading: loadingSubjects } = useSubjects();
 
   return (
     <div className="min-h-screen bg-background">
@@ -136,19 +135,26 @@ const Index = () => {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {examTypes.map((exam) => (
-              <Link
-                key={exam.name}
-                to="/subjects"
-                className="group rounded-xl border border-border bg-card p-6 transition-all duration-200 hover:border-primary/30 hover:shadow-md"
-              >
-                <h3 className="text-xl font-bold text-foreground mb-1 group-hover:text-primary transition-colors">
-                  {exam.name}
-                </h3>
-                <p className="text-sm text-muted-foreground mb-2">{exam.description}</p>
-                <p className="text-xs text-primary font-medium">{exam.levels}</p>
-              </Link>
-            ))}
+            {loadingSubjects ? (
+              // Skeleton loading
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="rounded-xl border border-border bg-card p-6">
+                  <Skeleton className="h-6 w-20 mb-2" />
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              ))
+            ) : (
+              subjects.map((subject) => (
+                <SubjectExamCard key={subject.id} subject={subject} />
+              ))
+            )}
+            {/* Placeholder nếu không có môn học */}
+            {!loadingSubjects && subjects.length === 0 && (
+              <div className="col-span-full text-center py-8 text-muted-foreground">
+                Chưa có môn học nào. Vui lòng thêm môn học trong trang quản lý.
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -243,5 +249,59 @@ const Index = () => {
     </div>
   );
 };
+
+// Component hiển thị từng môn học với trạng thái nội dung
+function SubjectExamCard({ subject }: { subject: { id: string; name: string; slug: string; description: string | null; icon: string | null } }) {
+  const { data: layers = [] } = useLayersBySubject(subject.id);
+  const firstLayer = layers[0];
+  const { data: categories = [], isLoading } = useCategoriesByLayer(firstLayer?.id, null);
+  
+  const hasContent = categories.length > 0;
+  
+  // Tạo label hiển thị số lượng
+  const getContentLabel = () => {
+    if (isLoading) return null;
+    if (!hasContent) return "Đang cập nhật";
+    
+    // Hiển thị tên các categories (VD: N5 - N1)
+    if (categories.length <= 2) {
+      return categories.map(c => c.name).join(" - ");
+    }
+    return `${categories[0]?.name} - ${categories[categories.length - 1]?.name}`;
+  };
+
+  return (
+    <Link
+      to={hasContent ? `/subjects/${subject.slug}` : "#"}
+      className={`group rounded-xl border border-border bg-card p-6 transition-all duration-200 ${
+        hasContent 
+          ? "hover:border-primary/30 hover:shadow-md cursor-pointer" 
+          : "opacity-70 cursor-default"
+      }`}
+      onClick={(e) => !hasContent && e.preventDefault()}
+    >
+      <div className="flex items-start gap-3">
+        {subject.icon && (
+          <span className="text-2xl">{subject.icon}</span>
+        )}
+        <div className="flex-1">
+          <h3 className={`text-xl font-bold text-foreground mb-1 ${hasContent ? "group-hover:text-primary" : ""} transition-colors`}>
+            {subject.name}
+          </h3>
+          <p className="text-sm text-muted-foreground mb-2 line-clamp-1">
+            {subject.description || "Mô tả môn học"}
+          </p>
+          {isLoading ? (
+            <Skeleton className="h-3 w-16" />
+          ) : (
+            <p className={`text-xs font-medium ${hasContent ? "text-primary" : "text-muted-foreground italic"}`}>
+              {getContentLabel()}
+            </p>
+          )}
+        </div>
+      </div>
+    </Link>
+  );
+}
 
 export default Index;
