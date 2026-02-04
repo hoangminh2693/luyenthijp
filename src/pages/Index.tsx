@@ -12,11 +12,11 @@ import {
   Sparkles,
   Shield,
   Smartphone,
-  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSubjects, useLayersBySubject, useCategoriesByLayer } from "@/hooks/useSubjectLayers";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ActivityWidget } from "@/components/ui/ActivityWidget";
 
 /**
  * Index Page - Trang chủ của ứng dụng luyện đề thi
@@ -102,8 +102,13 @@ const Index = () => {
               </Button>
             </div>
 
+            {/* Activity Widget - Hiển thị hoạt động thực */}
+            <div className="mt-10">
+              <ActivityWidget />
+            </div>
+
             {/* Trust indicators */}
-            <div className="mt-12 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Shield className="h-4 w-4 text-success" />
                 <span>Miễn phí hoàn toàn</span>
