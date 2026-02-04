@@ -86,6 +86,7 @@ const LeaderboardPage = () => {
   // Filter states
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [levels, setLevels] = useState<Level[]>([]);
+  const [legacyLevels, setLegacyLevels] = useState<Level[]>([]); // Legacy levels from old system
   
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [selectedLevelId, setSelectedLevelId] = useState<string>('all');
@@ -105,18 +106,57 @@ const LeaderboardPage = () => {
   // Load filter data
   useEffect(() => {
     const loadFilterData = async () => {
-      const [subjectsRes, levelsRes] = await Promise.all([
+      const [subjectsRes, legacyLevelsRes, layersRes, categoriesRes] = await Promise.all([
         supabase.from('subjects').select('*').order('name'),
         supabase.from('levels').select('*').order('order_index'),
+        supabase.from('subject_layers').select('*').order('order_index'),
+        supabase.from('categories').select('*').order('order_index'),
       ]);
 
       const subjectsData = subjectsRes.data || [];
       setSubjects(subjectsData);
-      setLevels(levelsRes.data || []);
+      setLegacyLevels(legacyLevelsRes.data || []);
       
-      // Auto-select first subject (likely Japanese)
+      // Build levels from categories (first layer = level equivalent)
+      const layers = layersRes.data || [];
+      const categories = categoriesRes.data || [];
+      
+      // For each subject, find the first layer and get its root categories as "levels"
+      const derivedLevels: Level[] = [];
+      for (const subject of subjectsData) {
+        const subjectLayers = layers.filter(l => l.subject_id === subject.id);
+        if (subjectLayers.length > 0) {
+          const firstLayer = subjectLayers[0];
+          const layerCategories = categories.filter(c => 
+            c.layer_id === firstLayer.id && c.parent_id === null
+          );
+          layerCategories.forEach(cat => {
+            derivedLevels.push({
+              id: cat.id,
+              name: cat.name,
+              slug: cat.slug,
+              subject_id: subject.id,
+              order_index: cat.order_index
+            });
+          });
+        }
+      }
+      
+      // Merge with legacy levels (prefer derived, fallback to legacy)
+      const mergedLevels = [...derivedLevels];
+      const derivedSubjectIds = new Set(derivedLevels.map(l => l.subject_id));
+      legacyLevelsRes.data?.forEach(legacyLevel => {
+        if (!derivedSubjectIds.has(legacyLevel.subject_id)) {
+          mergedLevels.push(legacyLevel);
+        }
+      });
+      
+      setLevels(mergedLevels);
+      
+      // Auto-select first subject (likely Japanese/JLPT)
       if (subjectsData.length > 0 && !selectedSubjectId) {
         const japaneseSubject = subjectsData.find(s => 
+          s.name.toLowerCase().includes('jlpt') || 
           s.name.toLowerCase().includes('nhật') || 
           s.name.toLowerCase().includes('japanese') ||
           s.slug.includes('tieng-nhat')
@@ -128,11 +168,17 @@ const LeaderboardPage = () => {
     loadFilterData();
   }, []);
 
-  // Filter levels based on subject
+  // Filter levels based on subject (combine new categories + legacy levels)
   const filteredLevels = useMemo(() => {
     if (!selectedSubjectId) return [];
-    return levels.filter(l => l.subject_id === selectedSubjectId);
-  }, [levels, selectedSubjectId]);
+    
+    // First try derived levels from categories
+    const derivedLevels = levels.filter(l => l.subject_id === selectedSubjectId);
+    if (derivedLevels.length > 0) return derivedLevels;
+    
+    // Fallback to legacy levels
+    return legacyLevels.filter(l => l.subject_id === selectedSubjectId);
+  }, [levels, legacyLevels, selectedSubjectId]);
 
   // Get tab description
   const getTabDescription = (tab: LeaderboardType) => {
