@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/layout/Header';
 import { QuestionCountSelector } from '@/components/quiz/QuestionCountSelector';
 import { ListeningExamSelector } from '@/components/quiz/ListeningExamSelector';
+import { ActivityWidget } from '@/components/ui/ActivityWidget';
 import { useLeafCategory, useQuestionCountForCategory } from '@/hooks/useCategoryPath';
 import { useListeningExams } from '@/hooks/useQuestions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -294,9 +295,10 @@ const StartQuizPage = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container py-8">
-        {/* Breadcrumb */}
-        <div className="mb-8">
+        {/* Breadcrumb + Activity Widget */}
+        <div className="mb-8 flex items-center justify-between gap-4">
           <Breadcrumb items={breadcrumbItems} />
+          <ActivityWidget variant="compact" className="hidden sm:flex" />
         </div>
 
         <div className="grid gap-8 lg:grid-cols-3">
