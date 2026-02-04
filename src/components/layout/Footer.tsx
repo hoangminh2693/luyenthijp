@@ -1,5 +1,6 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Heart, Mail, BookOpen, Shield, FileText, Info, Newspaper, GraduationCap } from 'lucide-react';
+import { ActivityWidget } from '@/components/ui/ActivityWidget';
 
 /**
  * Footer Component - Chân trang của ứng dụng
@@ -7,6 +8,10 @@ import { Heart, Mail, BookOpen, Shield, FileText, Info, Newspaper, GraduationCap
  */
 export function Footer() {
   const currentYear = new Date().getFullYear();
+  const location = useLocation();
+  
+  // Ẩn widget khi đang làm bài (route /quiz nhưng không phải kết quả)
+  const isQuizInProgress = location.pathname.startsWith('/quiz');
 
   const quickLinks = [
     { href: '/subjects', label: 'Luyện đề thi', icon: GraduationCap },
@@ -23,6 +28,13 @@ export function Footer() {
 
   return (
     <footer className="mt-auto border-t border-border bg-card">
+      {/* Mobile Activity Widget - hiển thị cuối trang trước footer content */}
+      {!isQuizInProgress && (
+        <div className="sm:hidden border-b border-border py-3 flex justify-center bg-muted/30">
+          <ActivityWidget variant="compact" />
+        </div>
+      )}
+      
       <div className="container py-12">
         {/* Main footer content */}
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
