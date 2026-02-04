@@ -131,6 +131,29 @@ function removeQuestionNumber(text: string): string {
   return text.replace(/^\s*\d+\s*[.\-):]\s*/, '');
 }
 
+/**
+ * Chuyển đổi các ký hiệu markup thành HTML:
+ * - [br] → <br>
+ * - [b]nội dung[/b] → <b>nội dung</b>
+ * - [u]nội dung[/u] → <u>nội dung</u>
+ * - [i]nội dung[/i] → <i>nội dung</i>
+ */
+function convertMarkupToHtml(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(/\[br\]/gi, '<br>')
+    .replace(/\[b\](.*?)\[\/b\]/gi, '<b>$1</b>')
+    .replace(/\[u\](.*?)\[\/u\]/gi, '<u>$1</u>')
+    .replace(/\[i\](.*?)\[\/i\]/gi, '<i>$1</i>');
+}
+
+/**
+ * Áp dụng chuyển đổi markup cho text sau khi xử lý số thứ tự
+ */
+function processText(text: string): string {
+  return convertMarkupToHtml(removeQuestionNumber(text?.trim() || ''));
+}
+
 export function TableImport({ onQuestionsChange }: TableImportProps) {
   const [questions, setQuestions] = useState<TableQuestion[]>([{ ...emptyQuestion }]);
   const [pasteMode, setPasteMode] = useState(false);
@@ -223,13 +246,13 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
         }
 
         parsed.push({
-          content: removeQuestionNumber(values[0]?.trim() || ''),
-          option_a: values[1]?.trim() || '',
-          option_b: values[2]?.trim() || '',
-          option_c: values[3]?.trim() || '',
-          option_d: values[4]?.trim() || '',
+          content: processText(values[0] || ''),
+          option_a: convertMarkupToHtml(values[1]?.trim() || ''),
+          option_b: convertMarkupToHtml(values[2]?.trim() || ''),
+          option_c: convertMarkupToHtml(values[3]?.trim() || ''),
+          option_d: convertMarkupToHtml(values[4]?.trim() || ''),
           correct_option: ['A', 'B', 'C', 'D'].includes(correctOption) ? correctOption : '',
-          explanation: values[6]?.trim() || '',
+          explanation: convertMarkupToHtml(values[6]?.trim() || ''),
           image_url: undefined,
           audio_url: undefined,
           subQuestions: [],
@@ -276,13 +299,13 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
           }
           
           parsed.push({
-            content: removeQuestionNumber(content),
-            option_a: readings[0] || '',
-            option_b: readings[1] || '',
-            option_c: readings[2] || '',
-            option_d: readings[3] || '',
+            content: processText(content),
+            option_a: convertMarkupToHtml(readings[0] || ''),
+            option_b: convertMarkupToHtml(readings[1] || ''),
+            option_c: convertMarkupToHtml(readings[2] || ''),
+            option_d: convertMarkupToHtml(readings[3] || ''),
             correct_option: ['A', 'B', 'C', 'D'].includes(correctOption) ? correctOption : '',
-            explanation,
+            explanation: convertMarkupToHtml(explanation),
             image_url: undefined,
             audio_url: undefined,
             subQuestions: [],
@@ -304,13 +327,13 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
           }
           
           parsed.push({
-            content: removeQuestionNumber(line),
+            content: processText(line),
             option_a: '',
             option_b: '',
             option_c: '',
             option_d: '',
             correct_option: '',
-            explanation,
+            explanation: convertMarkupToHtml(explanation),
             image_url: undefined,
             audio_url: undefined,
             subQuestions: [],
