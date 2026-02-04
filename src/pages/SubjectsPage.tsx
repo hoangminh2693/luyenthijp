@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { BookOpen, Loader2 } from 'lucide-react';
 import { SubjectCard } from '@/components/ui/SubjectCard';
 import { Breadcrumb } from '@/components/layout/Header';
+import { ActivityWidget } from '@/components/ui/ActivityWidget';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Subject {
@@ -44,9 +45,10 @@ const SubjectsPage = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container py-8">
-        {/* Breadcrumb */}
-        <div className="mb-8">
+        {/* Breadcrumb + Activity Widget */}
+        <div className="mb-8 flex items-center justify-between gap-4">
           <Breadcrumb items={[{ label: 'Chọn môn học' }]} />
+          <ActivityWidget variant="compact" className="hidden sm:flex" />
         </div>
 
         {/* Header */}

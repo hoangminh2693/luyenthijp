@@ -2,13 +2,20 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Activity, TrendingUp, Users, Flame } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+
+interface ActivityWidgetProps {
+  /** Chế độ hiển thị: full (mặc định) hoặc compact (góc nhỏ) */
+  variant?: "full" | "compact";
+  className?: string;
+}
 
 /**
  * ActivityWidget - Widget hiển thị hoạt động học tập thực
  * Sử dụng RPC function để lấy thống kê công khai (không lộ PII)
  * Nguyên tắc: Trung thực, tạo động lực, không gây hiểu lầm
  */
-export function ActivityWidget() {
+export function ActivityWidget({ variant = "full", className }: ActivityWidgetProps) {
   // Fetch số lượt luyện trong 24 giờ qua thông qua RPC
   const { data: activityData, isLoading } = useQuery({
     queryKey: ["activity-stats"],
@@ -57,7 +64,7 @@ export function ActivityWidget() {
       return {
         icon: Users,
         value: activeUsers,
-        label: "người đã luyện hôm nay",
+        label: variant === "compact" ? "người hôm nay" : "người đã luyện hôm nay",
         color: "text-success",
       };
     }
@@ -67,7 +74,7 @@ export function ActivityWidget() {
       return {
         icon: TrendingUp,
         value: recentAttempts,
-        label: "lượt luyện trong 24 giờ",
+        label: variant === "compact" ? "lượt luyện" : "lượt luyện trong 24 giờ",
         color: "text-primary",
       };
     }
@@ -77,7 +84,7 @@ export function ActivityWidget() {
       return {
         icon: Activity,
         value: recentAttempts,
-        label: "lượt luyện gần đây",
+        label: variant === "compact" ? "lượt luyện" : "lượt luyện gần đây",
         color: "text-muted-foreground",
       };
     }
@@ -86,14 +93,22 @@ export function ActivityWidget() {
     return {
       icon: Flame,
       value: null,
-      label: "Hãy là người đầu tiên luyện hôm nay!",
+      label: variant === "compact" ? "Hãy bắt đầu!" : "Hãy là người đầu tiên luyện hôm nay!",
       color: "text-warning",
     };
   };
 
   if (isLoading) {
+    if (variant === "compact") {
+      return (
+        <div className={cn("inline-flex items-center gap-1.5 rounded-full bg-muted/50 px-3 py-1.5", className)}>
+          <Skeleton className="h-3 w-3 rounded-full" />
+          <Skeleton className="h-3 w-16" />
+        </div>
+      );
+    }
     return (
-      <div className="inline-flex items-center gap-2 rounded-full bg-muted/50 px-4 py-2">
+      <div className={cn("inline-flex items-center gap-2 rounded-full bg-muted/50 px-4 py-2", className)}>
         <Skeleton className="h-4 w-4 rounded-full" />
         <Skeleton className="h-4 w-32" />
       </div>
@@ -105,18 +120,46 @@ export function ActivityWidget() {
 
   const IconComponent = display.icon;
 
+  // Compact variant - nhỏ gọn cho góc phải
+  if (variant === "compact") {
+    return (
+      <div 
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-full bg-muted/50 px-3 py-1.5 text-xs",
+          "transition-all duration-300 hover:bg-muted animate-fade-in",
+          className
+        )}
+      >
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75"></span>
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary"></span>
+        </span>
+        <IconComponent className={cn("h-3 w-3", display.color)} />
+        <span className="text-foreground">
+          {display.value !== null && (
+            <span className={cn("font-medium", display.color)}>
+              {display.value.toLocaleString()}{" "}
+            </span>
+          )}
+          <span className="text-muted-foreground">{display.label}</span>
+        </span>
+      </div>
+    );
+  }
+
+  // Full variant - đầy đủ với slogan
   return (
-    <div className="flex flex-col items-center gap-2 animate-fade-in">
+    <div className={cn("flex flex-col items-center gap-2 animate-fade-in", className)}>
       {/* Activity indicator */}
       <div className="group inline-flex items-center gap-2 rounded-full bg-muted/50 px-4 py-2 text-sm transition-all duration-300 hover:bg-muted hover:shadow-md hover-scale">
         <span className="relative flex h-2 w-2">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75"></span>
           <span className="relative inline-flex h-2 w-2 rounded-full bg-primary"></span>
         </span>
-        <IconComponent className={`h-4 w-4 ${display.color} transition-transform group-hover:scale-110`} />
+        <IconComponent className={cn("h-4 w-4 transition-transform group-hover:scale-110", display.color)} />
         <span className="text-foreground">
           {display.value !== null && (
-            <span className={`font-semibold ${display.color}`}>
+            <span className={cn("font-semibold", display.color)}>
               {display.value.toLocaleString()}{" "}
             </span>
           )}

@@ -1,6 +1,7 @@
 import { useParams, Navigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { CategoryCard } from '@/components/ui/CategoryCard';
+import { ActivityWidget } from '@/components/ui/ActivityWidget';
 import { Breadcrumb } from '@/components/layout/Header';
 import { 
   useSubjectBySlug, 
@@ -203,9 +204,10 @@ const DynamicCategoryPage = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container py-8">
-        {/* Breadcrumb */}
-        <div className="mb-8">
+        {/* Breadcrumb + Activity Widget */}
+        <div className="mb-8 flex items-center justify-between gap-4">
           <Breadcrumb items={breadcrumbItems} />
+          <ActivityWidget variant="compact" className="hidden sm:flex" />
         </div>
 
         {/* Header */}

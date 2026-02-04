@@ -1,6 +1,7 @@
 import { Award, CheckCircle, XCircle, RotateCcw, Home } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { ActivityWidget } from '@/components/ui/ActivityWidget';
 import type { QuizResult } from '@/data/quizData';
 import { cn } from '@/lib/utils';
 
@@ -81,6 +82,11 @@ export function ResultSummary({ result, examName, onRetry }: ResultSummaryProps)
             Chọn đề khác
           </Link>
         </Button>
+      </div>
+
+      {/* Activity Widget - hiển thị ở trang kết quả */}
+      <div className="mt-6 flex justify-center">
+        <ActivityWidget variant="compact" />
       </div>
     </div>
   );
