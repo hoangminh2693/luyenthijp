@@ -106,10 +106,14 @@ export function ActivityWidget() {
   const IconComponent = display.icon;
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-2 animate-fade-in">
       {/* Activity indicator */}
-      <div className="inline-flex items-center gap-2 rounded-full bg-muted/50 px-4 py-2 text-sm">
-        <IconComponent className={`h-4 w-4 ${display.color}`} />
+      <div className="group inline-flex items-center gap-2 rounded-full bg-muted/50 px-4 py-2 text-sm transition-all duration-300 hover:bg-muted hover:shadow-md hover-scale">
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75"></span>
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-primary"></span>
+        </span>
+        <IconComponent className={`h-4 w-4 ${display.color} transition-transform group-hover:scale-110`} />
         <span className="text-foreground">
           {display.value !== null && (
             <span className={`font-semibold ${display.color}`}>
@@ -121,7 +125,7 @@ export function ActivityWidget() {
       </div>
 
       {/* Motivational slogan */}
-      <p className="text-xs text-muted-foreground italic">
+      <p className="text-xs text-muted-foreground italic animate-fade-in" style={{ animationDelay: "0.2s" }}>
         💡 {getMotivationalSlogan()}
       </p>
     </div>
