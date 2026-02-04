@@ -5,33 +5,27 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * ActivityWidget - Widget hiển thị hoạt động học tập thực
+ * Sử dụng RPC function để lấy thống kê công khai (không lộ PII)
  * Nguyên tắc: Trung thực, tạo động lực, không gây hiểu lầm
  */
 export function ActivityWidget() {
-  // Fetch số lượt luyện trong 24 giờ qua
+  // Fetch số lượt luyện trong 24 giờ qua thông qua RPC
   const { data: activityData, isLoading } = useQuery({
     queryKey: ["activity-stats"],
     queryFn: async () => {
-      const twentyFourHoursAgo = new Date();
-      twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+      const { data, error } = await supabase.rpc("get_public_activity_stats");
+      
+      if (error) {
+        console.error("Error fetching activity stats:", error);
+        return { recentAttempts: 0, activeUsers: 0 };
+      }
 
-      // Đếm số lượt trả lời trong 24 giờ qua
-      const { count: recentAttempts } = await supabase
-        .from("question_history")
-        .select("*", { count: "exact", head: true })
-        .gte("answered_at", twentyFourHoursAgo.toISOString());
-
-      // Đếm số người dùng khác nhau đã luyện trong 24 giờ
-      const { data: activeUsers } = await supabase
-        .from("question_history")
-        .select("user_id")
-        .gte("answered_at", twentyFourHoursAgo.toISOString());
-
-      const uniqueUsers = new Set(activeUsers?.map((u) => u.user_id) || []).size;
-
+      // RPC trả về array với 1 row
+      const stats = data?.[0] || { recent_attempts: 0, active_users: 0 };
+      
       return {
-        recentAttempts: recentAttempts || 0,
-        activeUsers: uniqueUsers,
+        recentAttempts: Number(stats.recent_attempts) || 0,
+        activeUsers: Number(stats.active_users) || 0,
       };
     },
     staleTime: 5 * 60 * 1000, // Cache 5 phút

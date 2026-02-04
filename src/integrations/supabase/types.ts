@@ -594,6 +594,13 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_public_activity_stats: {
+        Args: never
+        Returns: {
+          active_users: number
+          recent_attempts: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
