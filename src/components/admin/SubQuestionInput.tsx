@@ -58,6 +58,29 @@ function removeQuestionNumber(text: string): string {
   return text.replace(/^\s*\d+\s*[.\-):]\s*/, '');
 }
 
+/**
+ * Chuyển đổi các ký hiệu markup thành HTML:
+ * - [br] → <br>
+ * - [b]nội dung[/b] → <b>nội dung</b>
+ * - [u]nội dung[/u] → <u>nội dung</u>
+ * - [i]nội dung[/i] → <i>nội dung</i>
+ */
+function convertMarkupToHtml(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(/\[br\]/gi, '<br>')
+    .replace(/\[b\](.*?)\[\/b\]/gi, '<b>$1</b>')
+    .replace(/\[u\](.*?)\[\/u\]/gi, '<u>$1</u>')
+    .replace(/\[i\](.*?)\[\/i\]/gi, '<i>$1</i>');
+}
+
+/**
+ * Áp dụng chuyển đổi markup cho text sau khi xử lý số thứ tự
+ */
+function processText(text: string): string {
+  return convertMarkupToHtml(removeQuestionNumber(text?.trim() || ''));
+}
+
 export function SubQuestionInput({ subQuestions, onChange, disabled }: SubQuestionInputProps) {
   const [pasteMode, setPasteMode] = useState(false);
   const [pasteText, setPasteText] = useState('');
@@ -98,13 +121,13 @@ export function SubQuestionInput({ subQuestions, onChange, disabled }: SubQuesti
         }
 
         parsed.push({
-          content: removeQuestionNumber(values[0]?.trim() || ''),
-          option_a: values[1]?.trim() || '',
-          option_b: values[2]?.trim() || '',
-          option_c: values[3]?.trim() || '',
-          option_d: values[4]?.trim() || '',
+          content: processText(values[0] || ''),
+          option_a: convertMarkupToHtml(values[1]?.trim() || ''),
+          option_b: convertMarkupToHtml(values[2]?.trim() || ''),
+          option_c: convertMarkupToHtml(values[3]?.trim() || ''),
+          option_d: convertMarkupToHtml(values[4]?.trim() || ''),
           correct_option: ['A', 'B', 'C', 'D'].includes(correctOption) ? correctOption : '',
-          explanation: values[6]?.trim() || '',
+          explanation: convertMarkupToHtml(values[6]?.trim() || ''),
         });
       }
     });
