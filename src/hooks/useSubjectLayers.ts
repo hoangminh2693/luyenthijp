@@ -253,26 +253,23 @@ export function useCategoryPath(categoryId: string | undefined) {
 }
 
 // Hook lấy số lượng câu hỏi theo category
-// Sử dụng view questions_safe (có quyền public access)
+// Sử dụng RPC function để đếm thông minh (fallback về section nếu cần)
 export function useQuestionCountByCategory(categoryId: string | undefined) {
   return useQuery({
     queryKey: ['questions', 'count', 'category', categoryId],
     queryFn: async () => {
       if (!categoryId) return 0;
       
-      // Đếm từ view questions_safe (có category_id và public access)
-      // Chỉ đếm câu hỏi cha (không có parent_id) để tránh đếm trùng câu con
-      const { count, error } = await supabase
-        .from('questions_safe')
-        .select('id', { count: 'exact', head: true })
-        .eq('category_id', categoryId)
-        .is('parent_id', null);
+      // Sử dụng RPC function để đếm câu hỏi
+      // Function này sẽ tự động fallback về section tương ứng nếu category chưa có câu hỏi
+      const { data, error } = await supabase
+        .rpc('get_question_count_by_category', { p_category_id: categoryId });
       
       if (error) {
         console.warn('Could not count questions by category:', error.message);
         return 0;
       }
-      return count || 0;
+      return data || 0;
     },
     enabled: !!categoryId,
   });

@@ -611,6 +611,10 @@ export type Database = {
           recent_attempts: number
         }[]
       }
+      get_question_count_by_category: {
+        Args: { p_category_id: string }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
