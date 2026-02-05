@@ -253,20 +253,20 @@ export function useCategoryPath(categoryId: string | undefined) {
 }
 
 // Hook lấy số lượng câu hỏi theo category
-// NOTE: Sử dụng bảng questions với category_id (cần admin role hoặc public access)
-// Fallback: nếu category_id null, trả về 0
+// Sử dụng view questions_safe (có quyền public access)
 export function useQuestionCountByCategory(categoryId: string | undefined) {
   return useQuery({
     queryKey: ['questions', 'count', 'category', categoryId],
     queryFn: async () => {
       if (!categoryId) return 0;
       
-      // Đếm từ bảng questions (có category_id)
-      // Note: Cần cập nhật questions_safe view để include category_id
+      // Đếm từ view questions_safe (có category_id và public access)
+      // Chỉ đếm câu hỏi cha (không có parent_id) để tránh đếm trùng câu con
       const { count, error } = await supabase
-        .from('questions')
+        .from('questions_safe')
         .select('id', { count: 'exact', head: true })
-        .eq('category_id', categoryId);
+        .eq('category_id', categoryId)
+        .is('parent_id', null);
       
       if (error) {
         console.warn('Could not count questions by category:', error.message);
