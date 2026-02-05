@@ -476,6 +476,7 @@ export type Database = {
       questions_safe: {
         Row: {
           audio_url: string | null
+          category_id: string | null
           content: string | null
           created_at: string | null
           id: string | null
@@ -493,6 +494,7 @@ export type Database = {
         }
         Insert: {
           audio_url?: string | null
+          category_id?: string | null
           content?: string | null
           created_at?: string | null
           id?: string | null
@@ -510,6 +512,7 @@ export type Database = {
         }
         Update: {
           audio_url?: string | null
+          category_id?: string | null
           content?: string | null
           created_at?: string | null
           id?: string | null
@@ -526,6 +529,13 @@ export type Database = {
           section_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "questions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "questions_parent_id_fkey"
             columns: ["parent_id"]
