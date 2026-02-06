@@ -142,31 +142,37 @@ const StartQuizPage = () => {
   // Fetch question count
   const { data: totalQuestions = 0, isLoading: loadingCount } = useQuestionCountForCategory(leafCategory?.id);
   
+  // Lấy level category (thường là category đầu tiên, VD: N5, N2...)
+  const levelCategoryForCount = categories.length > 0 ? categories[0] : null;
+  
   // Fallback: Đếm câu hỏi từ section_id cũ nếu category_id chưa có
   const { data: sectionQuestionCount = 0 } = useQuery({
-    queryKey: ['questions-by-section-fallback', leafCategory?.id, leafCategory?.slug],
+    queryKey: ['questions-by-section-fallback', leafCategory?.id, leafCategory?.slug, levelCategoryForCount?.name],
     queryFn: async () => {
       if (!leafCategory) return 0;
       
-      // Tìm section có slug matching
-      const { data: sections } = await supabase
+      // Tìm section có slug matching VÀ level.name matching với level category
+      let query = supabase
         .from('sections')
-        .select('id')
-        .eq('slug', leafCategory.slug)
-        .limit(10);
+        .select('id, levels!inner(name)')
+        .eq('slug', leafCategory.slug);
+      
+      if (levelCategoryForCount) {
+        query = query.eq('levels.name', levelCategoryForCount.name);
+      }
+      
+      const { data: sections } = await query.limit(1);
       
       if (!sections || sections.length === 0) return 0;
       
-      // Đếm câu hỏi từ các sections
-      let total = 0;
-      for (const sec of sections) {
-        const { count } = await supabase
-          .from('questions_safe')
-          .select('id', { count: 'exact', head: true })
-          .eq('section_id', sec.id);
-        total += count || 0;
-      }
-      return total;
+      // Đếm câu hỏi từ section (chỉ lấy 1 section đúng)
+      const { count } = await supabase
+        .from('questions_safe')
+        .select('id', { count: 'exact', head: true })
+        .eq('section_id', sections[0].id)
+        .is('parent_id', null);
+      
+      return count || 0;
     },
     enabled: !!leafCategory && totalQuestions === 0,
   });
@@ -176,18 +182,28 @@ const StartQuizPage = () => {
   // Fetch listening exams nếu là phần nghe (fixed_exam_mode)
   const isListeningSection = leafCategory?.fixed_exam_mode ?? false;
   
+  // Lấy level category (thường là category đầu tiên, VD: N5, N2...)
+  const levelCategory = categories.length > 0 ? categories[0] : null;
+  
   // Tìm section_id để fetch listening exams (trong giai đoạn chuyển đổi)
+  // Cần match cả section.slug VÀ level.name để tránh lẫn lộn giữa các cấp độ
   const { data: matchingSection } = useQuery({
-    queryKey: ['matching-section', leafCategory?.slug],
+    queryKey: ['matching-section', leafCategory?.slug, levelCategory?.name],
     queryFn: async () => {
       if (!leafCategory) return null;
       
-      const { data } = await supabase
+      // Tìm section có slug khớp với category VÀ level.name khớp với level category
+      let query = supabase
         .from('sections')
-        .select('id')
-        .eq('slug', leafCategory.slug)
-        .limit(1)
-        .maybeSingle();
+        .select('id, level_id, levels!inner(name, slug)')
+        .eq('slug', leafCategory.slug);
+      
+      // Match với level category nếu có
+      if (levelCategory) {
+        query = query.eq('levels.name', levelCategory.name);
+      }
+      
+      const { data } = await query.limit(1).maybeSingle();
       
       return data;
     },
