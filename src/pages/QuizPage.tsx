@@ -60,18 +60,28 @@ const QuizPage = () => {
   } = useLeafCategory(subjectSlug, categoryPath);
   
   // Tìm section_id matching để fetch questions (trong giai đoạn chuyển đổi)
+  // Cần match cả section.slug VÀ level.name/slug để tránh lẫn lộn giữa các cấp độ
+  const parentCategory = categories.length > 0 ? categories[categories.length - 1 - 1] : null; // Parent của leaf
+  const levelCategory = categories.length > 0 ? categories[0] : null; // Category đầu tiên thường là level (N5, N2...)
+  
   const { data: matchingSection } = useQuery({
-    queryKey: ['matching-section-for-quiz', leafCategory?.slug],
+    queryKey: ['matching-section-for-quiz', leafCategory?.slug, levelCategory?.name],
     queryFn: async () => {
       if (!leafCategory) return null;
       
-      // Tìm section có slug khớp với category
-      const { data } = await supabase
+      // Tìm section có slug khớp với category VÀ level.name khớp với parent category
+      // VD: section.slug = 'moji-goi' VÀ level.name = 'N2'
+      let query = supabase
         .from('sections')
-        .select('id')
-        .eq('slug', leafCategory.slug)
-        .limit(1)
-        .maybeSingle();
+        .select('id, level_id, levels!inner(name, slug)')
+        .eq('slug', leafCategory.slug);
+      
+      // Match với level category (parent) nếu có
+      if (levelCategory) {
+        query = query.eq('levels.name', levelCategory.name);
+      }
+      
+      const { data } = await query.limit(1).maybeSingle();
       
       return data;
     },
