@@ -68,20 +68,30 @@ const QuizPage = () => {
     queryFn: async () => {
       if (!leafCategory || !subject) return null;
       
-      // Tìm section: phải match slug VÀ level phải thuộc subject + root (slug hoặc name)
-      const { data } = await supabase
-        .from('sections')
-        .select('id, level_id, levels!inner(id, name, slug, subject_id)')
-        .eq('slug', leafCategory.slug)
-        .eq('levels.subject_id', subject.id)
-        .or(
-          rootCategory
-            ? `levels.slug.eq.${rootCategory.slug},levels.name.eq.${rootCategory.name}`
-            : 'levels.id.not.is.null'
-        )
-        .limit(1)
-        .maybeSingle();
+      // Bước 1: Tìm level thuộc subject và match với root category (VD: N2, N5)
+      let levelId: string | null = null;
+      if (rootCategory) {
+        const { data: levelData } = await supabase
+          .from('levels')
+          .select('id')
+          .eq('subject_id', subject.id)
+          .or(`slug.eq.${rootCategory.slug},name.eq.${rootCategory.name}`)
+          .limit(1)
+          .maybeSingle();
+        levelId = levelData?.id || null;
+      }
       
+      // Bước 2: Tìm section với slug matching và level_id đã xác định
+      let query = supabase
+        .from('sections')
+        .select('id, level_id')
+        .eq('slug', leafCategory.slug);
+      
+      if (levelId) {
+        query = query.eq('level_id', levelId);
+      }
+      
+      const { data } = await query.limit(1).maybeSingle();
       return data;
     },
     enabled: !!leafCategory && !!subject,
