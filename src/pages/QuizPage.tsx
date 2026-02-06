@@ -60,32 +60,31 @@ const QuizPage = () => {
   } = useLeafCategory(subjectSlug, categoryPath);
   
   // Tìm section_id matching để fetch questions (trong giai đoạn chuyển đổi)
-  // Cần match cả section.slug VÀ level.name/slug để tránh lẫn lộn giữa các cấp độ
-  const parentCategory = categories.length > 0 ? categories[categories.length - 1 - 1] : null; // Parent của leaf
-  const levelCategory = categories.length > 0 ? categories[0] : null; // Category đầu tiên thường là level (N5, N2...)
+  // Cần match cả subject_id (qua levels) + root category slug/name để tránh trộn môn / cấp
+  const rootCategory = categories.length > 0 ? categories[0] : null; // Category gốc (VD: N5, N2)
   
   const { data: matchingSection } = useQuery({
-    queryKey: ['matching-section-for-quiz', leafCategory?.slug, levelCategory?.name],
+    queryKey: ['matching-section-for-quiz', subject?.id, leafCategory?.slug, rootCategory?.slug, rootCategory?.name],
     queryFn: async () => {
-      if (!leafCategory) return null;
+      if (!leafCategory || !subject) return null;
       
-      // Tìm section có slug khớp với category VÀ level.name khớp với parent category
-      // VD: section.slug = 'moji-goi' VÀ level.name = 'N2'
-      let query = supabase
+      // Tìm section: phải match slug VÀ level phải thuộc subject + root (slug hoặc name)
+      const { data } = await supabase
         .from('sections')
-        .select('id, level_id, levels!inner(name, slug)')
-        .eq('slug', leafCategory.slug);
-      
-      // Match với level category (parent) nếu có
-      if (levelCategory) {
-        query = query.eq('levels.name', levelCategory.name);
-      }
-      
-      const { data } = await query.limit(1).maybeSingle();
+        .select('id, level_id, levels!inner(id, name, slug, subject_id)')
+        .eq('slug', leafCategory.slug)
+        .eq('levels.subject_id', subject.id)
+        .or(
+          rootCategory
+            ? `levels.slug.eq.${rootCategory.slug},levels.name.eq.${rootCategory.name}`
+            : 'levels.id.not.is.null'
+        )
+        .limit(1)
+        .maybeSingle();
       
       return data;
     },
-    enabled: !!leafCategory,
+    enabled: !!leafCategory && !!subject,
   });
   
   const sectionId = matchingSection?.id;

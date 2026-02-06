@@ -142,39 +142,41 @@ const StartQuizPage = () => {
   // Fetch question count
   const { data: totalQuestions = 0, isLoading: loadingCount } = useQuestionCountForCategory(leafCategory?.id);
   
-  // Lấy level category (thường là category đầu tiên, VD: N5, N2...)
-  const levelCategoryForCount = categories.length > 0 ? categories[0] : null;
+  // Root category (VD: N5, N2) để map về legacy level
+  const rootCategory = categories.length > 0 ? categories[0] : null;
   
   // Fallback: Đếm câu hỏi từ section_id cũ nếu category_id chưa có
   const { data: sectionQuestionCount = 0 } = useQuery({
-    queryKey: ['questions-by-section-fallback', leafCategory?.id, leafCategory?.slug, levelCategoryForCount?.name],
+    queryKey: ['questions-by-section-fallback', subject?.id, leafCategory?.slug, rootCategory?.slug, rootCategory?.name],
     queryFn: async () => {
-      if (!leafCategory) return 0;
+      if (!leafCategory || !subject) return 0;
       
-      // Tìm section có slug matching VÀ level.name matching với level category
-      let query = supabase
+      // Tìm section với slug matching, level thuộc subject + root slug/name
+      const { data: matchedSection } = await supabase
         .from('sections')
-        .select('id, levels!inner(name)')
-        .eq('slug', leafCategory.slug);
+        .select('id, levels!inner(id, name, slug, subject_id)')
+        .eq('slug', leafCategory.slug)
+        .eq('levels.subject_id', subject.id)
+        .or(
+          rootCategory
+            ? `levels.slug.eq.${rootCategory.slug},levels.name.eq.${rootCategory.name}`
+            : 'levels.id.not.is.null'
+        )
+        .limit(1)
+        .maybeSingle();
       
-      if (levelCategoryForCount) {
-        query = query.eq('levels.name', levelCategoryForCount.name);
-      }
+      if (!matchedSection) return 0;
       
-      const { data: sections } = await query.limit(1);
-      
-      if (!sections || sections.length === 0) return 0;
-      
-      // Đếm câu hỏi từ section (chỉ lấy 1 section đúng)
+      // Đếm câu hỏi từ section (chỉ câu cha)
       const { count } = await supabase
         .from('questions_safe')
         .select('id', { count: 'exact', head: true })
-        .eq('section_id', sections[0].id)
+        .eq('section_id', matchedSection.id)
         .is('parent_id', null);
       
       return count || 0;
     },
-    enabled: !!leafCategory && totalQuestions === 0,
+    enabled: !!leafCategory && !!subject && totalQuestions === 0,
   });
   
   const effectiveQuestionCount = totalQuestions > 0 ? totalQuestions : sectionQuestionCount;
@@ -182,32 +184,30 @@ const StartQuizPage = () => {
   // Fetch listening exams nếu là phần nghe (fixed_exam_mode)
   const isListeningSection = leafCategory?.fixed_exam_mode ?? false;
   
-  // Lấy level category (thường là category đầu tiên, VD: N5, N2...)
-  const levelCategory = categories.length > 0 ? categories[0] : null;
-  
   // Tìm section_id để fetch listening exams (trong giai đoạn chuyển đổi)
-  // Cần match cả section.slug VÀ level.name để tránh lẫn lộn giữa các cấp độ
+  // Cần match subject_id + root category slug/name để tránh trộn cấp độ
   const { data: matchingSection } = useQuery({
-    queryKey: ['matching-section', leafCategory?.slug, levelCategory?.name],
+    queryKey: ['matching-section', subject?.id, leafCategory?.slug, rootCategory?.slug, rootCategory?.name],
     queryFn: async () => {
-      if (!leafCategory) return null;
+      if (!leafCategory || !subject) return null;
       
-      // Tìm section có slug khớp với category VÀ level.name khớp với level category
-      let query = supabase
+      // Tìm section: slug match + level thuộc subject + root slug/name
+      const { data } = await supabase
         .from('sections')
-        .select('id, level_id, levels!inner(name, slug)')
-        .eq('slug', leafCategory.slug);
-      
-      // Match với level category nếu có
-      if (levelCategory) {
-        query = query.eq('levels.name', levelCategory.name);
-      }
-      
-      const { data } = await query.limit(1).maybeSingle();
+        .select('id, level_id, levels!inner(id, name, slug, subject_id)')
+        .eq('slug', leafCategory.slug)
+        .eq('levels.subject_id', subject.id)
+        .or(
+          rootCategory
+            ? `levels.slug.eq.${rootCategory.slug},levels.name.eq.${rootCategory.name}`
+            : 'levels.id.not.is.null'
+        )
+        .limit(1)
+        .maybeSingle();
       
       return data;
     },
-    enabled: !!leafCategory && isListeningSection,
+    enabled: !!leafCategory && !!subject && isListeningSection,
   });
   
   const { data: listeningExams = [], isLoading: loadingListening } = useListeningExams(
