@@ -157,9 +157,9 @@ export function useQuestionsBySection(sectionId: string | undefined) {
 }
 
 // Hook lấy câu hỏi ngẫu nhiên từ section (SECURE - không có đáp án)
-export function useRandomQuestions(sectionId: string | undefined, count: number) {
+export function useRandomQuestions(sectionId: string | undefined, count: number, sessionId?: string) {
   return useQuery({
-    queryKey: ['questions', 'random', sectionId, count],
+    queryKey: ['questions', 'random', sectionId, count, sessionId],
     queryFn: async () => {
       if (!sectionId) return [];
       
@@ -270,9 +270,9 @@ export function useListeningExams(sectionId: string | undefined) {
 }
 
 // Hook lấy 1 đề nghe ngẫu nhiên cho phần 聴解
-export function useRandomListeningExam(sectionId: string | undefined, enabled: boolean = true) {
+export function useRandomListeningExam(sectionId: string | undefined, enabled: boolean = true, sessionId?: string) {
   return useQuery({
-    queryKey: ['listening-exam', 'random', sectionId],
+    queryKey: ['listening-exam', 'random', sectionId, sessionId],
     queryFn: async () => {
       if (!sectionId) return null;
       

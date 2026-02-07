@@ -50,6 +50,9 @@ const QuizPage = () => {
   
   // Question history hook
   const { getQuestionStats } = useQuestionHistory();
+  
+  // Unique session ID - changes on each mount to ensure fresh questions
+  const [sessionId] = useState(() => crypto.randomUUID());
 
   // Fetch category data
   const { 
@@ -102,11 +105,13 @@ const QuizPage = () => {
   // Fetch câu hỏi dựa theo mode
   const { data: randomQuestions = [], isLoading: loadingRandomQuestions } = useRandomQuestions(
     !isListeningMode ? sectionId : undefined, 
-    questionCount
+    questionCount,
+    sessionId
   );
   const { data: listeningExam, isLoading: loadingListeningExam } = useRandomListeningExam(
     isListeningMode ? sectionId : undefined,
-    isListeningMode
+    isListeningMode,
+    sessionId
   );
   
   // Chọn questions dựa theo mode
