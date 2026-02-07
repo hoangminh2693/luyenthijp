@@ -323,10 +323,10 @@ export function QuestionCard({
         </span>
         <div className="flex-1">
           {showQuestionContent && question.content.trim() !== '' ? (
-            <p 
-              className="text-base font-medium text-foreground leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: question.content }}
-            />
+             <p 
+               className="text-base font-normal text-foreground leading-relaxed [&_b]:font-bold [&_strong]:font-bold [&_b]:text-foreground [&_strong]:text-foreground"
+               dangerouslySetInnerHTML={{ __html: question.content }}
+             />
           ) : (
             <p className="text-base font-medium text-muted-foreground italic">
               Câu hỏi trong audio - Nghe và chọn đáp án
