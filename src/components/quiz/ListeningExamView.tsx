@@ -194,12 +194,18 @@ export function ListeningExamView({ exam, examName, onRetry }: ListeningExamView
       }
 
       setRevealedAnswers(revealed);
+      
+      // Use totalQuestionCount for accurate percentage (not just submitted count)
+      const correctCount = serverResult.correct_answers;
+      const wrongCount = totalQuestionCount - correctCount;
+      const percentage = Math.round((correctCount / totalQuestionCount) * 100);
+      
       setResult({
-        totalQuestions: serverResult.total_questions,
-        correctAnswers: serverResult.correct_answers,
-        wrongAnswers: serverResult.wrong_answers,
-        score: serverResult.correct_answers,
-        percentage: serverResult.percentage,
+        totalQuestions: totalQuestionCount,
+        correctAnswers: correctCount,
+        wrongAnswers: wrongCount,
+        score: correctCount,
+        percentage,
         details,
       });
       setPhase('result');
@@ -310,7 +316,16 @@ export function ListeningExamView({ exam, examName, onRetry }: ListeningExamView
         </div>
       )}
 
-      {/* Audio player with full controls AFTER submission */}
+      {/* Result summary */}
+      {phase === 'result' && result && (
+        <ResultSummary
+          result={result}
+          examName={examName}
+          onRetry={handleRetryExam}
+        />
+      )}
+
+      {/* Audio player with full controls AFTER submission - below result */}
       {phase === 'result' && (
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
           <div className="flex items-center gap-2">
@@ -326,14 +341,7 @@ export function ListeningExamView({ exam, examName, onRetry }: ListeningExamView
         </div>
       )}
 
-      {/* Result summary */}
-      {phase === 'result' && result && (
-        <ResultSummary
-          result={result}
-          examName={examName}
-          onRetry={handleRetryExam}
-        />
-      )}
+      {/* Removed duplicate ResultSummary - now above audio player */}
 
       {phase === 'result' && (
         <div className="flex items-center gap-2">
@@ -457,7 +465,7 @@ export function ListeningExamView({ exam, examName, onRetry }: ListeningExamView
           ) : (
             <Button
               onClick={handleSubmit}
-              disabled={answeredCount === 0 || isSubmitting}
+              disabled={answeredCount < totalQuestionCount || isSubmitting}
               className="gap-2"
             >
               {isSubmitting ? (
@@ -472,7 +480,7 @@ export function ListeningExamView({ exam, examName, onRetry }: ListeningExamView
       )}
 
       {/* Floating submit button visible on all pages */}
-      {phase === 'exam' && currentMondaiPage < totalPages - 1 && answeredCount > 0 && (
+      {phase === 'exam' && currentMondaiPage < totalPages - 1 && answeredCount === totalQuestionCount && (
         <div className="fixed bottom-6 right-6 z-50">
           <Button
             onClick={handleSubmit}
