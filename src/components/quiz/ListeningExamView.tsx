@@ -33,28 +33,24 @@ interface ListeningExamViewProps {
   onRetry: () => void;
 }
 
-/** Group questions by mondai_index, keeping order */
+/** Group questions by mondaiIndex */
 function groupByMondai(questions: Question[]): MondaiGroup[] {
   const groups = new Map<number, MondaiGroup>();
   
   for (const q of questions) {
-    // Extract mondai info from the question content or use defaults
-    // mondai_index is not in the safe view, but questions are ordered by mondai_index
-    // We need to infer from content pattern or use sequential grouping
-    // Since mondai_index isn't in questions_safe view, let's group by examining content patterns
-    // Actually, looking at the data, each parent question has content like "<b>番</b>"
-    // and the mondai grouping is implicit from the order
-    
-    // For now, we'll just present all questions sequentially grouped
-    // The mondai_title would be ideal but isn't in the safe view
-    const idx = 0; // Will be overridden below
+    const idx = q.mondaiIndex ?? 0;
     if (!groups.has(idx)) {
-      groups.set(idx, { mondaiIndex: idx, mondaiTitle: '', questions: [] });
+      groups.set(idx, {
+        mondaiIndex: idx,
+        mondaiTitle: q.mondaiTitle || `問題${idx}`,
+        questions: [],
+      });
     }
     groups.get(idx)!.questions.push(q);
   }
   
-  return Array.from(groups.values());
+  // Sort by mondaiIndex
+  return Array.from(groups.values()).sort((a, b) => a.mondaiIndex - b.mondaiIndex);
 }
 
 export function ListeningExamView({ exam, examName, onRetry }: ListeningExamViewProps) {
@@ -73,17 +69,8 @@ export function ListeningExamView({ exam, examName, onRetry }: ListeningExamView
   const examAudioRef = useRef<HTMLAudioElement>(null);
   const [audioStarted, setAudioStarted] = useState(false);
 
-  // Group questions - each parent question acts as its own "page" for pagination
-  // but we group by mondai for better UX
-  const mondaiPages = useMemo(() => {
-    // Since we can't access mondai_index from safe view, 
-    // we'll paginate by individual parent questions
-    return exam.questions.map((q, idx) => ({
-      mondaiIndex: idx,
-      mondaiTitle: `Câu ${idx + 1}`,
-      questions: [q],
-    }));
-  }, [exam.questions]);
+  // Group questions by mondai
+  const mondaiPages = useMemo(() => groupByMondai(exam.questions), [exam.questions]);
 
   const totalPages = mondaiPages.length;
   const currentPage = mondaiPages[currentMondaiPage];
@@ -369,10 +356,8 @@ export function ListeningExamView({ exam, examName, onRetry }: ListeningExamView
         </Button>
         
         <div className="flex items-center gap-2 overflow-x-auto px-2">
-          {mondaiPages.map((_, idx) => {
-            // Check if all questions on this page are answered
-            const pageQuestions = mondaiPages[idx].questions;
-            const isPageAnswered = pageQuestions.every(q => {
+          {mondaiPages.map((page, idx) => {
+            const isPageAnswered = page.questions.every(q => {
               if (q.subQuestions && q.subQuestions.length > 0) {
                 return q.subQuestions.every(sq => !!subAnswers[sq.id]);
               }
@@ -384,15 +369,15 @@ export function ListeningExamView({ exam, examName, onRetry }: ListeningExamView
                 key={idx}
                 onClick={() => goToPage(idx)}
                 className={cn(
-                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-medium transition-all',
+                  'shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap',
                   idx === currentMondaiPage
-                    ? 'bg-primary text-primary-foreground scale-110'
+                    ? 'bg-primary text-primary-foreground scale-105'
                     : isPageAnswered
                     ? 'bg-primary/20 text-primary'
                     : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
                 )}
               >
-                {idx + 1}
+                {page.mondaiTitle}
               </button>
             );
           })}
@@ -420,26 +405,32 @@ export function ListeningExamView({ exam, examName, onRetry }: ListeningExamView
           !flipDirection && 'animate-fade-in'
         )}
       >
-        {currentPage && currentPage.questions.map((question, qIdx) => {
-          const globalIndex = mondaiPages
-            .slice(0, currentMondaiPage)
-            .reduce((sum, p) => sum + p.questions.length, 0) + qIdx;
+        {/* Mondai title header */}
+        {currentPage && (
+          <div className="mb-4 rounded-xl border border-border bg-muted/30 px-5 py-3">
+            <h3 className="text-lg font-bold text-foreground">
+              {currentPage.mondaiTitle}
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              {currentPage.questions.length} câu hỏi
+            </p>
+          </div>
+        )}
 
-          return (
-            <div key={question.id} className="mb-4">
-              <QuestionCard
-                question={getDisplayQuestion(question)}
-                questionNumber={globalIndex + 1}
-                selectedAnswer={answers[question.id] || null}
-                onSelectAnswer={(answer) => handleSelectAnswer(question.id, answer)}
-                showResult={phase === 'result'}
-                isSubmitted={phase === 'result' || isSubmitting}
-                subAnswers={subAnswers}
-                onSelectSubAnswer={handleSelectSubAnswer}
-              />
-            </div>
-          );
-        })}
+        {currentPage && currentPage.questions.map((question, qIdx) => (
+          <div key={question.id} className="mb-4">
+            <QuestionCard
+              question={getDisplayQuestion(question)}
+              questionNumber={qIdx + 1}
+              selectedAnswer={answers[question.id] || null}
+              onSelectAnswer={(answer) => handleSelectAnswer(question.id, answer)}
+              showResult={phase === 'result'}
+              isSubmitted={phase === 'result' || isSubmitting}
+              subAnswers={subAnswers}
+              onSelectSubAnswer={handleSelectSubAnswer}
+            />
+          </div>
+        ))}
       </div>
 
       {/* Navigation + Submit buttons at bottom */}
