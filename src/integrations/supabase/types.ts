@@ -231,6 +231,8 @@ export type Database = {
           explanation: string | null
           id: string
           image_url: string | null
+          mondai_index: number | null
+          mondai_title: string | null
           option_a: string
           option_b: string
           option_c: string | null
@@ -251,6 +253,8 @@ export type Database = {
           explanation?: string | null
           id?: string
           image_url?: string | null
+          mondai_index?: number | null
+          mondai_title?: string | null
           option_a: string
           option_b: string
           option_c?: string | null
@@ -271,6 +275,8 @@ export type Database = {
           explanation?: string | null
           id?: string
           image_url?: string | null
+          mondai_index?: number | null
+          mondai_title?: string | null
           option_a?: string
           option_b?: string
           option_c?: string | null
@@ -481,6 +487,8 @@ export type Database = {
           created_at: string | null
           id: string | null
           image_url: string | null
+          mondai_index: number | null
+          mondai_title: string | null
           option_a: string | null
           option_b: string | null
           option_c: string | null
@@ -499,6 +507,8 @@ export type Database = {
           created_at?: string | null
           id?: string | null
           image_url?: string | null
+          mondai_index?: number | null
+          mondai_title?: string | null
           option_a?: string | null
           option_b?: string | null
           option_c?: string | null
@@ -517,6 +527,8 @@ export type Database = {
           created_at?: string | null
           id?: string | null
           image_url?: string | null
+          mondai_index?: number | null
+          mondai_title?: string | null
           option_a?: string | null
           option_b?: string | null
           option_c?: string | null
