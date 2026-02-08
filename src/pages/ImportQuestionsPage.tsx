@@ -1,9 +1,10 @@
 /**
  * ImportQuestionsPage - Trang import câu hỏi từ file Excel/CSV hoặc nhập trực tiếp bằng bảng
  * Hỗ trợ tạo môn học, cấp độ, phần mới và import câu hỏi
+ * Hỗ trợ import đề thi 聴解 (Listening) với cấu trúc Mondai
  */
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download, LogIn, Shield, Table2, FileText } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download, LogIn, Shield, Table2, FileText, Headphones } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/layout/Header';
@@ -11,6 +12,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { TableImport, type TableQuestion } from '@/components/admin/TableImport';
+import { 
+  ListeningImport, 
+  type ListeningExamData, 
+  flattenListeningExam, 
+  countValidListeningQuestions 
+} from '@/components/admin/ListeningImport';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { sanitizeRichText } from '@/lib/richText';
 
@@ -106,7 +113,11 @@ const ImportQuestionsPage = () => {
   const [tableQuestions, setTableQuestions] = useState<TableQuestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const [importMode, setImportMode] = useState<'table' | 'file'>('table');
+  const [importMode, setImportMode] = useState<'table' | 'file' | 'listening'>('table');
+
+  // Listening import data
+  const [listeningData, setListeningData] = useState<ListeningExamData>({ audioUrl: '', mondais: [] });
+  const validListeningCount = useMemo(() => countValidListeningQuestions(listeningData), [listeningData]);
 
   const validTableQuestionsCount = useMemo(
     () => tableQuestions.filter(isValidTableQuestion).length,
@@ -172,6 +183,7 @@ const ImportQuestionsPage = () => {
     setParsedQuestions([]);
     setFile(null);
     setImportResult(null);
+    setListeningData({ audioUrl: '', mondais: [] });
   }, [selectedSectionId]);
 
   // Filter levels and sections based on selection
@@ -260,10 +272,18 @@ const ImportQuestionsPage = () => {
 
   // Import questions to database with duplicate check
   const handleImport = useCallback(async () => {
-    const questionsToImport =
-      importMode === 'table'
-        ? tableQuestions.filter(isValidTableQuestion)
-        : parsedQuestions;
+    // Determine questions based on mode
+    let questionsToImport: any[];
+    let listeningQuestions: ReturnType<typeof flattenListeningExam> = [];
+    
+    if (importMode === 'listening') {
+      listeningQuestions = flattenListeningExam(listeningData);
+      questionsToImport = listeningQuestions;
+    } else if (importMode === 'table') {
+      questionsToImport = tableQuestions.filter(isValidTableQuestion);
+    } else {
+      questionsToImport = parsedQuestions;
+    }
 
     if (!selectedSectionId || questionsToImport.length === 0) {
       toast.error('Vui lòng chọn phần và nhập câu hỏi');
@@ -288,7 +308,6 @@ const ImportQuestionsPage = () => {
       }
 
       const normalizeContent = (content: string) => {
-        // so sánh trùng lặp theo text thuần (bỏ tag HTML)
         return content
           .replace(/<[^>]*>/g, ' ')
           .replace(/\s+/g, ' ')
@@ -296,7 +315,6 @@ const ImportQuestionsPage = () => {
           .toLowerCase();
       };
 
-      // Create a Set of existing question contents for fast lookup
       const existingContents = new Set(
         (existingQuestions || []).map(q => normalizeContent(q.content))
       );
@@ -305,10 +323,9 @@ const ImportQuestionsPage = () => {
         const q = questionsToImport[i];
         const normalizedContent = normalizeContent(q.content);
 
-        // Check for duplicate
-        if (existingContents.has(normalizedContent)) {
+        if (normalizedContent && existingContents.has(normalizedContent)) {
           result.duplicates++;
-          continue; // Skip duplicate
+          continue;
         }
 
         const explanationRaw = (q as { explanation?: string }).explanation;
@@ -316,42 +333,56 @@ const ImportQuestionsPage = () => {
           ? sanitizeRichText(explanationRaw)
           : null;
 
+        // Build insert object
+        const insertData: Record<string, any> = {
+          section_id: selectedSectionId,
+          content: sanitizeRichText(q.content || ''),
+          option_a: sanitizeRichText(q.option_a || ''),
+          option_b: sanitizeRichText(q.option_b || ''),
+          option_c: sanitizeRichText(q.option_c || '') || null,
+          option_d: sanitizeRichText(q.option_d || '') || null,
+          correct_option: q.correct_option || 'A',
+          explanation: safeExplanation,
+          image_url: q.image_url || null,
+          audio_url: q.audio_url || null,
+          question_type: q.question_type || 'standard',
+          option_count: q.option_count || 4,
+        };
+
+        // Add mondai fields for listening mode
+        if (importMode === 'listening' && q.mondai_index != null) {
+          insertData.mondai_index = q.mondai_index;
+          insertData.mondai_title = q.mondai_title || null;
+        }
+
         const { data: parentQuestion, error } = await supabase
           .from('questions')
-          .insert({
-            section_id: selectedSectionId,
-            content: sanitizeRichText(q.content),
-            option_a: sanitizeRichText(q.option_a || ''),
-            option_b: sanitizeRichText(q.option_b || ''),
-            option_c: sanitizeRichText(q.option_c || '') || null,
-            option_d: sanitizeRichText(q.option_d || '') || null,
-            correct_option: q.correct_option || 'A',
-            explanation: safeExplanation,
-            image_url: (q as TableQuestion).image_url || null,
-            audio_url: (q as TableQuestion).audio_url || null,
-            question_type: (q as TableQuestion).question_type || 'standard',
-            option_count: (q as TableQuestion).option_count || 4,
-          })
+          .insert(insertData as any)
           .select('id')
           .single();
 
         // Insert sub-questions if any
-        const subQuestions = (q as TableQuestion).subQuestions;
+        const subQuestions = q.subQuestions;
         if (!error && parentQuestion && subQuestions && subQuestions.length > 0) {
           for (const sq of subQuestions) {
-            await supabase.from('questions').insert({
+            const subInsert: Record<string, any> = {
               section_id: selectedSectionId,
               parent_id: parentQuestion.id,
-              content: sanitizeRichText(sq.content),
-              option_a: sanitizeRichText(sq.option_a),
-              option_b: sanitizeRichText(sq.option_b),
+              content: sanitizeRichText(sq.content || ''),
+              option_a: sanitizeRichText(sq.option_a || ''),
+              option_b: sanitizeRichText(sq.option_b || ''),
               option_c: sanitizeRichText(sq.option_c || '') || null,
               option_d: sanitizeRichText(sq.option_d || '') || null,
               correct_option: sq.correct_option,
               explanation: sq.explanation ? sanitizeRichText(sq.explanation) : null,
               question_type: sq.question_type || 'standard',
               option_count: sq.option_count || 4,
-            });
+            };
+            if (importMode === 'listening' && q.mondai_index != null) {
+              subInsert.mondai_index = q.mondai_index;
+              subInsert.mondai_title = q.mondai_title || null;
+            }
+            await supabase.from('questions').insert(subInsert as any);
           }
         }
 
@@ -360,8 +391,7 @@ const ImportQuestionsPage = () => {
           result.errors.push(`Câu ${i + 1}: ${error.message}`);
         } else {
           result.success++;
-          // Add to set to prevent duplicates within the same import batch
-          existingContents.add(normalizedContent);
+          if (normalizedContent) existingContents.add(normalizedContent);
         }
       }
 
@@ -374,11 +404,11 @@ const ImportQuestionsPage = () => {
 
       if (result.success > 0) {
         toast.success(`Import thành công: ${messages.join(', ')}`);
-        // Reset form to import more questions quickly
         setTableQuestions([]);
         setParsedQuestions([]);
         setFile(null);
         setImportResult(null);
+        setListeningData({ audioUrl: '', mondais: [] });
       } else if (result.duplicates > 0) {
         toast.warning(`Tất cả ${result.duplicates} câu hỏi đều trùng lặp`);
       }
@@ -391,7 +421,7 @@ const ImportQuestionsPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedSectionId, parsedQuestions, tableQuestions, importMode]);
+  }, [selectedSectionId, parsedQuestions, tableQuestions, importMode, listeningData]);
 
   // Download sample template
   const downloadTemplate = useCallback(() => {
@@ -570,8 +600,8 @@ const ImportQuestionsPage = () => {
                 {subjectHasLevels ? '4.' : '3.'} Nhập câu hỏi
               </h2>
               
-              <Tabs value={importMode} onValueChange={(v) => setImportMode(v as 'table' | 'file')} className="w-full">
-                <TabsList className="mb-4 grid w-full grid-cols-2">
+              <Tabs value={importMode} onValueChange={(v) => setImportMode(v as 'table' | 'file' | 'listening')} className="w-full">
+                <TabsList className="mb-4 grid w-full grid-cols-3">
                   <TabsTrigger value="table" className="gap-2">
                     <Table2 className="h-4 w-4" />
                     Nhập trực tiếp
@@ -579,6 +609,10 @@ const ImportQuestionsPage = () => {
                   <TabsTrigger value="file" className="gap-2">
                     <FileText className="h-4 w-4" />
                     Tải file CSV
+                  </TabsTrigger>
+                  <TabsTrigger value="listening" className="gap-2">
+                    <Headphones className="h-4 w-4" />
+                    聴解 Import
                   </TabsTrigger>
                 </TabsList>
 
@@ -621,7 +655,6 @@ const ImportQuestionsPage = () => {
                       </div>
                     )}
 
-                    {/* Preview from file */}
                     {parsedQuestions.length > 0 && (
                       <div className="rounded-lg border border-border bg-muted/20 p-4">
                         <h3 className="mb-2 text-sm font-medium text-foreground">Xem trước</h3>
@@ -645,6 +678,10 @@ const ImportQuestionsPage = () => {
                     )}
                   </div>
                 </TabsContent>
+
+                <TabsContent value="listening" className="mt-0">
+                  <ListeningImport onDataChange={setListeningData} />
+                </TabsContent>
               </Tabs>
             </div>
           )}
@@ -657,6 +694,8 @@ const ImportQuestionsPage = () => {
                 isLoading ||
                 (importMode === 'table'
                   ? validTableQuestionsCount === 0
+                  : importMode === 'listening'
+                  ? validListeningCount === 0 || !listeningData.audioUrl
                   : parsedQuestions.length === 0)
               }
               size="lg"
@@ -668,6 +707,8 @@ const ImportQuestionsPage = () => {
                 : `Import ${
                     importMode === 'table'
                       ? validTableQuestionsCount
+                      : importMode === 'listening'
+                      ? validListeningCount
                       : parsedQuestions.length
                   } câu hỏi`}
             </Button>
