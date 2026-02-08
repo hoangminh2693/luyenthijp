@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, FileText, Play, Loader2 } from 'lucide-react';
-import { useQuestionCount } from '@/hooks/useQuestions';
+import { ArrowRight, FileText, Play, Loader2, Headphones } from 'lucide-react';
+import { useQuestionCount, useListeningExams } from '@/hooks/useQuestions';
 
 /**
  * SectionCard Component - Thẻ hiển thị thông tin phần
@@ -12,6 +12,7 @@ interface SectionCardProps {
     slug: string;
     description: string | null;
     icon: string | null;
+    fixed_exam_mode?: boolean;
   };
   subjectSlug: string;
   levelSlug: string;
@@ -19,8 +20,14 @@ interface SectionCardProps {
 }
 
 export function SectionCard({ section, subjectSlug, levelSlug, index = 0 }: SectionCardProps) {
-  const { data: totalQuestions = 0, isLoading } = useQuestionCount(section.id);
+  const isListening = section.fixed_exam_mode ?? false;
+  const { data: totalQuestions = 0, isLoading } = useQuestionCount(isListening ? undefined : section.id);
+  const { data: listeningExams = [], isLoading: loadingExams } = useListeningExams(isListening ? section.id : undefined);
   
+  const statsLoading = isListening ? loadingExams : isLoading;
+  const statsText = isListening ? `${listeningExams.length} đề nghe` : `${totalQuestions} câu hỏi`;
+  const StatsIcon = isListening ? Headphones : FileText;
+
   return (
     <div
       className="group animate-fade-in-up opacity-0"
@@ -43,12 +50,12 @@ export function SectionCard({ section, subjectSlug, levelSlug, index = 0 }: Sect
         {/* Stats */}
         <div className="mb-4 flex items-center gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-1.5">
-            {isLoading ? (
+            {statsLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <>
-                <FileText className="h-4 w-4" />
-                <span>{totalQuestions} câu hỏi</span>
+                <StatsIcon className="h-4 w-4" />
+                <span>{statsText}</span>
               </>
             )}
           </div>
