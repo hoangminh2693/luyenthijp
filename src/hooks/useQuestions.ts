@@ -357,18 +357,65 @@ export function useRandomListeningExam(sectionId: string | undefined, enabled: b
 }
 
 // Hook đếm số đề nghe theo category_id (đếm distinct audio_url)
+// Uses legacy bridge: category → root ancestor → level → section → count audio_url
 export function useListeningExamCountByCategory(categoryId: string | undefined) {
   return useQuery({
     queryKey: ['listening-exam-count', 'category', categoryId],
     queryFn: async () => {
       if (!categoryId) return 0;
+
+      // Step 1: Get category info
+      const { data: cat } = await supabase
+        .from('categories')
+        .select('subject_id, slug, parent_id')
+        .eq('id', categoryId)
+        .single();
+      if (!cat) return 0;
+
+      // Step 2: Find root ancestor to map to legacy level
+      let rootSlug = cat.slug;
+      let currentParentId = cat.parent_id;
+      while (currentParentId) {
+        const { data: parent } = await supabase
+          .from('categories')
+          .select('slug, parent_id')
+          .eq('id', currentParentId)
+          .single();
+        if (!parent) break;
+        rootSlug = parent.slug;
+        currentParentId = parent.parent_id;
+      }
+
+      // Step 3: Find legacy level
+      const { data: level } = await supabase
+        .from('levels')
+        .select('id')
+        .eq('subject_id', cat.subject_id)
+        .eq('slug', rootSlug)
+        .maybeSingle();
+
+      // Step 4: Find legacy section
+      let sectionId: string | null = null;
+      if (level) {
+        const { data: section } = await supabase
+          .from('sections')
+          .select('id')
+          .eq('level_id', level.id)
+          .eq('slug', cat.slug)
+          .maybeSingle();
+        sectionId = section?.id ?? null;
+      }
+
+      if (!sectionId) return 0;
+
+      // Step 5: Count distinct audio_url in that section
       const { data, error } = await supabase
         .from('questions_safe')
         .select('audio_url')
-        .eq('category_id', categoryId)
+        .eq('section_id', sectionId)
         .not('audio_url', 'is', null);
-      
-      if (error) throw error;
+
+      if (error) return 0;
       const uniqueUrls = new Set((data || []).map(q => q.audio_url));
       return uniqueUrls.size;
     },
