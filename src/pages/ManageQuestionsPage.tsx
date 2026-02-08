@@ -4,7 +4,7 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, LogIn, Shield, Pencil, Trash2, Search, ChevronDown, Save, X, Image, Volume2, ArrowRightLeft, CheckSquare, Square, MoveRight } from 'lucide-react';
+import { Loader2, LogIn, Shield, Pencil, Trash2, Search, ChevronDown, Save, X, Image, Volume2, ArrowRightLeft, CheckSquare, Square, MoveRight, Headphones } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +41,7 @@ import { RichTextEditable } from '@/components/admin/RichTextEditable';
 import { SubQuestionInput, type SubQuestion } from '@/components/admin/SubQuestionInput';
 import { sanitizeRichText } from '@/lib/richText';
 import { MediaUpload } from '@/components/admin/MediaUpload';
+import { ListeningExamManager } from '@/components/admin/ListeningExamManager';
 
 interface Subject {
   id: string;
@@ -283,6 +284,25 @@ const ManageQuestionsPage = () => {
   }, [selectedSectionId]);
 
   const groupedQuestions = useMemo(() => groupQuestionsWithChildren(questions), [questions]);
+
+  // Detect if this section is a listening section (has questions with audio_url)
+  const isListeningSection = useMemo(() => {
+    return questions.some(q => q.audio_url && !q.parent_id);
+  }, [questions]);
+
+  const reloadQuestions = useCallback(async () => {
+    if (!selectedSectionId) return;
+    const { data, error } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('section_id', selectedSectionId)
+      .order('created_at', { ascending: true });
+    if (!error) {
+      setQuestions((data as unknown as QuestionRow[]) || []);
+    }
+    queryClient.invalidateQueries({ queryKey: ['questions'] });
+    queryClient.invalidateQueries({ queryKey: ['listening-exams'] });
+  }, [selectedSectionId, queryClient]);
 
   // Filter questions by search (tìm trong câu cha + câu con)
   const filteredQuestions = useMemo(() => {
@@ -808,6 +828,13 @@ const ManageQuestionsPage = () => {
                 <div className="flex justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
+              ) : isListeningSection ? (
+                /* Listening mode: group by exam */
+                <ListeningExamManager
+                  questions={questions}
+                  onQuestionsChanged={reloadQuestions}
+                  onEditQuestion={openEditDialog}
+                />
               ) : filteredQuestions.length === 0 ? (
                 <div className="rounded-xl border border-border bg-card p-12 text-center">
                   <p className="text-muted-foreground">

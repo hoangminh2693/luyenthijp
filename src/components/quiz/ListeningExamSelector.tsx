@@ -2,19 +2,24 @@
  * Component hiển thị thông tin đề nghe cho phần 聴解
  * Thay thế QuestionCountSelector cho các section có fixed_exam_mode = true
  */
-import { Headphones, Clock, AlertCircle } from 'lucide-react';
+import { Headphones, Clock, AlertCircle, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ListeningExamSelectorProps {
   totalExams: number;
-  questionCount: number;
-  audioUrl?: string;
+  estimatedMinutes: number;
   className?: string;
+}
+
+function formatDuration(minutes: number): string {
+  if (minutes <= 0) return '—';
+  if (minutes < 1) return '< 1 phút';
+  return `~${Math.ceil(minutes)} phút`;
 }
 
 export function ListeningExamSelector({
   totalExams,
-  questionCount,
+  estimatedMinutes,
   className,
 }: ListeningExamSelectorProps) {
   return (
@@ -44,17 +49,17 @@ export function ListeningExamSelector({
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
         <div className="flex items-center gap-2 rounded-lg bg-muted/30 p-3">
-          <span className="text-lg">📝</span>
+          <FileText className="h-5 w-5 text-muted-foreground" />
           <div>
-            <p className="text-xs text-muted-foreground">Số câu hỏi</p>
-            <p className="font-semibold text-foreground">{questionCount} câu</p>
+            <p className="text-xs text-muted-foreground">Số đề đang có</p>
+            <p className="font-semibold text-foreground">{totalExams} đề</p>
           </div>
         </div>
         <div className="flex items-center gap-2 rounded-lg bg-muted/30 p-3">
           <Clock className="h-5 w-5 text-muted-foreground" />
           <div>
             <p className="text-xs text-muted-foreground">Thời gian ước tính</p>
-            <p className="font-semibold text-foreground">~{Math.ceil(questionCount * 2)} phút</p>
+            <p className="font-semibold text-foreground">{formatDuration(estimatedMinutes)}</p>
           </div>
         </div>
       </div>
