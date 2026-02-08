@@ -10,19 +10,20 @@ export interface Question {
   options: {
     A: string;
     B: string;
-    C?: string; // Nullable cho câu 3 đáp án
-    D?: string; // Nullable cho câu 3 đáp án
+    C?: string;
+    D?: string;
   };
-  correctOption?: 'A' | 'B' | 'C' | 'D'; // Optional - only available after submission
-  explanation?: string; // Optional - only available after submission
+  correctOption?: 'A' | 'B' | 'C' | 'D';
+  explanation?: string;
   section_id: string;
   image_url?: string;
   audio_url?: string;
   parent_id?: string;
-  subQuestions?: Question[]; // Câu hỏi con
-  // Thông tin loại câu hỏi nghe
+  subQuestions?: Question[];
   questionType?: ListeningQuestionType;
-  optionCount?: number; // Số lượng đáp án (2-4)
+  optionCount?: number;
+  mondaiIndex?: number;
+  mondaiTitle?: string;
 }
 
 // Safe question from view (no correct_option, no explanation)
@@ -39,6 +40,8 @@ interface DbQuestionSafe {
   parent_id: string | null;
   question_type: ListeningQuestionType | null;
   option_count: number | null;
+  mondai_index: number | null;
+  mondai_title: string | null;
 }
 
 // Full question (for admin - includes answers)
@@ -72,13 +75,14 @@ function mapDbQuestionSafe(dbQuestion: DbQuestionSafe): Question {
       C: optionCount >= 3 ? (dbQuestion.option_c || '') : undefined,
       D: optionCount >= 4 ? (dbQuestion.option_d || '') : undefined,
     },
-    // correctOption and explanation NOT included - revealed only after submission
     section_id: dbQuestion.section_id,
     image_url: dbQuestion.image_url || undefined,
     audio_url: dbQuestion.audio_url || undefined,
     parent_id: dbQuestion.parent_id || undefined,
     questionType: dbQuestion.question_type || 'standard',
     optionCount: optionCount,
+    mondaiIndex: dbQuestion.mondai_index ?? undefined,
+    mondaiTitle: dbQuestion.mondai_title ?? undefined,
   };
 }
 
