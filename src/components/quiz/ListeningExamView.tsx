@@ -441,62 +441,56 @@ export function ListeningExamView({ exam, examName, onRetry }: ListeningExamView
         ))}
       </div>
 
-      {/* Navigation + Submit buttons at bottom */}
+      {/* Sticky bottom bar with navigation + progress + submit */}
       {phase === 'exam' && (
-        <div className="flex items-center justify-between gap-4">
-          <Button
-            variant="outline"
-            disabled={currentMondaiPage === 0}
-            onClick={() => goToPage(currentMondaiPage - 1)}
-            className="gap-1"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Trang trước
-          </Button>
-
-          {currentMondaiPage < totalPages - 1 ? (
+        <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-sm shadow-lg px-4 py-3">
+          <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
             <Button
+              variant="outline"
+              size="sm"
+              disabled={currentMondaiPage === 0}
+              onClick={() => goToPage(currentMondaiPage - 1)}
+              className="gap-1"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Trước
+            </Button>
+
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground">
+                {answeredCount}/{totalQuestionCount} câu
+              </span>
+              <Button
+                onClick={handleSubmit}
+                disabled={answeredCount < totalQuestionCount || isSubmitting}
+                size="sm"
+                className="gap-2"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
+              </Button>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentMondaiPage >= totalPages - 1}
               onClick={() => goToPage(currentMondaiPage + 1)}
               className="gap-1"
             >
-              Trang sau
+              Sau
               <ChevronRight className="h-4 w-4" />
             </Button>
-          ) : (
-            <Button
-              onClick={handleSubmit}
-              disabled={answeredCount < totalQuestionCount || isSubmitting}
-              className="gap-2"
-            >
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-              {isSubmitting ? 'Đang nộp...' : `Nộp bài (${answeredCount}/${totalQuestionCount})`}
-            </Button>
-          )}
+          </div>
         </div>
       )}
 
-      {/* Floating submit button visible on all pages */}
-      {phase === 'exam' && answeredCount === totalQuestionCount && (
-        <div className="fixed bottom-6 right-6 z-50">
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            size="lg"
-            className="gap-2 shadow-lg rounded-full"
-          >
-            {isSubmitting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-            Nộp bài
-          </Button>
-        </div>
-      )}
+      {/* Spacer for sticky bar */}
+      {phase === 'exam' && <div className="h-16" />}
     </div>
   );
 }
