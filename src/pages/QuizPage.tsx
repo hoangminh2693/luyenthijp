@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
 import { QuizProgress } from '@/components/quiz/QuizProgress';
 import { ResultSummary } from '@/components/quiz/ResultSummary';
+import { ListeningExamView } from '@/components/quiz/ListeningExamView';
 import { Breadcrumb } from '@/components/layout/Header';
 import { useQuestionHistory } from '@/hooks/useQuestionHistory';
 import { useLeafCategory } from '@/hooks/useCategoryPath';
@@ -303,6 +304,37 @@ const QuizPage = () => {
 
   const mappedQuestions = questions;
 
+  // ======= LISTENING MODE: Use dedicated ListeningExamView =======
+  if (isListeningMode && listeningExam) {
+    return (
+      <div className="min-h-screen bg-background pb-8">
+        <div className="container py-8">
+          <div className="mb-6">
+            <Breadcrumb items={breadcrumbItems} />
+          </div>
+          <div className="mb-8">
+            <Link
+              to={backUrl}
+              className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Quay lại
+            </Link>
+            <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
+              {pageTitle}
+            </h1>
+          </div>
+          <ListeningExamView
+            exam={listeningExam}
+            examName={pageTitle}
+            onRetry={handleRetry}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ======= STANDARD MODE =======
   return (
     <div className="min-h-screen bg-background pb-8">
       <div className="container py-8">
@@ -326,45 +358,9 @@ const QuizPage = () => {
             </h1>
             <p className="text-muted-foreground">
               {totalQuestionCount} câu hỏi
-              {isListeningMode && ' • Đề nghe hoàn chỉnh'}
             </p>
           </div>
         </div>
-
-        {/* Audio Player cho phần nghe */}
-        {isListeningMode && listeningExam?.audioUrl && !isSubmitted && (
-          <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-4">
-            <div className="flex items-center gap-4">
-              <Button
-                type="button"
-                variant="default"
-                size="icon"
-                onClick={toggleAudio}
-                className="h-12 w-12 shrink-0 rounded-full"
-              >
-                {isAudioPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
-              </Button>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <Headphones className="h-5 w-5 text-primary" />
-                  <span className="font-medium text-foreground">Audio đề nghe</span>
-                </div>
-                <audio
-                  ref={audioRef}
-                  src={listeningExam.audioUrl}
-                  controls
-                  className="w-full h-10"
-                  onPlay={() => setIsAudioPlaying(true)}
-                  onPause={() => setIsAudioPlaying(false)}
-                  onEnded={() => setIsAudioPlaying(false)}
-                />
-              </div>
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              💡 Bạn có thể phát lại audio nhiều lần trong khi làm bài.
-            </p>
-          </div>
-        )}
 
         {/* Main content */}
         <div className="grid gap-8 lg:grid-cols-[1fr_320px]">

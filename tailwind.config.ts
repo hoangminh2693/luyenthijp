@@ -97,12 +97,22 @@ export default {
           from: { transform: "scale(0.95)", opacity: "0" },
           to: { transform: "scale(1)", opacity: "1" },
         },
+        "slide-in-from-right": {
+          from: { opacity: "0", transform: "translateX(40px)" },
+          to: { opacity: "1", transform: "translateX(0)" },
+        },
+        "slide-in-from-left": {
+          from: { opacity: "0", transform: "translateX(-40px)" },
+          to: { opacity: "1", transform: "translateX(0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "fade-in-up": "fade-in-up 0.5s ease-out forwards",
         "scale-in": "scale-in 0.3s ease-out forwards",
+        "slide-in-from-right": "slide-in-from-right 0.3s ease-out forwards",
+        "slide-in-from-left": "slide-in-from-left 0.3s ease-out forwards",
       },
       boxShadow: {
         card: "0 4px 6px -1px hsl(217 91% 40% / 0.1), 0 2px 4px -2px hsl(217 91% 40% / 0.1)",
