@@ -355,3 +355,23 @@ export function useRandomListeningExam(sectionId: string | undefined, enabled: b
     refetchOnReconnect: false,
   });
 }
+
+// Hook đếm số đề nghe theo category_id (đếm distinct audio_url)
+export function useListeningExamCountByCategory(categoryId: string | undefined) {
+  return useQuery({
+    queryKey: ['listening-exam-count', 'category', categoryId],
+    queryFn: async () => {
+      if (!categoryId) return 0;
+      const { data, error } = await supabase
+        .from('questions_safe')
+        .select('audio_url')
+        .eq('category_id', categoryId)
+        .not('audio_url', 'is', null);
+      
+      if (error) throw error;
+      const uniqueUrls = new Set((data || []).map(q => q.audio_url));
+      return uniqueUrls.size;
+    },
+    enabled: !!categoryId,
+  });
+}
