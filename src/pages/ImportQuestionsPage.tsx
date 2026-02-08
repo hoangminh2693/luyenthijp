@@ -294,19 +294,6 @@ const ImportQuestionsPage = () => {
     const result: ImportResult & { duplicates: number } = { success: 0, failed: 0, duplicates: 0, errors: [] };
 
     try {
-      // Fetch existing questions in this section to check for duplicates
-      const { data: existingQuestions, error: fetchError } = await supabase
-        .from('questions')
-        .select('content')
-        .eq('section_id', selectedSectionId);
-
-      if (fetchError) {
-        console.error('Error fetching existing questions:', fetchError);
-        toast.error('Lỗi khi kiểm tra câu hỏi trùng lặp');
-        setIsLoading(false);
-        return;
-      }
-
       const normalizeContent = (content: string) => {
         return content
           .replace(/<[^>]*>/g, ' ')
@@ -315,15 +302,31 @@ const ImportQuestionsPage = () => {
           .toLowerCase();
       };
 
-      const existingContents = new Set(
-        (existingQuestions || []).map(q => normalizeContent(q.content))
-      );
+      // Skip duplicate check for listening mode (each import is a complete new exam)
+      let existingContents = new Set<string>();
+      if (importMode !== 'listening') {
+        const { data: existingQuestions, error: fetchError } = await supabase
+          .from('questions')
+          .select('content')
+          .eq('section_id', selectedSectionId);
+
+        if (fetchError) {
+          console.error('Error fetching existing questions:', fetchError);
+          toast.error('Lỗi khi kiểm tra câu hỏi trùng lặp');
+          setIsLoading(false);
+          return;
+        }
+
+        existingContents = new Set(
+          (existingQuestions || []).map(q => normalizeContent(q.content))
+        );
+      }
 
       for (let i = 0; i < questionsToImport.length; i++) {
         const q = questionsToImport[i];
         const normalizedContent = normalizeContent(q.content);
 
-        if (normalizedContent && existingContents.has(normalizedContent)) {
+        if (importMode !== 'listening' && normalizedContent && existingContents.has(normalizedContent)) {
           result.duplicates++;
           continue;
         }
