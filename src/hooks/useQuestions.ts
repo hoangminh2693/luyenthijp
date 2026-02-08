@@ -42,6 +42,7 @@ interface DbQuestionSafe {
   option_count: number | null;
   mondai_index: number | null;
   mondai_title: string | null;
+  created_at: string | null;
 }
 
 // Full question (for admin - includes answers)
@@ -112,8 +113,12 @@ function mapDbQuestion(dbQuestion: DbQuestion): Question {
 
 // Nhóm câu hỏi cha với câu hỏi con (safe version)
 function groupQuestionsWithChildrenSafe(questions: DbQuestionSafe[]): Question[] {
-  const parentQuestions = questions.filter(q => !q.parent_id);
-  const childQuestions = questions.filter(q => q.parent_id);
+  // Sort by created_at to preserve import order
+  const sorted = [...questions].sort((a, b) => 
+    (a.created_at || '').localeCompare(b.created_at || '')
+  );
+  const parentQuestions = sorted.filter(q => !q.parent_id);
+  const childQuestions = sorted.filter(q => q.parent_id);
   
   return parentQuestions.map(parent => {
     const mapped = mapDbQuestionSafe(parent);
@@ -281,12 +286,13 @@ export function useRandomListeningExam(sectionId: string | undefined, enabled: b
     queryFn: async () => {
       if (!sectionId) return null;
       
-      // Step 1: Get parent questions with audio_url
+      // Step 1: Get parent questions with audio_url, ordered by creation
       const { data: parentData, error: parentError } = await supabase
         .from('questions_safe')
         .select('*')
         .eq('section_id', sectionId)
-        .not('audio_url', 'is', null);
+        .not('audio_url', 'is', null)
+        .order('created_at', { ascending: true });
       
       if (parentError) throw parentError;
       
