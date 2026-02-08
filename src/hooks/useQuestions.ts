@@ -225,34 +225,35 @@ export function useListeningExams(sectionId: string | undefined) {
     queryFn: async () => {
       if (!sectionId) return [];
       
-      // Lấy tất cả câu hỏi có audio_url từ section này
-      const { data, error } = await supabase
+      // Get all questions from this section (parents have audio_url, children may not)
+      const { data: allData, error } = await supabase
         .from('questions_safe')
         .select('*')
-        .eq('section_id', sectionId)
-        .not('audio_url', 'is', null);
+        .eq('section_id', sectionId);
       
       if (error) throw error;
       
-      const questions = data as DbQuestionSafe[] || [];
+      const allQuestions = (allData as DbQuestionSafe[]) || [];
+      const parentQuestions = allQuestions.filter(q => !q.parent_id && q.audio_url);
       
       // Nhóm theo audio_url - mỗi audio = 1 đề nghe
       const examsByAudio = new Map<string, DbQuestionSafe[]>();
       
-      for (const q of questions) {
+      for (const q of parentQuestions) {
         if (!q.audio_url) continue;
-        
         if (!examsByAudio.has(q.audio_url)) {
           examsByAudio.set(q.audio_url, []);
         }
         examsByAudio.get(q.audio_url)!.push(q);
       }
       
-      // Chuyển đổi thành mảng ListeningExam
+      // Chuyển đổi thành mảng ListeningExam, including children
       const exams: ListeningExam[] = [];
       
-      for (const [audioUrl, examQuestions] of examsByAudio) {
-        const grouped = groupQuestionsWithChildrenSafe(examQuestions);
+      for (const [audioUrl, parents] of examsByAudio) {
+        const parentIds = new Set(parents.map(p => p.id));
+        const children = allQuestions.filter(q => q.parent_id && parentIds.has(q.parent_id));
+        const grouped = groupQuestionsWithChildrenSafe([...parents, ...children]);
         const questionCount = grouped.reduce((total, q) => {
           if (q.subQuestions && q.subQuestions.length > 0) {
             return total + q.subQuestions.length;
@@ -280,23 +281,22 @@ export function useRandomListeningExam(sectionId: string | undefined, enabled: b
     queryFn: async () => {
       if (!sectionId) return null;
       
-      // Lấy tất cả câu hỏi có audio_url từ section này
-      const { data, error } = await supabase
+      // Step 1: Get parent questions with audio_url
+      const { data: parentData, error: parentError } = await supabase
         .from('questions_safe')
         .select('*')
         .eq('section_id', sectionId)
         .not('audio_url', 'is', null);
       
-      if (error) throw error;
+      if (parentError) throw parentError;
       
-      const questions = data as DbQuestionSafe[] || [];
+      const parentQuestions = (parentData as DbQuestionSafe[]) || [];
       
       // Nhóm theo audio_url
       const examsByAudio = new Map<string, DbQuestionSafe[]>();
       
-      for (const q of questions) {
+      for (const q of parentQuestions) {
         if (!q.audio_url) continue;
-        
         if (!examsByAudio.has(q.audio_url)) {
           examsByAudio.set(q.audio_url, []);
         }
@@ -308,10 +308,25 @@ export function useRandomListeningExam(sectionId: string | undefined, enabled: b
       if (audioUrls.length === 0) return null;
       
       const randomAudioUrl = audioUrls[Math.floor(Math.random() * audioUrls.length)];
-      const examQuestions = examsByAudio.get(randomAudioUrl)!;
+      const examParents = examsByAudio.get(randomAudioUrl)!;
       
-      // Nhóm câu hỏi cha con và giữ nguyên thứ tự (không shuffle cho phần nghe)
-      const grouped = groupQuestionsWithChildrenSafe(examQuestions);
+      // Step 2: Fetch children (sub-questions) for these parents
+      const parentIds = examParents.filter(q => !q.parent_id).map(q => q.id);
+      let allQuestions = [...examParents];
+      
+      if (parentIds.length > 0) {
+        const { data: childData, error: childError } = await supabase
+          .from('questions_safe')
+          .select('*')
+          .in('parent_id', parentIds);
+        
+        if (!childError && childData) {
+          allQuestions = [...allQuestions, ...(childData as DbQuestionSafe[])];
+        }
+      }
+      
+      // Nhóm câu hỏi cha con và giữ nguyên thứ tự
+      const grouped = groupQuestionsWithChildrenSafe(allQuestions);
       
       const questionCount = grouped.reduce((total, q) => {
         if (q.subQuestions && q.subQuestions.length > 0) {
