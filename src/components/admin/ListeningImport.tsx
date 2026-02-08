@@ -523,20 +523,39 @@ function JsonImportArea({ onParsed }: { onParsed: (data: ListeningExamData) => v
         title: m.title || m.id || `問題${idx + 1}`,
         description: m.description || '',
         questions: (m.questions || []).map((q: any) => {
-          const optCount = q.options?.length || 4;
+          const optCount = q.options?.length || q.option_count || 4;
           const options = q.options || [];
+          
+          // Parse sub-questions if present
+          const subQuestions: ListeningSubQuestion[] = (q.subQuestions || q.sub_questions || []).map((sq: any) => {
+            const sqOpts = sq.options || [];
+            const sqCount = sqOpts.length || sq.option_count || 4;
+            return {
+              content: sq.content || sq.questionText || '',
+              option_a: sqOpts[0]?.text || sqOpts[0] || sq.option_a || '',
+              option_b: sqOpts[1]?.text || sqOpts[1] || sq.option_b || '',
+              option_c: sqOpts[2]?.text || sqOpts[2] || sq.option_c || '',
+              option_d: sqOpts[3]?.text || sqOpts[3] || sq.option_d || '',
+              correct_option: sq.correct_option || sq.answer || '',
+              explanation: sq.explanation || '',
+              question_type: sq.question_type || (sq.hasTextOptions === false ? 'audio_only' : 'standard'),
+              option_count: Math.min(sqCount, 4),
+              image_url: sq.imageUrl || sq.image_url || undefined,
+            } as ListeningSubQuestion;
+          });
+
           return {
             content: q.content || q.questionText || '',
-            option_a: options[0]?.text || options[0] || '',
-            option_b: options[1]?.text || options[1] || '',
-            option_c: options[2]?.text || options[2] || '',
-            option_d: options[3]?.text || options[3] || '',
-            correct_option: '',
+            option_a: options[0]?.text || options[0] || q.option_a || '',
+            option_b: options[1]?.text || options[1] || q.option_b || '',
+            option_c: options[2]?.text || options[2] || q.option_c || '',
+            option_d: options[3]?.text || options[3] || q.option_d || '',
+            correct_option: q.correct_option || q.answer || '',
             explanation: q.explanation || '',
-            question_type: q.hasTextOptions === false ? 'audio_only' : (q.hasImage ? 'image_based' : 'standard'),
+            question_type: q.question_type || (q.hasTextOptions === false ? 'audio_only' : (q.hasImage ? 'image_based' : 'standard')),
             option_count: Math.min(optCount, 4),
             image_url: q.imageUrl || q.image_url || undefined,
-            subQuestions: [],
+            subQuestions,
           } as ListeningMondaiQuestion;
         }),
       }));
@@ -560,7 +579,7 @@ function JsonImportArea({ onParsed }: { onParsed: (data: ListeningExamData) => v
   return (
     <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
       <p className="text-xs text-muted-foreground">
-        Paste JSON theo cấu trúc: {'{'} "audioSource": "url", "mondais": [{'{'} "title": "...", "questions": [...] {'}'}] {'}'}
+        Paste JSON theo cấu trúc: {'{'} "audioSource": "url", "mondais": [{'{'} "title": "問題5", "description": "...", "questions": [{'{'} "content": "...", "question_type": "audio_only", "correct_option": "A", "subQuestions": [{'{'}"content": "質問1", "option_a": "...", ...{'}'}] {'}'}] {'}'}] {'}'}
       </p>
       <Textarea
         value={text}
@@ -790,12 +809,13 @@ export function ListeningImport({ onDataChange }: ListeningImportProps) {
                   <div className="p-4 space-y-4">
                     {/* Description */}
                     <div>
-                      <label className="text-xs text-muted-foreground">Mô tả Mondai (hiển thị cho thí sinh)</label>
-                      <Input
+                      <label className="text-xs text-muted-foreground">Mô tả / Hướng dẫn Mondai (hiển thị cho thí sinh)</label>
+                      <Textarea
                         value={mondai.description}
                         onChange={(e) => updateMondaiField(mIdx, 'description', e.target.value)}
-                        placeholder="VD: Nghe hội thoại và chọn đáp án đúng"
-                        className="text-sm"
+                        placeholder="VD: 問題用紙に何もいんさつされていません。まず話を聞いてください。それから、質問とせんたくしを聞いて、1 から 4 の中から、最もよいものを一つ選んでください。"
+                        className="text-sm min-h-[60px]"
+                        rows={2}
                       />
                     </div>
 
