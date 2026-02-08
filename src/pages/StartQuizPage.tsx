@@ -8,7 +8,7 @@
  * - fixed_exam_mode = true: Không chọn số lượng, làm theo đề nghe hoàn chỉnh
  * - Các phần khác: Cho phép random và chọn số lượng như bình thường
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Navigate, useNavigate, Link } from 'react-router-dom';
 import { 
   Play, 
@@ -28,6 +28,7 @@ import { ListeningExamSelector } from '@/components/quiz/ListeningExamSelector';
 import { ActivityWidget } from '@/components/ui/ActivityWidget';
 import { useLeafCategory, useQuestionCountForCategory } from '@/hooks/useCategoryPath';
 import { useListeningExams } from '@/hooks/useQuestions';
+import { useAudioDurations } from '@/hooks/useAudioDurations';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -234,6 +235,15 @@ const StartQuizPage = () => {
     isListeningSection ? matchingSection?.id : undefined
   );
 
+  // Get audio URLs for duration calculation
+  const listeningAudioUrls = useMemo(
+    () => listeningExams.map(e => e.audioUrl),
+    [listeningExams]
+  );
+  const { avgDuration: avgAudioDuration } = useAudioDurations(
+    isListeningSection ? listeningAudioUrls : []
+  );
+
   // State
   const [questionCount, setQuestionCount] = useState<number>(5);
 
@@ -301,11 +311,8 @@ const StartQuizPage = () => {
   };
 
   // Tính thời gian ước tính
-  const listeningQuestionCount = listeningExams.length > 0 
-    ? Math.round(listeningExams.reduce((sum, e) => sum + e.questionCount, 0) / listeningExams.length)
-    : 0;
   const estimatedMinutes = isListeningSection 
-    ? Math.ceil(listeningQuestionCount * 2)
+    ? (avgAudioDuration > 0 ? Math.ceil(avgAudioDuration / 60) : 0)
     : Math.ceil(questionCount * 1.5);
 
   // Lấy thông tin giới thiệu
@@ -379,7 +386,7 @@ const StartQuizPage = () => {
                 {isListeningSection ? (
                   <ListeningExamSelector
                     totalExams={listeningExams.length}
-                    questionCount={listeningQuestionCount}
+                    estimatedMinutes={avgAudioDuration > 0 ? Math.ceil(avgAudioDuration / 60) : 0}
                   />
                 ) : (
                   <QuestionCountSelector
