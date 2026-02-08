@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, FileText, Play, Loader2, Layers } from 'lucide-react';
+import { ArrowRight, FileText, Play, Loader2, Layers, Headphones } from 'lucide-react';
 import { useQuestionCountByCategory, useCategoriesByParent, type Category } from '@/hooks/useSubjectLayers';
+import { useListeningExamCountByCategory } from '@/hooks/useQuestions';
 
 /**
  * CategoryCard Component - Thẻ hiển thị thông tin category động
@@ -21,9 +22,15 @@ export function CategoryCard({
   index = 0,
   isLeaf: isLeafOverride
 }: CategoryCardProps) {
-  const { data: questionCount = 0, isLoading: loadingCount } = useQuestionCountByCategory(category.id);
+  const isListening = category.fixed_exam_mode ?? false;
+  const { data: questionCount = 0, isLoading: loadingCount } = useQuestionCountByCategory(isListening ? undefined : category.id);
+  const { data: examCount = 0, isLoading: loadingExamCount } = useListeningExamCountByCategory(isListening ? category.id : undefined);
   const { data: children = [] } = useCategoriesByParent(category.id);
   
+  const statsLoading = isListening ? loadingExamCount : loadingCount;
+  const statsText = isListening ? `${examCount} đề nghe` : `${questionCount} câu hỏi`;
+  const StatsIcon = isListening ? Headphones : FileText;
+
   // Xác định xem category này là leaf hay branch
   const isLeaf = isLeafOverride ?? (children.length === 0);
   
@@ -58,12 +65,12 @@ export function CategoryCard({
           {/* Stats */}
           <div className="mb-4 flex items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">
-              {loadingCount ? (
+              {statsLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <>
-                  <FileText className="h-4 w-4" />
-                  <span>{questionCount} câu hỏi</span>
+                  <StatsIcon className="h-4 w-4" />
+                  <span>{statsText}</span>
                 </>
               )}
             </div>
