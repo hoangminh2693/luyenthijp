@@ -162,7 +162,7 @@ export function ListeningExamManager({
     }
   }, [deletingExam, onQuestionsChanged]);
 
-  // Group parent questions with children for display
+  // Group parent questions with children, then organize by mondai
   const getParentQuestions = (examQuestions: QuestionRow[]) => {
     const parents = examQuestions.filter(q => !q.parent_id)
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
@@ -178,6 +178,26 @@ export function ListeningExamManager({
         (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       ),
     }));
+  };
+
+  // Group questions by mondai within an exam
+  const getMondaiGroups = (examQuestions: QuestionRow[]) => {
+    const parentQs = getParentQuestions(examQuestions);
+    const groups = new Map<number, { mondaiIndex: number; mondaiTitle: string; questions: typeof parentQs }>();
+    
+    for (const q of parentQs) {
+      const idx = q.mondai_index ?? 0;
+      if (!groups.has(idx)) {
+        groups.set(idx, {
+          mondaiIndex: idx,
+          mondaiTitle: q.mondai_title || `問題${idx}`,
+          questions: [],
+        });
+      }
+      groups.get(idx)!.questions.push(q);
+    }
+    
+    return Array.from(groups.values()).sort((a, b) => a.mondaiIndex - b.mondaiIndex);
   };
 
   if (exams.length === 0) {
@@ -202,7 +222,7 @@ export function ListeningExamManager({
       {/* Exam list */}
       {exams.map((exam, idx) => {
         const duration = durations.get(exam.audioUrl) || 0;
-        const parentQs = getParentQuestions(exam.questions);
+        const mondaiGroups = getMondaiGroups(exam.questions);
         const isExpanded = expandedExams.has(exam.audioUrl);
 
         return (
@@ -264,97 +284,102 @@ export function ListeningExamManager({
                     <audio src={exam.audioUrl} controls className="w-full h-8" />
                   </div>
 
-                  {/* Questions */}
-                  <div className="divide-y divide-border">
-                    {parentQs.map((q, qIdx) => (
-                      <div key={q.id} className="px-4 py-3 hover:bg-muted/30 transition-colors">
-                        <div className="flex items-start gap-3">
-                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-primary/10 text-xs font-bold text-primary mt-0.5">
-                            {qIdx + 1}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            {/* Mondai info */}
-                            {q.mondai_title && (
-                              <span className="text-[10px] bg-muted rounded px-1.5 py-0.5 text-muted-foreground mb-1 inline-block">
-                                {q.mondai_title}
-                              </span>
-                            )}
-                            <div
-                              className="text-sm text-foreground"
-                              dangerouslySetInnerHTML={{
-                                __html: q.content || '<em class="text-muted-foreground">Câu hỏi trong audio</em>'
-                              }}
-                            />
-                            {/* Question type badge */}
-                            <div className="flex flex-wrap gap-1.5 mt-1 text-xs text-muted-foreground">
-                              {q.question_type && q.question_type !== 'standard' && (
-                                <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-medium">
-                                  {q.question_type === 'audio_only' ? '🎧 Audio Only' : '🖼️ Image'}
-                                </span>
-                              )}
-                              <span className={cn(
-                                q.correct_option === 'A' && 'text-emerald-600 dark:text-emerald-400 font-medium'
-                              )}>
-                                ①<span dangerouslySetInnerHTML={{ __html: q.option_a || '—' }} />
-                              </span>
-                              <span className={cn(
-                                q.correct_option === 'B' && 'text-emerald-600 dark:text-emerald-400 font-medium'
-                              )}>
-                                ②<span dangerouslySetInnerHTML={{ __html: q.option_b || '—' }} />
-                              </span>
-                              {(q.option_count ?? 4) >= 3 && (
-                                <span className={cn(
-                                  q.correct_option === 'C' && 'text-emerald-600 dark:text-emerald-400 font-medium'
-                                )}>
-                                  ③<span dangerouslySetInnerHTML={{ __html: q.option_c || '—' }} />
-                                </span>
-                              )}
-                              {(q.option_count ?? 4) >= 4 && (
-                                <span className={cn(
-                                  q.correct_option === 'D' && 'text-emerald-600 dark:text-emerald-400 font-medium'
-                                )}>
-                                  ④<span dangerouslySetInnerHTML={{ __html: q.option_d || '—' }} />
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Sub-questions */}
-                            {q.subQuestions && q.subQuestions.length > 0 && (
-                              <div className="mt-2 ml-2 space-y-1 border-l-2 border-border pl-3">
-                                {q.subQuestions.map((sq, sqIdx) => (
-                                  <div key={sq.id} className="text-xs text-muted-foreground">
-                                    <span className="font-medium text-foreground">
-                                      Câu con {sqIdx + 1}:
-                                    </span>{' '}
-                                    <span dangerouslySetInnerHTML={{ 
-                                      __html: sq.content || '(audio)' 
-                                    }} />
-                                    <span className="ml-2 text-emerald-600 dark:text-emerald-400">
-                                      ✓{sq.correct_option}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex gap-1 shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => onEditQuestion({
-                                ...q,
-                                subQuestions: q.subQuestions || [],
-                              })}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
+                  {/* Questions grouped by Mondai */}
+                  {mondaiGroups.map((mondai) => (
+                    <div key={mondai.mondaiIndex}>
+                      {/* Mondai header */}
+                      <div className="px-4 py-2 bg-muted/40 border-b border-border flex items-center gap-2">
+                        <span className="text-xs font-bold text-foreground">{mondai.mondaiTitle}</span>
+                        <span className="text-[10px] text-muted-foreground">({mondai.questions.length} câu)</span>
                       </div>
-                    ))}
-                  </div>
+
+                      {/* Questions in this mondai */}
+                      <div className="divide-y divide-border">
+                        {mondai.questions.map((q, qIdx) => (
+                          <div key={q.id} className="px-4 py-3 hover:bg-muted/30 transition-colors">
+                            <div className="flex items-start gap-3">
+                              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-primary/10 text-xs font-bold text-primary mt-0.5">
+                                {qIdx + 1}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <div
+                                  className="text-sm text-foreground"
+                                  dangerouslySetInnerHTML={{
+                                    __html: q.content || '<em class="text-muted-foreground">Câu hỏi trong audio</em>'
+                                  }}
+                                />
+                                {/* Question type badge + options */}
+                                <div className="flex flex-wrap gap-1.5 mt-1 text-xs text-muted-foreground">
+                                  {q.question_type && q.question_type !== 'standard' && (
+                                    <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-medium">
+                                      {q.question_type === 'audio_only' ? '🎧 Audio Only' : '🖼️ Image'}
+                                    </span>
+                                  )}
+                                  <span className={cn(
+                                    q.correct_option === 'A' && 'text-emerald-600 dark:text-emerald-400 font-medium'
+                                  )}>
+                                    ①<span dangerouslySetInnerHTML={{ __html: q.option_a || '—' }} />
+                                  </span>
+                                  <span className={cn(
+                                    q.correct_option === 'B' && 'text-emerald-600 dark:text-emerald-400 font-medium'
+                                  )}>
+                                    ②<span dangerouslySetInnerHTML={{ __html: q.option_b || '—' }} />
+                                  </span>
+                                  {(q.option_count ?? 4) >= 3 && (
+                                    <span className={cn(
+                                      q.correct_option === 'C' && 'text-emerald-600 dark:text-emerald-400 font-medium'
+                                    )}>
+                                      ③<span dangerouslySetInnerHTML={{ __html: q.option_c || '—' }} />
+                                    </span>
+                                  )}
+                                  {(q.option_count ?? 4) >= 4 && (
+                                    <span className={cn(
+                                      q.correct_option === 'D' && 'text-emerald-600 dark:text-emerald-400 font-medium'
+                                    )}>
+                                      ④<span dangerouslySetInnerHTML={{ __html: q.option_d || '—' }} />
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Sub-questions */}
+                                {q.subQuestions && q.subQuestions.length > 0 && (
+                                  <div className="mt-2 ml-2 space-y-1 border-l-2 border-border pl-3">
+                                    {q.subQuestions.map((sq, sqIdx) => (
+                                      <div key={sq.id} className="text-xs text-muted-foreground">
+                                        <span className="font-medium text-foreground">
+                                          Câu con {sqIdx + 1}:
+                                        </span>{' '}
+                                        <span dangerouslySetInnerHTML={{ 
+                                          __html: sq.content || '(audio)' 
+                                        }} />
+                                        <span className="ml-2 text-emerald-600 dark:text-emerald-400">
+                                          ✓{sq.correct_option}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex gap-1 shrink-0">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => onEditQuestion({
+                                    ...q,
+                                    subQuestions: q.subQuestions || [],
+                                  })}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CollapsibleContent>
             </div>
