@@ -480,7 +480,7 @@ export function ListeningExamView({ exam, examName, onRetry }: ListeningExamView
       )}
 
       {/* Floating submit button visible on all pages */}
-      {phase === 'exam' && currentMondaiPage < totalPages - 1 && answeredCount === totalQuestionCount && (
+      {phase === 'exam' && answeredCount === totalQuestionCount && (
         <div className="fixed bottom-6 right-6 z-50">
           <Button
             onClick={handleSubmit}
@@ -493,7 +493,7 @@ export function ListeningExamView({ exam, examName, onRetry }: ListeningExamView
             ) : (
               <Send className="h-4 w-4" />
             )}
-            Nộp bài ({answeredCount}/{totalQuestionCount})
+            Nộp bài
           </Button>
         </div>
       )}
