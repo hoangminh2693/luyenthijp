@@ -26,8 +26,9 @@ export function MediaUpload({ type, value, onChange, disabled }: MediaUploadProp
     if (!file) return;
 
     // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('File quá lớn. Tối đa 10MB.');
+    const maxSize = type === 'audio' ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error(`File quá lớn. Tối đa ${type === 'audio' ? '50MB' : '10MB'}.`);
       return;
     }
 
