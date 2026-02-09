@@ -165,10 +165,11 @@ export function useQuestionsBySection(sectionId: string | undefined) {
   });
 }
 
-// Hook lấy câu hỏi ngẫu nhiên từ section/category (SECURE - không có đáp án)
-export function useRandomQuestions(sectionId: string | undefined, count: number, sessionId?: string, categoryId?: string) {
+// Hook lấy câu hỏi từ section/category (SECURE - không có đáp án)
+// shuffle: true = xáo trộn ngẫu nhiên, false = giữ nguyên thứ tự (fixed_exam_mode)
+export function useRandomQuestions(sectionId: string | undefined, count: number, sessionId?: string, categoryId?: string, shuffle: boolean = true) {
   return useQuery({
-    queryKey: ['questions', 'random', sectionId, categoryId, count, sessionId],
+    queryKey: ['questions', 'random', sectionId, categoryId, count, sessionId, shuffle],
     queryFn: async () => {
       if (!sectionId && !categoryId) return [];
       
@@ -190,9 +191,14 @@ export function useRandomQuestions(sectionId: string | undefined, count: number,
       // Nhóm câu hỏi cha với câu con
       const grouped = groupQuestionsWithChildrenSafe(data as DbQuestionSafe[] || []);
       
-      // Shuffle và lấy số lượng câu cha cần thiết
-      const shuffled = [...grouped].sort(() => Math.random() - 0.5);
-      return shuffled.slice(0, Math.min(count, shuffled.length));
+      if (shuffle) {
+        // Shuffle và lấy số lượng câu cha cần thiết
+        const shuffled = [...grouped].sort(() => Math.random() - 0.5);
+        return shuffled.slice(0, Math.min(count, shuffled.length));
+      } else {
+        // Fixed exam mode: giữ nguyên thứ tự, lấy đúng số lượng
+        return grouped.slice(0, Math.min(count, grouped.length));
+      }
     },
     enabled: (!!sectionId || !!categoryId) && count > 0,
     staleTime: Infinity,

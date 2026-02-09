@@ -107,12 +107,16 @@ const QuizPage = () => {
   // Determine categoryId fallback for subjects without legacy sections (e.g., BJT)
   const categoryIdForQuiz = !sectionId ? leafCategory?.id : undefined;
   
+  // Determine if questions should be shuffled
+  const shouldShuffle = !leafCategory?.fixed_exam_mode;
+  
   // Fetch câu hỏi dựa theo mode
   const { data: randomQuestions = [], isLoading: loadingRandomQuestions } = useRandomQuestions(
     !isListeningMode ? sectionId : undefined, 
     questionCount,
     sessionId,
-    !isListeningMode ? categoryIdForQuiz : undefined
+    !isListeningMode ? categoryIdForQuiz : undefined,
+    shouldShuffle
   );
   const { data: listeningExam, isLoading: loadingListeningExam } = useRandomListeningExam(
     isListeningMode ? sectionId : undefined,
