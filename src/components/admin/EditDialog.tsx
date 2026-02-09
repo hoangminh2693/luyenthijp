@@ -1,5 +1,5 @@
 /**
- * EditDialog - Dialog chỉnh sửa môn học, cấp độ, phần
+ * EditDialog - Dialog chỉnh sửa môn học, danh mục
  */
 import {
   Dialog,
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useState, useEffect } from 'react';
+import { CategoryModeConfig, type CategoryModeSettings } from './CategoryModeConfig';
 
 interface EditDialogProps {
   open: boolean;
@@ -21,7 +22,10 @@ interface EditDialogProps {
   description: string;
   hasLevels?: boolean;
   showHasLevels?: boolean;
-  onSave: (name: string, description: string, hasLevels?: boolean) => Promise<void>;
+  /** Show category mode settings (allow_random, fixed_exam_mode, etc.) */
+  showModeConfig?: boolean;
+  modeSettings?: CategoryModeSettings;
+  onSave: (name: string, description: string, hasLevels?: boolean, modeSettings?: CategoryModeSettings) => Promise<void>;
   saving?: boolean;
 }
 
@@ -33,23 +37,31 @@ export const EditDialog = ({
   description: initialDescription,
   hasLevels: initialHasLevels,
   showHasLevels = false,
+  showModeConfig = false,
+  modeSettings: initialModeSettings,
   onSave,
   saving = false,
 }: EditDialogProps) => {
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription);
   const [hasLevels, setHasLevels] = useState(initialHasLevels ?? true);
+  const [modeSettings, setModeSettings] = useState<CategoryModeSettings>(
+    initialModeSettings ?? { allow_random: true, allow_count_selection: true, fixed_exam_mode: false }
+  );
 
   useEffect(() => {
     if (open) {
       setName(initialName);
       setDescription(initialDescription);
       setHasLevels(initialHasLevels ?? true);
+      setModeSettings(
+        initialModeSettings ?? { allow_random: true, allow_count_selection: true, fixed_exam_mode: false }
+      );
     }
-  }, [open, initialName, initialDescription, initialHasLevels]);
+  }, [open, initialName, initialDescription, initialHasLevels, initialModeSettings]);
 
   const handleSave = async () => {
-    await onSave(name, description, hasLevels);
+    await onSave(name, description, hasLevels, modeSettings);
   };
 
   return (
@@ -91,6 +103,13 @@ export const EditDialog = ({
                 Có phân chia cấp độ
               </label>
             </div>
+          )}
+          {showModeConfig && (
+            <CategoryModeConfig
+              settings={modeSettings}
+              onChange={setModeSettings}
+              disabled={saving}
+            />
           )}
         </div>
         <DialogFooter>

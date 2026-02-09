@@ -4,6 +4,7 @@
  */
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import type { CategoryModeSettings } from '@/components/admin/CategoryModeConfig';
 import {
   Plus,
   LogIn,
@@ -141,26 +142,31 @@ const ManageSubjectsPage = () => {
   };
 
   // Edit category
-  const handleEditCategory = async (name: string, description: string) => {
+  const handleEditCategory = async (name: string, description: string, _hasLevels?: boolean, modeSettings?: CategoryModeSettings) => {
     if (!editingCategory) return;
 
     setSavingEdit(true);
     try {
       const slug = createSlug(name);
+      const updateData: Record<string, any> = {
+        name: name.trim(),
+        slug,
+        description: description.trim() || null,
+      };
+      if (modeSettings) {
+        updateData.allow_random = modeSettings.allow_random;
+        updateData.allow_count_selection = modeSettings.allow_count_selection;
+        updateData.fixed_exam_mode = modeSettings.fixed_exam_mode;
+      }
       const { error } = await supabase
         .from('categories')
-        .update({
-          name: name.trim(),
-          slug,
-          description: description.trim() || null,
-        })
+        .update(updateData)
         .eq('id', editingCategory.id);
 
       if (error) throw error;
 
       setEditingCategory(null);
       toast.success('Đã cập nhật danh mục');
-      // Reload để cập nhật tree
       loadData();
     } catch (err: any) {
       console.error('Error updating category:', err);
@@ -421,6 +427,12 @@ const ManageSubjectsPage = () => {
         title="Sửa danh mục"
         name={editingCategory?.name || ''}
         description={editingCategory?.description || ''}
+        showModeConfig
+        modeSettings={editingCategory ? {
+          allow_random: editingCategory.allow_random,
+          allow_count_selection: editingCategory.allow_count_selection,
+          fixed_exam_mode: editingCategory.fixed_exam_mode,
+        } : undefined}
         onSave={handleEditCategory}
         saving={savingEdit}
       />

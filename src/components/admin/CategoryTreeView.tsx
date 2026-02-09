@@ -2,11 +2,12 @@
  * CategoryTreeView - Hiển thị cây categories theo layers
  */
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, FolderOpen, Layers } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Pencil, Trash2, FolderOpen, Layers, Shuffle, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { CategoryModeConfig, type CategoryModeSettings } from './CategoryModeConfig';
 import type { SubjectLayer, Category } from '@/hooks/useSubjectLayers';
 
 interface CategoryTreeViewProps {
@@ -36,6 +37,11 @@ export function CategoryTreeView({
   const [addingForLayer, setAddingForLayer] = useState<string | null>(null);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryIcon, setNewCategoryIcon] = useState('');
+  const [newModeSettings, setNewModeSettings] = useState<CategoryModeSettings>({
+    allow_random: true,
+    allow_count_selection: true,
+    fixed_exam_mode: false,
+  });
   const [saving, setSaving] = useState(false);
 
   // Load categories
@@ -112,6 +118,9 @@ export function CategoryTreeView({
           slug: createSlug(newCategoryName),
           icon: newCategoryIcon || null,
           order_index: orderIndex,
+          allow_random: newModeSettings.allow_random,
+          allow_count_selection: newModeSettings.allow_count_selection,
+          fixed_exam_mode: newModeSettings.fixed_exam_mode,
         })
         .select()
         .single();
@@ -121,6 +130,7 @@ export function CategoryTreeView({
       setCategories([...categories, data]);
       setNewCategoryName('');
       setNewCategoryIcon('');
+      setNewModeSettings({ allow_random: true, allow_count_selection: true, fixed_exam_mode: false });
       setAddingForParent(null);
       setAddingForLayer(null);
       toast.success('Đã thêm danh mục');
@@ -197,6 +207,20 @@ export function CategoryTreeView({
                       ({childCategories.length} {nextLayer?.name.toLowerCase()})
                     </span>
                   )}
+                  {/* Mode badges */}
+                  <span className="ml-2 inline-flex gap-1">
+                    {category.fixed_exam_mode ? (
+                      <span className="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                        <FileText className="h-2.5 w-2.5" />
+                        Đề cố định
+                      </span>
+                    ) : category.allow_random ? (
+                      <span className="inline-flex items-center gap-0.5 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                        <Shuffle className="h-2.5 w-2.5" />
+                        Random
+                      </span>
+                    ) : null}
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-1">
@@ -264,6 +288,11 @@ export function CategoryTreeView({
                 className="flex-1"
               />
             </div>
+            <CategoryModeConfig
+              settings={newModeSettings}
+              onChange={setNewModeSettings}
+              disabled={saving}
+            />
             <div className="flex gap-2">
               <Button
                 size="sm"
@@ -280,6 +309,7 @@ export function CategoryTreeView({
                   setAddingForParent(null);
                   setNewCategoryName('');
                   setNewCategoryIcon('');
+                  setNewModeSettings({ allow_random: true, allow_count_selection: true, fixed_exam_mode: false });
                 }}
               >
                 Hủy
