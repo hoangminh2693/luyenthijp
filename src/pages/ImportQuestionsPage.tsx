@@ -1,7 +1,9 @@
 /**
  * ImportQuestionsPage - Trang import câu hỏi từ file Excel/CSV hoặc nhập trực tiếp bằng bảng
- * Hỗ trợ tạo môn học, cấp độ, phần mới và import câu hỏi
- * Hỗ trợ import đề thi 聴解 (Listening) với cấu trúc Mondai
+ * Hỗ trợ:
+ * - Môn có levels/sections (legacy: JLPT)
+ * - Môn có layers/categories (dynamic: BJT, etc.)
+ * - Import đề thi 聴解 (Listening) với cấu trúc Mondai
  */
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download, LogIn, Shield, Table2, FileText, Headphones } from 'lucide-react';
@@ -61,11 +63,34 @@ interface Section {
   description: string | null;
 }
 
+interface SubjectLayer {
+  id: string;
+  subject_id: string;
+  name: string;
+  slug: string;
+  order_index: number;
+  required: boolean;
+}
+
+interface Category {
+  id: string;
+  subject_id: string;
+  layer_id: string;
+  parent_id: string | null;
+  name: string;
+  slug: string;
+  icon: string | null;
+  description: string | null;
+  order_index: number | null;
+  allow_random: boolean;
+  allow_count_selection: boolean;
+  fixed_exam_mode: boolean;
+}
+
 function isValidTableQuestion(q: TableQuestion): boolean {
   const optionCount = q.option_count ?? 4;
   const questionType = q.question_type ?? 'standard';
   
-  // For audio_only questions with sub-questions, only need audio
   if (questionType === 'audio_only' && q.subQuestions && q.subQuestions.length > 0) {
     return q.subQuestions.some(sq => {
       const sqType = sq.question_type ?? 'standard';
@@ -77,15 +102,12 @@ function isValidTableQuestion(q: TableQuestion): boolean {
     });
   }
   
-  // For audio_only without sub-questions
   if (questionType === 'audio_only') {
     return !!q.correct_option;
   }
   
-  // For standard/image_based, content is required
   if (!q.content) return false;
 
-  // Check direct answer based on option_count
   const hasRequiredOptions = 
     !!q.option_a && !!q.option_b && 
     (optionCount < 3 || !!q.option_c) && 
@@ -124,38 +146,59 @@ const ImportQuestionsPage = () => {
     [tableQuestions]
   );
 
-  // Data from database
+  // Legacy data
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [levels, setLevels] = useState<Level[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
+  
+  // Dynamic layer data
+  const [subjectLayers, setSubjectLayers] = useState<SubjectLayer[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  
   const [loadingData, setLoadingData] = useState(true);
 
   // Selected values
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [selectedLevelId, setSelectedLevelId] = useState<string>('');
   const [selectedSectionId, setSelectedSectionId] = useState<string>('');
+  
+  // Dynamic layer selections: layerIndex → categoryId
+  const [selectedCategories, setSelectedCategories] = useState<Record<number, string>>({});
 
   // Get selected subject
   const selectedSubject = subjects.find(s => s.id === selectedSubjectId);
+  
+  // Determine if subject uses layers (dynamic) vs levels (legacy)
+  const subjectLayersList = useMemo(
+    () => subjectLayers.filter(l => l.subject_id === selectedSubjectId).sort((a, b) => a.order_index - b.order_index),
+    [subjectLayers, selectedSubjectId]
+  );
+  const usesLayers = subjectLayersList.length > 0;
   const subjectHasLevels = selectedSubject?.has_levels ?? true;
 
   // Tải dữ liệu từ database
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [subjectsRes, levelsRes, sectionsRes] = await Promise.all([
+        const [subjectsRes, levelsRes, sectionsRes, layersRes, categoriesRes] = await Promise.all([
           supabase.from('subjects').select('*').order('name'),
           supabase.from('levels').select('*').order('order_index'),
           supabase.from('sections').select('*').order('order_index'),
+          supabase.from('subject_layers').select('*').order('order_index'),
+          supabase.from('categories').select('*').order('order_index'),
         ]);
 
         if (subjectsRes.error) throw subjectsRes.error;
         if (levelsRes.error) throw levelsRes.error;
         if (sectionsRes.error) throw sectionsRes.error;
+        if (layersRes.error) throw layersRes.error;
+        if (categoriesRes.error) throw categoriesRes.error;
 
         setSubjects(subjectsRes.data || []);
         setLevels(levelsRes.data || []);
         setSections(sectionsRes.data || []);
+        setSubjectLayers(layersRes.data || []);
+        setCategories(categoriesRes.data || []);
       } catch (err) {
         console.error('Error loading data:', err);
         toast.error('Lỗi khi tải dữ liệu');
@@ -167,26 +210,36 @@ const ImportQuestionsPage = () => {
     loadData();
   }, []);
 
-  // Reset selections when parent changes
+  // Reset selections when subject changes
   useEffect(() => {
     setSelectedLevelId('');
     setSelectedSectionId('');
+    setSelectedCategories({});
   }, [selectedSubjectId]);
 
   useEffect(() => {
     setSelectedSectionId('');
   }, [selectedLevelId]);
 
-  // Reset form data when section changes
+  // Reset form data when target changes (section or leaf category)
+  const importTarget = useMemo(() => {
+    if (usesLayers) {
+      // Find the deepest selected category
+      const maxIdx = Math.max(...Object.keys(selectedCategories).map(Number), -1);
+      return maxIdx >= 0 ? selectedCategories[maxIdx] : '';
+    }
+    return selectedSectionId;
+  }, [usesLayers, selectedCategories, selectedSectionId]);
+
   useEffect(() => {
     setTableQuestions([]);
     setParsedQuestions([]);
     setFile(null);
     setImportResult(null);
     setListeningData({ audioUrl: '', mondais: [] });
-  }, [selectedSectionId]);
+  }, [importTarget]);
 
-  // Filter levels and sections based on selection
+  // Filter levels and sections based on selection (legacy)
   const filteredLevels = levels.filter(l => l.subject_id === selectedSubjectId);
   const filteredSections = subjectHasLevels
     ? sections.filter(s => s.level_id === selectedLevelId)
@@ -194,6 +247,46 @@ const ImportQuestionsPage = () => {
         const level = levels.find(l => l.id === s.level_id);
         return level?.subject_id === selectedSubjectId;
       });
+
+  // Get categories for a specific layer with optional parent filter
+  const getCategoriesForLayer = useCallback((layerIdx: number): Category[] => {
+    const layer = subjectLayersList[layerIdx];
+    if (!layer) return [];
+    
+    const parentCatId = layerIdx > 0 ? selectedCategories[layerIdx - 1] : undefined;
+    
+    return categories.filter(c => {
+      if (c.layer_id !== layer.id) return false;
+      if (layerIdx === 0) return c.parent_id === null;
+      return c.parent_id === (parentCatId || null);
+    });
+  }, [subjectLayersList, categories, selectedCategories]);
+
+  // Check if we have a valid leaf category selected (for layer-based subjects)
+  const selectedLeafCategory = useMemo(() => {
+    if (!usesLayers) return null;
+    // Find the deepest selected category
+    const maxIdx = Math.max(...Object.keys(selectedCategories).map(Number), -1);
+    if (maxIdx < 0) return null;
+    const catId = selectedCategories[maxIdx];
+    return categories.find(c => c.id === catId) || null;
+  }, [usesLayers, selectedCategories, categories]);
+
+  // Determine if import is ready
+  const isReadyToImport = usesLayers ? !!selectedLeafCategory : !!selectedSectionId;
+
+  // Handle category selection change
+  const handleCategoryChange = useCallback((layerIdx: number, categoryId: string) => {
+    setSelectedCategories(prev => {
+      const next: Record<number, string> = {};
+      // Keep selections up to this layer
+      for (let i = 0; i < layerIdx; i++) {
+        if (prev[i]) next[i] = prev[i];
+      }
+      if (categoryId) next[layerIdx] = categoryId;
+      return next;
+    });
+  }, []);
 
   // Parse CSV file
   const parseCSV = useCallback((text: string): ParsedQuestion[] => {
@@ -224,7 +317,6 @@ const ImportQuestionsPage = () => {
       if (values.length >= 6) {
         let correctOption = values[5]?.trim().toUpperCase();
         
-        // Support both formats: "A/B/C/D" or "option_a/option_b/option_c/option_d"
         if (correctOption.startsWith('OPTION_')) {
           correctOption = correctOption.replace('OPTION_', '');
         }
@@ -270,9 +362,8 @@ const ImportQuestionsPage = () => {
     }
   }, [parseCSV]);
 
-  // Import questions to database with duplicate check
+  // Import questions to database
   const handleImport = useCallback(async () => {
-    // Determine questions based on mode
     let questionsToImport: any[];
     let listeningQuestions: ReturnType<typeof flattenListeningExam> = [];
     
@@ -285,8 +376,8 @@ const ImportQuestionsPage = () => {
       questionsToImport = parsedQuestions;
     }
 
-    if (!selectedSectionId || questionsToImport.length === 0) {
-      toast.error('Vui lòng chọn phần và nhập câu hỏi');
+    if (!isReadyToImport || questionsToImport.length === 0) {
+      toast.error('Vui lòng chọn đầy đủ phân loại và nhập câu hỏi');
       return;
     }
 
@@ -302,13 +393,20 @@ const ImportQuestionsPage = () => {
           .toLowerCase();
       };
 
-      // Skip duplicate check for listening mode (each import is a complete new exam)
+      // Determine target: section_id (legacy) or category_id (dynamic)
+      const targetSectionId = usesLayers ? null : selectedSectionId;
+      const targetCategoryId = usesLayers ? selectedLeafCategory?.id : null;
+
+      // Skip duplicate check for listening mode
       let existingContents = new Set<string>();
       if (importMode !== 'listening') {
-        const { data: existingQuestions, error: fetchError } = await supabase
-          .from('questions')
-          .select('content')
-          .eq('section_id', selectedSectionId);
+        let fetchQuery = supabase.from('questions').select('content');
+        if (targetSectionId) {
+          fetchQuery = fetchQuery.eq('section_id', targetSectionId);
+        } else if (targetCategoryId) {
+          fetchQuery = fetchQuery.eq('category_id', targetCategoryId);
+        }
+        const { data: existingQuestions, error: fetchError } = await fetchQuery;
 
         if (fetchError) {
           console.error('Error fetching existing questions:', fetchError);
@@ -338,7 +436,6 @@ const ImportQuestionsPage = () => {
 
         // Build insert object
         const insertData: Record<string, any> = {
-          section_id: selectedSectionId,
           content: sanitizeRichText(q.content || ''),
           option_a: sanitizeRichText(q.option_a || ''),
           option_b: sanitizeRichText(q.option_b || ''),
@@ -351,6 +448,14 @@ const ImportQuestionsPage = () => {
           question_type: q.question_type || 'standard',
           option_count: q.option_count || 4,
         };
+
+        // Set target: legacy section_id or dynamic category_id
+        if (targetSectionId) {
+          insertData.section_id = targetSectionId;
+        }
+        if (targetCategoryId) {
+          insertData.category_id = targetCategoryId;
+        }
 
         // Add mondai fields for listening mode
         if (importMode === 'listening' && q.mondai_index != null) {
@@ -369,7 +474,6 @@ const ImportQuestionsPage = () => {
         if (!error && parentQuestion && subQuestions && subQuestions.length > 0) {
           for (const sq of subQuestions) {
             const subInsert: Record<string, any> = {
-              section_id: selectedSectionId,
               parent_id: parentQuestion.id,
               content: sanitizeRichText(sq.content || ''),
               option_a: sanitizeRichText(sq.option_a || ''),
@@ -381,6 +485,8 @@ const ImportQuestionsPage = () => {
               question_type: sq.question_type || 'standard',
               option_count: sq.option_count || 4,
             };
+            if (targetSectionId) subInsert.section_id = targetSectionId;
+            if (targetCategoryId) subInsert.category_id = targetCategoryId;
             if (importMode === 'listening' && q.mondai_index != null) {
               subInsert.mondai_index = q.mondai_index;
               subInsert.mondai_title = q.mondai_title || null;
@@ -424,7 +530,7 @@ const ImportQuestionsPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedSectionId, parsedQuestions, tableQuestions, importMode, listeningData]);
+  }, [selectedSectionId, parsedQuestions, tableQuestions, importMode, listeningData, usesLayers, selectedLeafCategory, isReadyToImport]);
 
   // Download sample template
   const downloadTemplate = useCallback(() => {
@@ -494,6 +600,9 @@ const ImportQuestionsPage = () => {
     );
   }
 
+  // Count current step number
+  let stepNumber = 1;
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container py-8">
@@ -517,9 +626,9 @@ const ImportQuestionsPage = () => {
             </p>
           </div>
 
-          {/* Select subject */}
+          {/* Step 1: Select subject */}
           <div className="mb-6 rounded-xl border border-border bg-card p-6">
-            <h2 className="mb-3 font-semibold text-foreground">1. Chọn môn học</h2>
+            <h2 className="mb-3 font-semibold text-foreground">{stepNumber++}. Chọn môn học</h2>
             <div className="mb-4">
               <select
                 value={selectedSubjectId}
@@ -530,7 +639,7 @@ const ImportQuestionsPage = () => {
                 <option value="">-- Chọn môn học --</option>
                 {subjects.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name} {!s.has_levels && '(không có cấp độ)'}
+                    {s.name}
                   </option>
                 ))}
               </select>
@@ -542,10 +651,50 @@ const ImportQuestionsPage = () => {
             )}
           </div>
 
-          {/* Select level (if subject has levels) */}
-          {selectedSubjectId && subjectHasLevels && (
+          {/* Dynamic Layer Selection (for layer-based subjects like BJT) */}
+          {selectedSubjectId && usesLayers && (
+            <>
+              {subjectLayersList.map((layer, idx) => {
+                // Only show this layer if previous layers are selected (or it's the first)
+                if (idx > 0 && !selectedCategories[idx - 1]) return null;
+                
+                const layerCategories = getCategoriesForLayer(idx);
+                const currentStep = stepNumber++;
+                
+                return (
+                  <div key={layer.id} className="mb-6 rounded-xl border border-border bg-card p-6">
+                    <h2 className="mb-3 font-semibold text-foreground">
+                      {currentStep}. Chọn {layer.name}
+                    </h2>
+                    <div className="mb-4">
+                      <select
+                        value={selectedCategories[idx] || ''}
+                        onChange={(e) => handleCategoryChange(idx, e.target.value)}
+                        className="w-full rounded-lg border border-border bg-background px-4 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="">-- Chọn {layer.name} --</option>
+                        {layerCategories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {layerCategories.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        Chưa có {layer.name}. <Link to="/manage-subjects" className="text-primary hover:underline">Thêm {layer.name}</Link> trước.
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </>
+          )}
+
+          {/* Legacy Level Selection (for level-based subjects like JLPT) */}
+          {selectedSubjectId && !usesLayers && subjectHasLevels && (
             <div className="mb-6 rounded-xl border border-border bg-card p-6">
-              <h2 className="mb-3 font-semibold text-foreground">2. Chọn cấp độ</h2>
+              <h2 className="mb-3 font-semibold text-foreground">{stepNumber++}. Chọn cấp độ</h2>
               <div className="mb-4">
                 <select
                   value={selectedLevelId}
@@ -568,11 +717,11 @@ const ImportQuestionsPage = () => {
             </div>
           )}
 
-          {/* Select section */}
-          {((selectedSubjectId && !subjectHasLevels) || selectedLevelId) && (
+          {/* Legacy Section Selection */}
+          {selectedSubjectId && !usesLayers && ((subjectHasLevels && selectedLevelId) || !subjectHasLevels) && (
             <div className="mb-6 rounded-xl border border-border bg-card p-6">
               <h2 className="mb-3 font-semibold text-foreground">
-                {subjectHasLevels ? '3.' : '2.'} Chọn phần
+                {stepNumber++}. Chọn phần
               </h2>
               <div className="mb-4">
                 <select
@@ -597,10 +746,10 @@ const ImportQuestionsPage = () => {
           )}
 
           {/* Input questions - Tabs for table/file */}
-          {selectedSectionId && (
+          {isReadyToImport && (
             <div className="mb-6 rounded-xl border border-border bg-card p-6">
               <h2 className="mb-3 font-semibold text-foreground">
-                {subjectHasLevels ? '4.' : '3.'} Nhập câu hỏi
+                {stepNumber++}. Nhập câu hỏi
               </h2>
               
               <Tabs value={importMode} onValueChange={(v) => setImportMode(v as 'table' | 'file' | 'listening')} className="w-full">
@@ -690,7 +839,7 @@ const ImportQuestionsPage = () => {
           )}
 
           {/* Import button */}
-          {selectedSectionId && (
+          {isReadyToImport && (
             <Button
               onClick={handleImport}
               disabled={
