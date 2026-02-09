@@ -35,50 +35,14 @@ interface QuestionCardProps {
 }
 
 function AudioPlayer({ src }: { src: string }) {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-
-  const togglePlay = () => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
   return (
     <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-3">
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        onClick={togglePlay}
-        className="h-10 w-10 shrink-0"
-      >
-        {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-      </Button>
+      <Volume2 className="h-4 w-4 shrink-0 text-muted-foreground" />
       <audio
-        ref={audioRef}
         src={src}
-        onEnded={() => setIsPlaying(false)}
-        className="hidden"
+        controls
+        className="w-full h-8"
       />
-      <div className="flex-1">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Volume2 className="h-4 w-4" />
-          <span>Nghe audio</span>
-        </div>
-        <audio
-          src={src}
-          controls
-          className="mt-1 w-full h-8"
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
-        />
-      </div>
     </div>
   );
 }
