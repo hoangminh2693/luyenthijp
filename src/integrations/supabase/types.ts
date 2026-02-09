@@ -242,7 +242,7 @@ export type Database = {
           question_type:
             | Database["public"]["Enums"]["listening_question_type"]
             | null
-          section_id: string
+          section_id: string | null
         }
         Insert: {
           audio_url?: string | null
@@ -264,7 +264,7 @@ export type Database = {
           question_type?:
             | Database["public"]["Enums"]["listening_question_type"]
             | null
-          section_id: string
+          section_id?: string | null
         }
         Update: {
           audio_url?: string | null
@@ -286,7 +286,7 @@ export type Database = {
           question_type?:
             | Database["public"]["Enums"]["listening_question_type"]
             | null
-          section_id?: string
+          section_id?: string | null
         }
         Relationships: [
           {
