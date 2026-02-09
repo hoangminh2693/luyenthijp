@@ -34,7 +34,49 @@ interface QuestionCardProps {
   onSelectSubAnswer?: (subQuestionId: string, answer: string) => void;
 }
 
-function AudioPlayer({ src }: { src: string }) {
+function AudioPlayer({ src, locked = false }: { src: string; locked?: boolean }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  const togglePlay = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  // Locked mode: chỉ play/pause, không cho tua
+  if (locked) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-3">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={togglePlay}
+          className="h-10 w-10 shrink-0"
+        >
+          {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+        </Button>
+        <audio
+          ref={audioRef}
+          src={src}
+          onEnded={() => setIsPlaying(false)}
+          className="hidden"
+        />
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Volume2 className="h-4 w-4" />
+          <span>Nghe audio</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Unlocked mode: full controls
   return (
     <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-3">
       <Volume2 className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -320,7 +362,7 @@ export function QuestionCard({
 
         {question.audio_url && (
           <div className="mb-4">
-            <AudioPlayer src={question.audio_url} />
+            <AudioPlayer src={question.audio_url} locked={!showResult} />
           </div>
         )}
 
