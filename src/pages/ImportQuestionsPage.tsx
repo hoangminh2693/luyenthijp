@@ -6,7 +6,7 @@
  * - Import đề thi 聴解 (Listening) với cấu trúc Mondai
  */
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download, LogIn, Shield, Table2, FileText, Headphones } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download, LogIn, Shield, Table2, FileText, Headphones, CopyCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/layout/Header';
@@ -22,6 +22,7 @@ import {
 } from '@/components/admin/ListeningImport';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { sanitizeRichText } from '@/lib/richText';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface ParsedQuestion {
   content: string;
@@ -136,6 +137,7 @@ const ImportQuestionsPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importMode, setImportMode] = useState<'table' | 'file' | 'listening'>('table');
+  const [allowDuplicates, setAllowDuplicates] = useState(false);
 
   // Listening import data
   const [listeningData, setListeningData] = useState<ListeningExamData>({ audioUrl: '', mondais: [] });
@@ -397,9 +399,9 @@ const ImportQuestionsPage = () => {
       const targetSectionId = usesLayers ? null : selectedSectionId;
       const targetCategoryId = usesLayers ? selectedLeafCategory?.id : null;
 
-      // Skip duplicate check for listening mode
+      // Skip duplicate check if allowDuplicates is enabled
       let existingContents = new Set<string>();
-      if (importMode !== 'listening') {
+      if (!allowDuplicates) {
         let fetchQuery = supabase.from('questions').select('content');
         if (targetSectionId) {
           fetchQuery = fetchQuery.eq('section_id', targetSectionId);
@@ -424,7 +426,7 @@ const ImportQuestionsPage = () => {
         const q = questionsToImport[i];
         const normalizedContent = normalizeContent(q.content);
 
-        if (importMode !== 'listening' && normalizedContent && existingContents.has(normalizedContent)) {
+        if (!allowDuplicates && normalizedContent && existingContents.has(normalizedContent)) {
           result.duplicates++;
           continue;
         }
@@ -530,7 +532,7 @@ const ImportQuestionsPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedSectionId, parsedQuestions, tableQuestions, importMode, listeningData, usesLayers, selectedLeafCategory, isReadyToImport]);
+  }, [selectedSectionId, parsedQuestions, tableQuestions, importMode, listeningData, usesLayers, selectedLeafCategory, isReadyToImport, allowDuplicates]);
 
   // Download sample template
   const downloadTemplate = useCallback(() => {
@@ -842,8 +844,25 @@ const ImportQuestionsPage = () => {
             </div>
           )}
 
-          {/* Import button */}
+          {/* Duplicate control + Import button */}
           {isReadyToImport && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+                <Checkbox
+                  id="allow-duplicates"
+                  checked={allowDuplicates}
+                  onCheckedChange={(checked) => setAllowDuplicates(!!checked)}
+                />
+                <label htmlFor="allow-duplicates" className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                  <CopyCheck className="h-4 w-4 text-muted-foreground" />
+                  Cho phép import câu hỏi trùng lặp
+                </label>
+                {allowDuplicates && (
+                  <span className="ml-auto text-xs text-warning">
+                    ⚠ Sẽ không kiểm tra trùng lặp
+                  </span>
+                )}
+              </div>
             <Button
               onClick={handleImport}
               disabled={
@@ -868,6 +887,7 @@ const ImportQuestionsPage = () => {
                       : parsedQuestions.length
                   } câu hỏi`}
             </Button>
+            </div>
           )}
 
           {/* Import result */}
