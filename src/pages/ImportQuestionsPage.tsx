@@ -659,6 +659,10 @@ const ImportQuestionsPage = () => {
                 if (idx > 0 && !selectedCategories[idx - 1]) return null;
                 
                 const layerCategories = getCategoriesForLayer(idx);
+                
+                // Skip layers that have no categories (e.g., "Chủ đề" when subject only has skills)
+                if (layerCategories.length === 0 && idx > 0) return null;
+                
                 const currentStep = stepNumber++;
                 
                 return (

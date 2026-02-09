@@ -165,18 +165,25 @@ export function useQuestionsBySection(sectionId: string | undefined) {
   });
 }
 
-// Hook lấy câu hỏi ngẫu nhiên từ section (SECURE - không có đáp án)
-export function useRandomQuestions(sectionId: string | undefined, count: number, sessionId?: string) {
+// Hook lấy câu hỏi ngẫu nhiên từ section/category (SECURE - không có đáp án)
+export function useRandomQuestions(sectionId: string | undefined, count: number, sessionId?: string, categoryId?: string) {
   return useQuery({
-    queryKey: ['questions', 'random', sectionId, count, sessionId],
+    queryKey: ['questions', 'random', sectionId, categoryId, count, sessionId],
     queryFn: async () => {
-      if (!sectionId) return [];
+      if (!sectionId && !categoryId) return [];
       
       // Use the SAFE view that excludes correct_option and explanation
-      const { data, error } = await supabase
+      let query = supabase
         .from('questions_safe')
-        .select('*')
-        .eq('section_id', sectionId);
+        .select('*');
+      
+      if (sectionId) {
+        query = query.eq('section_id', sectionId);
+      } else if (categoryId) {
+        query = query.eq('category_id', categoryId);
+      }
+      
+      const { data, error } = await query;
       
       if (error) throw error;
       
@@ -187,7 +194,7 @@ export function useRandomQuestions(sectionId: string | undefined, count: number,
       const shuffled = [...grouped].sort(() => Math.random() - 0.5);
       return shuffled.slice(0, Math.min(count, shuffled.length));
     },
-    enabled: !!sectionId && count > 0,
+    enabled: (!!sectionId || !!categoryId) && count > 0,
     staleTime: Infinity,
     gcTime: 1000 * 60 * 30,
     refetchOnWindowFocus: false,
@@ -224,17 +231,25 @@ export interface ListeningExam {
 }
 
 // Hook lấy danh sách các đề nghe (nhóm theo audio_url) cho phần 聴解
-export function useListeningExams(sectionId: string | undefined) {
+// Supports both section_id (legacy) and category_id (dynamic layer)
+export function useListeningExams(sectionId: string | undefined, categoryId?: string) {
   return useQuery({
-    queryKey: ['listening-exams', sectionId],
+    queryKey: ['listening-exams', sectionId, categoryId],
     queryFn: async () => {
-      if (!sectionId) return [];
+      if (!sectionId && !categoryId) return [];
       
-      // Get all questions from this section (parents have audio_url, children may not)
-      const { data: allData, error } = await supabase
+      // Get all questions from this section/category (parents have audio_url, children may not)
+      let query = supabase
         .from('questions_safe')
-        .select('*')
-        .eq('section_id', sectionId);
+        .select('*');
+      
+      if (sectionId) {
+        query = query.eq('section_id', sectionId);
+      } else if (categoryId) {
+        query = query.eq('category_id', categoryId);
+      }
+      
+      const { data: allData, error } = await query;
       
       if (error) throw error;
       
@@ -275,24 +290,37 @@ export function useListeningExams(sectionId: string | undefined) {
       
       return exams;
     },
-    enabled: !!sectionId,
+    enabled: !!sectionId || !!categoryId,
   });
 }
 
 // Hook lấy 1 đề nghe ngẫu nhiên cho phần 聴解
-export function useRandomListeningExam(sectionId: string | undefined, enabled: boolean = true, sessionId?: string) {
+// Supports both section_id (legacy) and category_id (dynamic layer)
+export function useRandomListeningExam(
+  sectionId: string | undefined, 
+  enabled: boolean = true, 
+  sessionId?: string,
+  categoryId?: string
+) {
   return useQuery({
-    queryKey: ['listening-exam', 'random', sectionId, sessionId],
+    queryKey: ['listening-exam', 'random', sectionId, categoryId, sessionId],
     queryFn: async () => {
-      if (!sectionId) return null;
+      if (!sectionId && !categoryId) return null;
       
       // Step 1: Get parent questions with audio_url, ordered by creation
-      const { data: parentData, error: parentError } = await supabase
+      let query = supabase
         .from('questions_safe')
         .select('*')
-        .eq('section_id', sectionId)
         .not('audio_url', 'is', null)
         .order('created_at', { ascending: true });
+      
+      if (sectionId) {
+        query = query.eq('section_id', sectionId);
+      } else if (categoryId) {
+        query = query.eq('category_id', categoryId);
+      }
+      
+      const { data: parentData, error: parentError } = await query;
       
       if (parentError) throw parentError;
       
@@ -347,7 +375,7 @@ export function useRandomListeningExam(sectionId: string | undefined, enabled: b
         questionCount,
       } as ListeningExam;
     },
-    enabled: !!sectionId && enabled,
+    enabled: (!!sectionId || !!categoryId) && enabled,
     staleTime: Infinity,
     gcTime: 1000 * 60 * 30,
     refetchOnWindowFocus: false,
