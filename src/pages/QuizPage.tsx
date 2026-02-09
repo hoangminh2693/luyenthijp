@@ -86,16 +86,17 @@ const QuizPage = () => {
       }
       
       // Bước 2: Tìm section với slug matching và level_id đã xác định
-      let query = supabase
+      // Nếu không tìm thấy level match, không nên fallback tìm section bất kỳ
+      // vì có thể trộn lẫn với section cùng slug của subject khác
+      if (!levelId) return null;
+      
+      const { data } = await supabase
         .from('sections')
         .select('id, level_id')
-        .eq('slug', leafCategory.slug);
-      
-      if (levelId) {
-        query = query.eq('level_id', levelId);
-      }
-      
-      const { data } = await query.limit(1).maybeSingle();
+        .eq('slug', leafCategory.slug)
+        .eq('level_id', levelId)
+        .limit(1)
+        .maybeSingle();
       return data;
     },
     enabled: !!leafCategory && !!subject,
