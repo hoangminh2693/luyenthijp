@@ -1,6 +1,8 @@
 /**
  * ManageQuestionsPage - Trang quản lý câu hỏi đã import
- * Cho phép xem, sửa, xóa câu hỏi
+ * Hỗ trợ:
+ * - Môn có levels/sections (legacy: JLPT)
+ * - Môn có layers/categories (dynamic: BJT, etc.)
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -66,6 +68,30 @@ interface Section {
   order_index?: number;
 }
 
+interface SubjectLayer {
+  id: string;
+  subject_id: string;
+  name: string;
+  slug: string;
+  order_index: number;
+  required: boolean;
+}
+
+interface CategoryRow {
+  id: string;
+  subject_id: string;
+  layer_id: string;
+  parent_id: string | null;
+  name: string;
+  slug: string;
+  icon: string | null;
+  description: string | null;
+  order_index: number | null;
+  allow_random: boolean;
+  allow_count_selection: boolean;
+  fixed_exam_mode: boolean;
+}
+
 // Loại câu hỏi nghe theo format JLPT
 type ListeningQuestionType = 'standard' | 'audio_only' | 'image_based';
 
@@ -78,7 +104,8 @@ interface QuestionRow {
   option_d: string | null;
   correct_option: string;
   explanation: string | null;
-  section_id: string;
+  section_id: string | null;
+  category_id: string | null;
   created_at: string;
   parent_id?: string | null;
   image_url?: string | null;
@@ -93,7 +120,8 @@ interface ParentQuestionRow extends QuestionRow {
 
 type EditQuestionForm = Partial<QuestionRow> & { 
   subQuestions?: SubQuestion[]; 
-  newSectionId?: string;
+  newTargetId?: string;
+  newTargetType?: 'section' | 'category';
   question_type?: ListeningQuestionType;
   option_count?: number;
 };
@@ -126,14 +154,39 @@ function getSortedSectionsWithLabels(
       };
     })
     .sort((a, b) => {
-      // Sort by subject name first
       const subjectCompare = a.subjectName.localeCompare(b.subjectName, 'vi');
       if (subjectCompare !== 0) return subjectCompare;
-      // Then by level order_index
       if (a.levelOrderIndex !== b.levelOrderIndex) return a.levelOrderIndex - b.levelOrderIndex;
-      // Then by section order_index
       return a.sectionOrderIndex - b.sectionOrderIndex;
     });
+}
+
+// Helper to get leaf categories with full path labels
+function getLeafCategoriesWithLabels(
+  allCategories: CategoryRow[],
+  subjects: Subject[],
+  excludeCategoryId?: string
+) {
+  // Leaf = categories that have no children
+  const leafCategories = allCategories.filter(cat => {
+    const hasChildren = allCategories.some(other => other.parent_id === cat.id);
+    return !hasChildren && (!excludeCategoryId || cat.id !== excludeCategoryId);
+  });
+
+  return leafCategories.map(cat => {
+    const path: string[] = [cat.name];
+    let current = cat;
+    while (current.parent_id) {
+      const parent = allCategories.find(c => c.id === current.parent_id);
+      if (parent) { path.unshift(parent.name); current = parent; }
+      else break;
+    }
+    const subject = subjects.find(s => s.id === cat.subject_id);
+    return {
+      ...cat,
+      label: subject ? `${subject.name} > ${path.join(' > ')}` : path.join(' > '),
+    };
+  }).sort((a, b) => a.label.localeCompare(b.label, 'vi'));
 }
 
 function groupQuestionsWithChildren(rows: QuestionRow[]): ParentQuestionRow[] {
@@ -151,7 +204,6 @@ function groupQuestionsWithChildren(rows: QuestionRow[]): ParentQuestionRow[] {
       childrenByParent.set(parentId, list);
     });
 
-  // sort children by created_at
   childrenByParent.forEach((list, key) => {
     childrenByParent.set(
       key,
@@ -170,12 +222,16 @@ const ManageQuestionsPage = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [levels, setLevels] = useState<Level[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
+  const [subjectLayers, setSubjectLayers] = useState<SubjectLayer[]>([]);
+  const [allCategories, setAllCategories] = useState<CategoryRow[]>([]);
   const [questions, setQuestions] = useState<QuestionRow[]>([]);
 
   // Filters
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [selectedLevelId, setSelectedLevelId] = useState<string>('');
   const [selectedSectionId, setSelectedSectionId] = useState<string>('');
+  // Dynamic layer selections: layerIndex → categoryId
+  const [selectedCategoryPerLayer, setSelectedCategoryPerLayer] = useState<Record<number, string>>({});
   const [searchQuery, setSearchQuery] = useState('');
 
   // Loading states
@@ -194,14 +250,58 @@ const ManageQuestionsPage = () => {
   // Bulk selection state
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<Set<string>>(new Set());
   const [bulkMoveDialogOpen, setBulkMoveDialogOpen] = useState(false);
-  const [bulkTargetSectionId, setBulkTargetSectionId] = useState<string>('');
+  const [bulkTargetId, setBulkTargetId] = useState<string>('');
   const [bulkMoving, setBulkMoving] = useState(false);
 
-  // Get selected subject
+  // === Computed values ===
+
   const selectedSubject = subjects.find((s) => s.id === selectedSubjectId);
   const subjectHasLevels = selectedSubject?.has_levels ?? true;
 
-  // Filter levels and sections
+  // Dynamic layers for current subject
+  const currentLayers = useMemo(
+    () => subjectLayers.filter(l => l.subject_id === selectedSubjectId).sort((a, b) => a.order_index - b.order_index),
+    [subjectLayers, selectedSubjectId]
+  );
+  const usesLayers = currentLayers.length > 0;
+
+  // Categories for each layer dropdown
+  const categoriesForLayer = useMemo(() => {
+    if (!usesLayers) return [];
+    return currentLayers.map((layer, idx) => {
+      const parentCatId = idx > 0 ? selectedCategoryPerLayer[idx - 1] : undefined;
+      if (idx > 0 && !parentCatId) return [];
+      return allCategories.filter(c => {
+        if (c.layer_id !== layer.id) return false;
+        if (idx === 0) return c.parent_id === null;
+        return c.parent_id === (parentCatId || null);
+      });
+    });
+  }, [currentLayers, allCategories, selectedCategoryPerLayer, usesLayers]);
+
+  // The effective leaf category for loading questions
+  const effectiveCategoryId = useMemo(() => {
+    if (!usesLayers) return '';
+    for (let i = currentLayers.length - 1; i >= 0; i--) {
+      const catId = selectedCategoryPerLayer[i];
+      if (catId) {
+        // Check if this category has children in next layer
+        if (i < currentLayers.length - 1) {
+          const nextLayer = currentLayers[i + 1];
+          const children = allCategories.filter(c => c.layer_id === nextLayer.id && c.parent_id === catId);
+          if (children.length > 0) return ''; // has children, need to select deeper
+        }
+        return catId;
+      }
+    }
+    return '';
+  }, [currentLayers, selectedCategoryPerLayer, allCategories, usesLayers]);
+
+  // Unified active filter
+  const activeFilterColumn = usesLayers ? 'category_id' : 'section_id';
+  const activeFilterValue = usesLayers ? effectiveCategoryId : selectedSectionId;
+
+  // Filter levels and sections (legacy)
   const filteredLevels = levels.filter((l) => l.subject_id === selectedSubjectId);
   const filteredSections = subjectHasLevels
     ? sections.filter((s) => s.level_id === selectedLevelId)
@@ -210,23 +310,30 @@ const ManageQuestionsPage = () => {
         return level?.subject_id === selectedSubjectId;
       });
 
-  // Load initial data
+  // === Data loading ===
+
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [subjectsRes, levelsRes, sectionsRes] = await Promise.all([
+        const [subjectsRes, levelsRes, sectionsRes, layersRes, categoriesRes] = await Promise.all([
           supabase.from('subjects').select('*').order('name'),
           supabase.from('levels').select('*').order('order_index'),
           supabase.from('sections').select('*').order('order_index'),
+          supabase.from('subject_layers').select('*').order('order_index'),
+          supabase.from('categories').select('*').order('order_index'),
         ]);
 
         if (subjectsRes.error) throw subjectsRes.error;
         if (levelsRes.error) throw levelsRes.error;
         if (sectionsRes.error) throw sectionsRes.error;
+        if (layersRes.error) throw layersRes.error;
+        if (categoriesRes.error) throw categoriesRes.error;
 
         setSubjects(subjectsRes.data || []);
         setLevels(levelsRes.data || []);
         setSections(sectionsRes.data || []);
+        setSubjectLayers(layersRes.data || []);
+        setAllCategories((categoriesRes.data || []) as CategoryRow[]);
       } catch (err) {
         console.error('Error loading data:', err);
         toast.error('Lỗi khi tải dữ liệu');
@@ -242,6 +349,7 @@ const ManageQuestionsPage = () => {
   useEffect(() => {
     setSelectedLevelId('');
     setSelectedSectionId('');
+    setSelectedCategoryPerLayer({});
     setQuestions([]);
     setSelectedQuestionIds(new Set());
   }, [selectedSubjectId]);
@@ -252,9 +360,23 @@ const ManageQuestionsPage = () => {
     setSelectedQuestionIds(new Set());
   }, [selectedLevelId]);
 
-  // Load questions when section changes
+  // Handle category selection change (clear deeper selections)
+  const handleCategoryChange = useCallback((layerIdx: number, categoryId: string) => {
+    setSelectedCategoryPerLayer(prev => {
+      const next: Record<number, string> = {};
+      for (let i = 0; i < layerIdx; i++) {
+        if (prev[i]) next[i] = prev[i];
+      }
+      if (categoryId) next[layerIdx] = categoryId;
+      return next;
+    });
+    setQuestions([]);
+    setSelectedQuestionIds(new Set());
+  }, []);
+
+  // Load questions when active filter changes
   useEffect(() => {
-    if (!selectedSectionId) {
+    if (!activeFilterValue) {
       setQuestions([]);
       setSelectedQuestionIds(new Set());
       return;
@@ -264,14 +386,16 @@ const ManageQuestionsPage = () => {
       setLoadingQuestions(true);
       setSelectedQuestionIds(new Set());
       try {
-        const { data, error } = await supabase
-          .from('questions')
-          .select('*')
-          .eq('section_id', selectedSectionId)
-          .order('created_at', { ascending: true });
+        let query = supabase.from('questions').select('*');
+        if (activeFilterColumn === 'category_id') {
+          query = query.eq('category_id', activeFilterValue);
+        } else {
+          query = query.eq('section_id', activeFilterValue);
+        }
+        const { data, error } = await query.order('created_at', { ascending: true });
 
         if (error) throw error;
-        setQuestions(data || []);
+        setQuestions((data as unknown as QuestionRow[]) || []);
       } catch (err) {
         console.error('Error loading questions:', err);
         toast.error('Lỗi khi tải câu hỏi');
@@ -281,30 +405,32 @@ const ManageQuestionsPage = () => {
     };
 
     loadQuestions();
-  }, [selectedSectionId]);
+  }, [activeFilterColumn, activeFilterValue]);
 
   const groupedQuestions = useMemo(() => groupQuestionsWithChildren(questions), [questions]);
 
-  // Detect if this section is a listening section (has questions with audio_url)
+  // Detect if this section/category is a listening section
   const isListeningSection = useMemo(() => {
     return questions.some(q => q.audio_url && !q.parent_id);
   }, [questions]);
 
   const reloadQuestions = useCallback(async () => {
-    if (!selectedSectionId) return;
-    const { data, error } = await supabase
-      .from('questions')
-      .select('*')
-      .eq('section_id', selectedSectionId)
-      .order('created_at', { ascending: true });
+    if (!activeFilterValue) return;
+    let query = supabase.from('questions').select('*');
+    if (activeFilterColumn === 'category_id') {
+      query = query.eq('category_id', activeFilterValue);
+    } else {
+      query = query.eq('section_id', activeFilterValue);
+    }
+    const { data, error } = await query.order('created_at', { ascending: true });
     if (!error) {
       setQuestions((data as unknown as QuestionRow[]) || []);
     }
     queryClient.invalidateQueries({ queryKey: ['questions'] });
     queryClient.invalidateQueries({ queryKey: ['listening-exams'] });
-  }, [selectedSectionId, queryClient]);
+  }, [activeFilterColumn, activeFilterValue, queryClient]);
 
-  // Filter questions by search (tìm trong câu cha + câu con)
+  // Filter questions by search
   const filteredQuestions = useMemo(() => {
     if (!searchQuery.trim()) return groupedQuestions;
     const query = searchQuery.toLowerCase();
@@ -341,46 +467,48 @@ const ManageQuestionsPage = () => {
 
   const isAllSelected = filteredQuestions.length > 0 && selectedQuestionIds.size === filteredQuestions.length;
 
+  // Build relocation targets (same type as current filter)
+  const relocationTargets = useMemo(() => {
+    if (usesLayers) {
+      return getLeafCategoriesWithLabels(allCategories, subjects, activeFilterValue || undefined)
+        .map(c => ({ id: c.id, label: c.label, type: 'category' as const }));
+    }
+    return getSortedSectionsWithLabels(sections, levels, subjects, activeFilterValue || undefined)
+      .map(s => ({ id: s.id, label: s.label, type: 'section' as const }));
+  }, [usesLayers, allCategories, sections, levels, subjects, activeFilterValue]);
+
   // Bulk move handler
   const handleBulkMove = useCallback(async () => {
-    if (selectedQuestionIds.size === 0 || !bulkTargetSectionId) return;
+    if (selectedQuestionIds.size === 0 || !bulkTargetId) return;
 
     setBulkMoving(true);
     try {
       const questionIds = Array.from(selectedQuestionIds);
-      
+      const target = relocationTargets.find(t => t.id === bulkTargetId);
+      if (!target) throw new Error('Target not found');
+
+      const updateCol = target.type === 'category' ? 'category_id' : 'section_id';
+
       // Update parent questions
       const { error: parentErr } = await supabase
         .from('questions')
-        .update({ section_id: bulkTargetSectionId })
+        .update({ [updateCol]: bulkTargetId } as any)
         .in('id', questionIds);
-
       if (parentErr) throw parentErr;
 
       // Update all sub-questions of these parents
       const { error: childErr } = await supabase
         .from('questions')
-        .update({ section_id: bulkTargetSectionId })
+        .update({ [updateCol]: bulkTargetId } as any)
         .in('parent_id', questionIds);
-
       if (childErr) throw childErr;
 
       // Refresh list
-      const { data: refreshed, error: refreshErr } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('section_id', selectedSectionId)
-        .order('created_at', { ascending: true });
-
-      if (refreshErr) throw refreshErr;
-      setQuestions((refreshed as unknown as QuestionRow[]) || []);
-
-      // Invalidate questions cache
-      queryClient.invalidateQueries({ queryKey: ['questions'] });
+      await reloadQuestions();
 
       toast.success(`Đã chuyển ${questionIds.length} câu hỏi`);
       setBulkMoveDialogOpen(false);
-      setBulkTargetSectionId('');
+      setBulkTargetId('');
       setSelectedQuestionIds(new Set());
     } catch (err) {
       console.error('Error bulk moving questions:', err);
@@ -388,12 +516,13 @@ const ManageQuestionsPage = () => {
     } finally {
       setBulkMoving(false);
     }
-  }, [selectedQuestionIds, bulkTargetSectionId, selectedSectionId, queryClient]);
+  }, [selectedQuestionIds, bulkTargetId, relocationTargets, reloadQuestions]);
 
-  // Open edit dialog (câu cha, kèm câu con)
+  // Open edit dialog
   const openEditDialog = useCallback(async (question: ParentQuestionRow) => {
-    // set trước để mở dialog nhanh
     setEditingQuestion(question);
+    const currentTargetId = usesLayers ? (question.category_id || '') : (question.section_id || '');
+    const currentTargetType = usesLayers ? 'category' : 'section';
     setEditForm({
       content: question.content,
       option_a: question.option_a,
@@ -404,7 +533,8 @@ const ManageQuestionsPage = () => {
       explanation: question.explanation || '',
       image_url: question.image_url || undefined,
       audio_url: question.audio_url || undefined,
-      newSectionId: question.section_id,
+      newTargetId: currentTargetId,
+      newTargetType: currentTargetType,
       question_type: question.question_type || 'standard',
       option_count: question.option_count || 4,
       subQuestions: (question.subQuestions ?? []).map((sq) => ({
@@ -421,7 +551,7 @@ const ManageQuestionsPage = () => {
       })),
     });
 
-    // Sau đó load lại câu hỏi con theo parent_id để đảm bảo đầy đủ (kể cả dữ liệu cũ bị lệch section)
+    // Reload sub-questions from DB to ensure completeness
     try {
       const { data: children, error } = await supabase
         .from('questions')
@@ -450,16 +580,14 @@ const ManageQuestionsPage = () => {
       }));
     } catch (err) {
       console.error('Error loading sub questions:', err);
-      // vẫn cho sửa câu cha, nhưng báo lỗi để biết vì sao chưa thấy câu con
       toast.error('Không tải được câu hỏi con. Vui lòng thử lại.');
     }
-  }, []);
+  }, [usesLayers]);
 
   // Helper: delete file from storage bucket by URL
   const deleteStorageFile = useCallback(async (publicUrl: string | null | undefined) => {
     if (!publicUrl) return;
     try {
-      // Extract path from public URL (after /object/public/question-media/)
       const match = publicUrl.match(/\/object\/public\/question-media\/(.+)$/);
       if (match && match[1]) {
         const filePath = decodeURIComponent(match[1]);
@@ -470,7 +598,7 @@ const ManageQuestionsPage = () => {
     }
   }, []);
 
-  // Save edited question (câu cha + câu hỏi con nếu có)
+  // Save edited question
   const handleSave = useCallback(async () => {
     if (!editingQuestion) return;
 
@@ -480,25 +608,20 @@ const ManageQuestionsPage = () => {
         ? sanitizeRichText(editForm.explanation || '')
         : null;
 
-      // Handle media deletion when user removes from form
+      // Handle media deletion
       const oldImageUrl = editingQuestion.image_url;
       const newImageUrl = editForm.image_url ?? null;
       const oldAudioUrl = editingQuestion.audio_url;
       const newAudioUrl = editForm.audio_url ?? null;
 
-      // Delete old image from storage if removed
-      if (oldImageUrl && oldImageUrl !== newImageUrl) {
-        await deleteStorageFile(oldImageUrl);
-      }
-      // Delete old audio from storage if removed
-      if (oldAudioUrl && oldAudioUrl !== newAudioUrl) {
-        await deleteStorageFile(oldAudioUrl);
-      }
+      if (oldImageUrl && oldImageUrl !== newImageUrl) await deleteStorageFile(oldImageUrl);
+      if (oldAudioUrl && oldAudioUrl !== newAudioUrl) await deleteStorageFile(oldAudioUrl);
 
-      // Determine target section (possibly changed)
-      const targetSectionId = editForm.newSectionId || editingQuestion.section_id;
+      // Determine target
+      const newTargetId = editForm.newTargetId || activeFilterValue;
+      const newTargetType = editForm.newTargetType || (usesLayers ? 'category' : 'section');
+      const targetCol = newTargetType === 'category' ? 'category_id' : 'section_id';
 
-      // Determine option count - handle nullable option_c/option_d based on option_count
       const optionCount = editForm.option_count || 4;
       const optionC = optionCount >= 3 ? sanitizeRichText(editForm.option_c || '') : null;
       const optionD = optionCount >= 4 ? sanitizeRichText(editForm.option_d || '') : null;
@@ -516,22 +639,21 @@ const ManageQuestionsPage = () => {
           explanation: safeExplanation,
           image_url: newImageUrl,
           audio_url: newAudioUrl,
-          section_id: targetSectionId,
+          [targetCol]: newTargetId,
           question_type: editForm.question_type || 'standard',
           option_count: optionCount,
-        })
+        } as any)
         .eq('id', editingQuestion.id);
 
       if (parentErr) throw parentErr;
 
-      // 2) Sync sub-questions (if any)
+      // 2) Sync sub-questions
       const nextSubQuestions = editForm.subQuestions ?? [];
       const prevSubQuestions = editingQuestion.subQuestions ?? [];
 
       const prevIds = new Set(prevSubQuestions.map((sq) => sq.id).filter(Boolean));
       const nextIds = new Set(nextSubQuestions.map((sq) => sq.id).filter(Boolean));
 
-      // Delete removed sub-questions
       const toDelete = Array.from(prevIds).filter((id) => !nextIds.has(id));
       if (toDelete.length > 0) {
         const { error: delErr } = await supabase
@@ -542,7 +664,6 @@ const ManageQuestionsPage = () => {
         if (delErr) throw delErr;
       }
 
-      // Update existing / Insert new
       for (const sq of nextSubQuestions) {
         const sqExplanation = (sq.explanation || '').trim().length > 0
           ? sanitizeRichText(sq.explanation)
@@ -564,8 +685,7 @@ const ManageQuestionsPage = () => {
             .eq('parent_id', editingQuestion.id);
           if (upErr) throw upErr;
         } else {
-          const { error: insErr } = await supabase.from('questions').insert({
-            section_id: targetSectionId,
+          const insertData: Record<string, any> = {
             parent_id: editingQuestion.id,
             content: sanitizeRichText(sq.content || ''),
             option_a: sanitizeRichText(sq.option_a || ''),
@@ -574,32 +694,25 @@ const ManageQuestionsPage = () => {
             option_d: sanitizeRichText(sq.option_d || ''),
             correct_option: sq.correct_option || 'A',
             explanation: sqExplanation,
-          });
+            [targetCol]: newTargetId,
+          };
+          const { error: insErr } = await supabase.from('questions').insert(insertData as any);
           if (insErr) throw insErr;
         }
       }
 
-      // 3) Update sub-questions section_id if section changed
-      if (targetSectionId !== editingQuestion.section_id) {
+      // 3) Update sub-questions target if changed
+      const oldTargetId = usesLayers ? editingQuestion.category_id : editingQuestion.section_id;
+      if (newTargetId !== oldTargetId) {
         const { error: updateChildrenErr } = await supabase
           .from('questions')
-          .update({ section_id: targetSectionId })
+          .update({ [targetCol]: newTargetId } as any)
           .eq('parent_id', editingQuestion.id);
         if (updateChildrenErr) throw updateChildrenErr;
       }
 
-      // 4) Refresh list after save - re-fetch current section
-      const { data: refreshed, error: refreshErr } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('section_id', selectedSectionId)
-        .order('created_at', { ascending: true });
-
-      if (refreshErr) throw refreshErr;
-      setQuestions((refreshed as unknown as QuestionRow[]) || []);
-
-      // Invalidate questions cache so QuizPage gets fresh data
-      queryClient.invalidateQueries({ queryKey: ['questions'] });
+      // 4) Refresh
+      await reloadQuestions();
 
       toast.success('Đã lưu câu hỏi');
       setEditingQuestion(null);
@@ -609,19 +722,17 @@ const ManageQuestionsPage = () => {
     } finally {
       setSaving(false);
     }
-  }, [editingQuestion, editForm, queryClient, selectedSectionId]);
+  }, [editingQuestion, editForm, queryClient, activeFilterColumn, activeFilterValue, usesLayers, reloadQuestions, deleteStorageFile]);
 
-  // Delete question (xóa cả câu hỏi con & file media)
+  // Delete question
   const handleDelete = useCallback(async () => {
     if (!deletingQuestion) return;
 
     setDeleting(true);
     try {
-      // Delete media from storage
       if (deletingQuestion.image_url) await deleteStorageFile(deletingQuestion.image_url);
       if (deletingQuestion.audio_url) await deleteStorageFile(deletingQuestion.audio_url);
 
-      // Delete sub-questions first (FK constraint)
       const subQuestions = deletingQuestion.subQuestions ?? [];
       if (subQuestions.length > 0) {
         const childIds = subQuestions.map((sq) => sq.id);
@@ -632,15 +743,10 @@ const ManageQuestionsPage = () => {
         if (childDelErr) throw childDelErr;
       }
 
-      // Delete parent question
       const { error } = await supabase.from('questions').delete().eq('id', deletingQuestion.id);
-
       if (error) throw error;
 
-      // Update local state
       setQuestions((prev) => prev.filter((q) => q.id !== deletingQuestion.id && q.parent_id !== deletingQuestion.id));
-
-      // Invalidate questions cache so QuizPage gets fresh data
       queryClient.invalidateQueries({ queryKey: ['questions'] });
 
       toast.success('Đã xóa câu hỏi');
@@ -743,8 +849,38 @@ const ManageQuestionsPage = () => {
               </Select>
             </div>
 
-            {/* Level */}
-            {selectedSubjectId && subjectHasLevels && (
+            {/* Dynamic Layer dropdowns (for layer-based subjects) */}
+            {selectedSubjectId && usesLayers && currentLayers.map((layer, idx) => {
+              // Only show if previous layer is selected (or first layer)
+              if (idx > 0 && !selectedCategoryPerLayer[idx - 1]) return null;
+              const layerCats = categoriesForLayer[idx] || [];
+              // Skip empty layers that aren't first
+              if (layerCats.length === 0 && idx > 0) return null;
+
+              return (
+                <div key={layer.id}>
+                  <label className="mb-1 block text-sm font-medium text-foreground">{layer.name}</label>
+                  <Select
+                    value={selectedCategoryPerLayer[idx] || ''}
+                    onValueChange={(v) => handleCategoryChange(idx, v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={`Chọn ${layer.name.toLowerCase()}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {layerCats.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.icon ? `${c.icon} ` : ''}{c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              );
+            })}
+
+            {/* Legacy Level (for level-based subjects) */}
+            {selectedSubjectId && !usesLayers && subjectHasLevels && (
               <div>
                 <label className="mb-1 block text-sm font-medium text-foreground">Cấp độ</label>
                 <Select value={selectedLevelId} onValueChange={setSelectedLevelId}>
@@ -762,8 +898,8 @@ const ManageQuestionsPage = () => {
               </div>
             )}
 
-            {/* Section */}
-            {((selectedSubjectId && !subjectHasLevels) || selectedLevelId) && (
+            {/* Legacy Section */}
+            {selectedSubjectId && !usesLayers && ((subjectHasLevels && selectedLevelId) || !subjectHasLevels) && (
               <div>
                 <label className="mb-1 block text-sm font-medium text-foreground">Phần</label>
                 <Select value={selectedSectionId} onValueChange={setSelectedSectionId}>
@@ -782,7 +918,7 @@ const ManageQuestionsPage = () => {
             )}
 
             {/* Search */}
-            {selectedSectionId && (
+            {activeFilterValue && (
               <div>
                 <label className="mb-1 block text-sm font-medium text-foreground">Tìm kiếm</label>
                 <div className="relative">
@@ -799,7 +935,7 @@ const ManageQuestionsPage = () => {
           </div>
 
           {/* Bulk action bar */}
-          {selectedSectionId && selectedQuestionIds.size > 0 && (
+          {activeFilterValue && selectedQuestionIds.size > 0 && (
             <div className="mb-4 flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 p-3">
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-foreground">
@@ -822,14 +958,13 @@ const ManageQuestionsPage = () => {
           )}
 
           {/* Questions list */}
-          {selectedSectionId && (
+          {activeFilterValue && (
             <div className="space-y-3">
               {loadingQuestions ? (
                 <div className="flex justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
               ) : isListeningSection ? (
-                /* Listening mode: group by exam */
                 <ListeningExamManager
                   questions={questions}
                   onQuestionsChanged={reloadQuestions}
@@ -897,7 +1032,6 @@ const ManageQuestionsPage = () => {
                           dangerouslySetInnerHTML={{ __html: q.content || '<em class="text-muted-foreground">Câu hỏi trong audio</em>' }}
                         />
                         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                          {/* Hiển thị loại câu hỏi nếu không phải standard */}
                           {q.question_type && q.question_type !== 'standard' && (
                             <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-xs font-medium">
                               {q.question_type === 'audio_only' ? '🎧 Audio Only' : '🖼️ Image Based'}
@@ -942,10 +1076,14 @@ const ManageQuestionsPage = () => {
             </div>
           )}
 
-          {!selectedSectionId && (
+          {!activeFilterValue && (
             <div className="rounded-xl border border-border bg-card p-12 text-center">
               <ChevronDown className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-              <p className="text-muted-foreground">Chọn môn học, cấp độ và phần để xem câu hỏi</p>
+              <p className="text-muted-foreground">
+                {usesLayers
+                  ? `Chọn môn học và ${currentLayers.map(l => l.name.toLowerCase()).join(', ')} để xem câu hỏi`
+                  : 'Chọn môn học, cấp độ và phần để xem câu hỏi'}
+              </p>
             </div>
           )}
         </div>
@@ -976,7 +1114,7 @@ const ManageQuestionsPage = () => {
                     />
                   </div>
 
-                  {/* Question type settings for listening sections */}
+                  {/* Question type settings */}
                   <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-4">
                     <h4 className="font-medium text-sm text-foreground flex items-center gap-2">
                       🎧 Cài đặt loại câu hỏi (cho phần nghe)
@@ -1115,28 +1253,35 @@ const ManageQuestionsPage = () => {
                     </div>
                   </div>
 
-                  {/* Move to different section */}
+                  {/* Move to different target */}
                   <div>
                     <label className="mb-1 flex items-center gap-2 text-sm font-medium">
                       <ArrowRightLeft className="h-4 w-4" />
                       Chuyển sang mục khác
                     </label>
                     <Select
-                      value={editForm.newSectionId || ''}
-                      onValueChange={(v) => setEditForm((prev) => ({ ...prev, newSectionId: v }))}
+                      value={editForm.newTargetId || ''}
+                      onValueChange={(v) => {
+                        const target = relocationTargets.find(t => t.id === v);
+                        setEditForm((prev) => ({
+                          ...prev,
+                          newTargetId: v,
+                          newTargetType: target?.type || (usesLayers ? 'category' : 'section'),
+                        }));
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Chọn mục đích" />
                       </SelectTrigger>
                       <SelectContent>
-                        {getSortedSectionsWithLabels(sections, levels, subjects).map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.label}
+                        {relocationTargets.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    {editForm.newSectionId && editForm.newSectionId !== editingQuestion?.section_id && (
+                    {editForm.newTargetId && editForm.newTargetId !== activeFilterValue && (
                       <p className="mt-1 text-xs text-warning">
                         ⚠️ Câu hỏi sẽ được chuyển sang mục khác sau khi lưu
                       </p>
@@ -1208,16 +1353,16 @@ const ManageQuestionsPage = () => {
           <div className="py-4">
             <label className="mb-2 block text-sm font-medium">Chọn mục đích</label>
             <Select
-              value={bulkTargetSectionId}
-              onValueChange={setBulkTargetSectionId}
+              value={bulkTargetId}
+              onValueChange={setBulkTargetId}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Chọn mục đích..." />
               </SelectTrigger>
               <SelectContent>
-                {getSortedSectionsWithLabels(sections, levels, subjects, selectedSectionId).map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.label}
+                {relocationTargets.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1228,7 +1373,7 @@ const ManageQuestionsPage = () => {
               variant="outline"
               onClick={() => {
                 setBulkMoveDialogOpen(false);
-                setBulkTargetSectionId('');
+                setBulkTargetId('');
               }}
               disabled={bulkMoving}
             >
@@ -1236,7 +1381,7 @@ const ManageQuestionsPage = () => {
             </Button>
             <Button
               onClick={handleBulkMove}
-              disabled={bulkMoving || !bulkTargetSectionId}
+              disabled={bulkMoving || !bulkTargetId}
               className="gap-2"
             >
               {bulkMoving ? (
