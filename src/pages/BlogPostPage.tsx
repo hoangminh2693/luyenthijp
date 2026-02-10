@@ -1,14 +1,16 @@
 import { useParams, Link } from 'react-router-dom';
-import { usePostBySlug } from '@/hooks/useBlogPosts';
+import { usePostBySlug, usePublishedPosts } from '@/hooks/useBlogPosts';
 import { Breadcrumb } from '@/components/layout/Header';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, User, ArrowLeft, Tag } from 'lucide-react';
+import { Calendar, User, ArrowLeft, ArrowRight, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { sanitizeRichText } from '@/lib/richText';
+import { useMemo } from 'react';
 
 const BlogPostPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const { data: post, isLoading, error } = usePostBySlug(slug);
+  const { data: allPosts } = usePublishedPosts();
 
   // Update document title for SEO
   if (post) {
@@ -16,6 +18,26 @@ const BlogPostPage = () => {
     const metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) metaDesc.setAttribute('content', post.meta_description || post.excerpt || '');
   }
+
+  // Related posts: cùng tag, loại trừ bài hiện tại
+  const relatedPosts = useMemo(() => {
+    if (!post || !allPosts) return [];
+    const currentTags = post.tags || [];
+    if (currentTags.length === 0) {
+      // Nếu không có tag, lấy bài mới nhất khác bài hiện tại
+      return allPosts.filter(p => p.id !== post.id).slice(0, 3);
+    }
+    // Tính điểm: số tag trùng
+    const scored = allPosts
+      .filter(p => p.id !== post.id)
+      .map(p => ({
+        post: p,
+        score: (p.tags || []).filter(t => currentTags.includes(t)).length,
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+    return scored.map(s => s.post);
+  }, [post, allPosts]);
 
   if (isLoading) {
     return (
@@ -63,7 +85,8 @@ const BlogPostPage = () => {
           {post.thumbnail_url && (
             <img
               src={post.thumbnail_url}
-              alt={post.title}
+              alt={`Ảnh bìa: ${post.title}`}
+              loading="lazy"
               className="w-full aspect-video object-cover rounded-xl mb-8"
             />
           )}
@@ -105,6 +128,45 @@ const BlogPostPage = () => {
               prose-img:rounded-lg prose-img:mx-auto"
             dangerouslySetInnerHTML={{ __html: sanitizeRichText(post.content) }}
           />
+
+          {/* Related Posts */}
+          {relatedPosts.length > 0 && (
+            <section className="mt-12 pt-8 border-t border-border">
+              <h2 className="text-xl font-bold text-foreground mb-6">Bài viết liên quan</h2>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {relatedPosts.map(rp => (
+                  <Link
+                    key={rp.id}
+                    to={`/blog/${rp.slug}`}
+                    className="group rounded-lg border border-border bg-card overflow-hidden hover:border-primary/30 hover:shadow-md transition-all"
+                  >
+                    {rp.thumbnail_url ? (
+                      <img
+                        src={rp.thumbnail_url}
+                        alt={`Ảnh bìa: ${rp.title}`}
+                        loading="lazy"
+                        className="aspect-video w-full object-cover"
+                      />
+                    ) : (
+                      <div className="aspect-video bg-muted flex items-center justify-center">
+                        <Tag className="h-8 w-8 text-muted-foreground/30" />
+                      </div>
+                    )}
+                    <div className="p-4">
+                      <h3 className="text-sm font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+                        {rp.title}
+                      </h3>
+                      {rp.published_at && (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {new Date(rp.published_at).toLocaleDateString('vi-VN')}
+                        </p>
+                      )}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Back to blog */}
           <div className="mt-12 pt-8 border-t border-border">

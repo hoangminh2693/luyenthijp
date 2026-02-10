@@ -659,6 +659,17 @@ const StatisticsPage = () => {
             </Card>
           </>
         )}
+
+        {/* SEO: Mô tả tĩnh */}
+        <section className="mt-12 rounded-xl border border-border bg-muted/30 p-6">
+          <h2 className="mb-3 text-lg font-semibold text-foreground">Về trang Thống kê học tập</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Trang Thống kê học tập giúp bạn theo dõi chi tiết tiến trình ôn luyện theo thời gian. 
+            Bạn có thể xem số câu hỏi đã làm, tỷ lệ đúng, biểu đồ hoạt động hàng ngày 
+            và phân tích điểm mạnh/yếu theo từng phần kiến thức. Đăng nhập để bắt đầu theo dõi 
+            kết quả học tập của bạn.
+          </p>
+        </section>
       </div>
     </div>
   );

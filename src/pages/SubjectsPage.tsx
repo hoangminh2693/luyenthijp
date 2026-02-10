@@ -99,6 +99,17 @@ const SubjectsPage = () => {
             </p>
           </div>
         )}
+
+        {/* SEO: Mô tả tĩnh giúp Google hiểu nội dung trang */}
+        <section className="mt-12 rounded-xl border border-border bg-muted/30 p-6">
+          <h2 className="mb-3 text-lg font-semibold text-foreground">Về trang luyện đề thi</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Trang Chọn môn học là nơi bạn bắt đầu hành trình luyện thi. Chúng tôi cung cấp đề thi trắc nghiệm 
+            cho nhiều kỳ thi quan trọng tại Nhật Bản như JLPT (N5–N1), BJT, 宅建 và các chứng chỉ nghề nghiệp khác. 
+            Mỗi môn học được chia thành các cấp độ và phần kiến thức cụ thể, giúp bạn tập trung ôn luyện 
+            đúng phần mình cần cải thiện.
+          </p>
+        </section>
       </div>
     </div>
   );

@@ -354,7 +354,8 @@ export function QuestionCard({
           <div className="mb-4">
             <img 
               src={question.image_url} 
-              alt="Question image" 
+              alt={`Hình minh họa câu hỏi ${questionNumber}: ${question.content.replace(/<[^>]*>/g, '').slice(0, 80)}`}
+              loading="lazy"
               className="w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl h-auto max-h-48 sm:max-h-64 md:max-h-80 rounded-lg object-contain border border-border mx-auto"
             />
           </div>
@@ -399,7 +400,8 @@ export function QuestionCard({
                   <div className="mb-3">
                     <img 
                       src={subQ.image_url} 
-                      alt="Sub-question image" 
+                      alt={`Hình minh họa câu ${questionNumber}.${idx + 1}: ${subQ.content.replace(/<[^>]*>/g, '').slice(0, 60)}`}
+                      loading="lazy"
                       className="w-full max-w-sm h-auto max-h-48 rounded-lg object-contain border border-border mx-auto"
                     />
                   </div>

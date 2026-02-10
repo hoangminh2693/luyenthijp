@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Heart, Mail, BookOpen, Shield, FileText, Info, Newspaper, GraduationCap } from 'lucide-react';
+import { Heart, Mail, BookOpen, Shield, FileText, Info, Newspaper, GraduationCap, AlertTriangle } from 'lucide-react';
 import { ActivityWidget } from '@/components/ui/ActivityWidget';
 
 /**
@@ -23,6 +23,7 @@ export function Footer() {
   const legalLinks = [
     { href: '/privacy', label: 'Chính sách bảo mật', icon: Shield },
     { href: '/terms', label: 'Điều khoản sử dụng', icon: FileText },
+    { href: '/disclaimer', label: 'Miễn trừ trách nhiệm', icon: AlertTriangle },
     { href: '/contact', label: 'Liên hệ', icon: Mail },
   ];
 
@@ -41,7 +42,7 @@ export function Footer() {
           {/* Brand & Description */}
           <div className="lg:col-span-2">
             <Link to="/" className="flex items-center gap-2 mb-4">
-              <img src="/favicon.png" alt="Luyện Đề Thi" className="h-10 w-10 rounded-lg" />
+              <img src="/favicon.png" alt="Logo Luyện Đề Thi - Nền tảng luyện thi tại Nhật" loading="lazy" className="h-10 w-10 rounded-lg" />
               <div>
                 <span className="text-lg font-bold text-foreground">Luyện Đề Thi</span>
                 <p className="text-xs text-muted-foreground">Nền tảng luyện thi tại Nhật</p>

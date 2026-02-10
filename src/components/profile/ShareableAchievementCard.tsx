@@ -155,7 +155,8 @@ export function ShareableAchievementCard({
               {avatarUrl ? (
                 <img 
                   src={avatarUrl} 
-                  alt={displayName}
+                  alt={`Ảnh đại diện của ${displayName}`}
+                  loading="lazy"
                   className="h-12 w-12 rounded-full border-2 border-white/20 object-cover"
                 />
               ) : (
