@@ -86,11 +86,11 @@ const BlogPage = () => {
                 key={post.id}
                 className="group rounded-xl border border-border bg-card overflow-hidden transition-all duration-200 hover:border-primary/30 hover:shadow-md"
               >
-                <Link to={`/blog/${post.slug}`}>
+                <Link to={`/blog/${post.slug}`} className="block overflow-hidden">
                   {post.thumbnail_url ? (
-                    <img src={post.thumbnail_url} alt={`Ảnh bìa bài viết: ${post.title}`} loading="lazy" className="aspect-video w-full object-cover" />
+                    <img src={post.thumbnail_url} alt={`Ảnh bìa bài viết: ${post.title}`} loading="lazy" className="aspect-video w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                   ) : (
-                    <div className="aspect-video bg-muted flex items-center justify-center">
+                    <div className="aspect-video bg-muted flex items-center justify-center transition-colors duration-300 group-hover:bg-muted/70">
                       <BookOpen className="h-12 w-12 text-muted-foreground/30" />
                     </div>
                   )}
