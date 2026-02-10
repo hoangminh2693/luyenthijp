@@ -126,27 +126,26 @@ export function useLeafCategory(
   };
 }
 
-// Hook lấy số câu hỏi của category (dùng section_id cũ hoặc category_id mới)
+// Hook lấy số câu hỏi của category (dùng questions_safe view để user thường cũng đọc được)
 export function useQuestionCountForCategory(categoryId: string | undefined) {
   return useQuery({
     queryKey: ['questions', 'count', 'for-category', categoryId],
     queryFn: async () => {
       if (!categoryId) return 0;
       
-      // Thử đếm theo category_id trước
-      const { count: catCount, error: catError } = await supabase
-        .from('questions')
+      // Sử dụng questions_safe view (không cần admin role)
+      const { count, error } = await supabase
+        .from('questions_safe')
         .select('id', { count: 'exact', head: true })
-        .eq('category_id', categoryId);
+        .eq('category_id', categoryId)
+        .is('parent_id', null);
       
-      if (!catError && catCount && catCount > 0) {
-        return catCount;
+      if (error) {
+        console.warn('Error counting questions for category:', error.message);
+        return 0;
       }
       
-      // Fallback: tìm section_id tương ứng (trong giai đoạn chuyển đổi)
-      // Category có thể map sang section cũ qua slug matching
-      // Tạm thời return 0 nếu không có
-      return catCount || 0;
+      return count || 0;
     },
     enabled: !!categoryId,
   });

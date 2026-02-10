@@ -391,14 +391,27 @@ export function useRandomListeningExam(
 }
 
 // Hook đếm số đề nghe theo category_id (đếm distinct audio_url)
-// Uses legacy bridge: category → root ancestor → level → section → count audio_url
+// Hỗ trợ cả category_id trực tiếp và legacy bridge
 export function useListeningExamCountByCategory(categoryId: string | undefined) {
   return useQuery({
     queryKey: ['listening-exam-count', 'category', categoryId],
     queryFn: async () => {
       if (!categoryId) return 0;
 
-      // Step 1: Get category info
+      // Step 1: Thử đếm trực tiếp theo category_id (cho môn học mới)
+      const { data: directData, error: directError } = await supabase
+        .from('questions_safe')
+        .select('audio_url')
+        .eq('category_id', categoryId)
+        .not('audio_url', 'is', null)
+        .is('parent_id', null);
+
+      if (!directError && directData && directData.length > 0) {
+        const uniqueUrls = new Set(directData.map(q => q.audio_url));
+        return uniqueUrls.size;
+      }
+
+      // Step 2: Fallback legacy bridge cho môn học cũ (category → level → section)
       const { data: cat } = await supabase
         .from('categories')
         .select('subject_id, slug, parent_id')
@@ -406,7 +419,7 @@ export function useListeningExamCountByCategory(categoryId: string | undefined) 
         .single();
       if (!cat) return 0;
 
-      // Step 2: Find root ancestor to map to legacy level
+      // Find root ancestor
       let rootSlug = cat.slug;
       let currentParentId = cat.parent_id;
       while (currentParentId) {
@@ -420,7 +433,7 @@ export function useListeningExamCountByCategory(categoryId: string | undefined) 
         currentParentId = parent.parent_id;
       }
 
-      // Step 3: Find legacy level
+      // Find legacy level
       const { data: level } = await supabase
         .from('levels')
         .select('id')
@@ -428,7 +441,7 @@ export function useListeningExamCountByCategory(categoryId: string | undefined) 
         .eq('slug', rootSlug)
         .maybeSingle();
 
-      // Step 4: Find legacy section
+      // Find legacy section
       let sectionId: string | null = null;
       if (level) {
         const { data: section } = await supabase
@@ -442,7 +455,7 @@ export function useListeningExamCountByCategory(categoryId: string | undefined) 
 
       if (!sectionId) return 0;
 
-      // Step 5: Count distinct audio_url in that section
+      // Count distinct audio_url in that section
       const { data, error } = await supabase
         .from('questions_safe')
         .select('audio_url')
