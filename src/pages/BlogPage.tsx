@@ -86,13 +86,15 @@ const BlogPage = () => {
                 key={post.id}
                 className="group rounded-xl border border-border bg-card overflow-hidden transition-all duration-200 hover:border-primary/30 hover:shadow-md"
               >
-                {post.thumbnail_url ? (
-                  <img src={post.thumbnail_url} alt={`Ảnh bìa bài viết: ${post.title}`} loading="lazy" className="aspect-video w-full object-cover" />
-                ) : (
-                  <div className="aspect-video bg-muted flex items-center justify-center">
-                    <BookOpen className="h-12 w-12 text-muted-foreground/30" />
-                  </div>
-                )}
+                <Link to={`/blog/${post.slug}`}>
+                  {post.thumbnail_url ? (
+                    <img src={post.thumbnail_url} alt={`Ảnh bìa bài viết: ${post.title}`} loading="lazy" className="aspect-video w-full object-cover" />
+                  ) : (
+                    <div className="aspect-video bg-muted flex items-center justify-center">
+                      <BookOpen className="h-12 w-12 text-muted-foreground/30" />
+                    </div>
+                  )}
+                </Link>
 
                 <div className="p-6">
                   {post.tags?.length > 0 && (
@@ -105,9 +107,11 @@ const BlogPage = () => {
                     </div>
                   )}
 
-                  <h2 className="text-lg font-semibold text-foreground mb-2 line-clamp-2 group-hover:text-primary transition-colors">
-                    {post.title}
-                  </h2>
+                  <Link to={`/blog/${post.slug}`}>
+                    <h2 className="text-lg font-semibold text-foreground mb-2 line-clamp-2 group-hover:text-primary transition-colors">
+                      {post.title}
+                    </h2>
+                  </Link>
 
                   {post.excerpt && (
                     <p className="text-sm text-muted-foreground line-clamp-3 mb-4">{post.excerpt}</p>
