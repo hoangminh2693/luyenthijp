@@ -936,6 +936,8 @@ const LeaderboardPage = () => {
             </Card>
           </div>
         )}
+
+        <LeaderboardSEOSection />
       </div>
     </div>
   );
@@ -1036,5 +1038,20 @@ const TopUserCard = ({ user, rank, isCurrentUser, activeTab }: TopUserCardProps)
     </div>
   );
 };
+
+// SEO: Static description section
+function LeaderboardSEOSection() {
+  return (
+    <section className="mt-12 rounded-xl border border-border bg-muted/30 p-6">
+      <h2 className="mb-3 text-lg font-semibold text-foreground">Về Bảng xếp hạng</h2>
+      <p className="text-sm text-muted-foreground leading-relaxed">
+        Bảng xếp hạng Luyện Đề Thi ghi nhận và vinh danh những người học chăm chỉ nhất. 
+        Hệ thống xếp hạng dựa trên nhiều tiêu chí: tổng hợp, độ chính xác, sự chăm chỉ 
+        và tốc độ tiến bộ. Hãy luyện tập mỗi ngày để cải thiện thứ hạng của bạn 
+        và cạnh tranh lành mạnh với cộng đồng người Việt tại Nhật.
+      </p>
+    </section>
+  );
+}
 
 export default LeaderboardPage;

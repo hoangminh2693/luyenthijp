@@ -87,7 +87,7 @@ const BlogPage = () => {
                 className="group rounded-xl border border-border bg-card overflow-hidden transition-all duration-200 hover:border-primary/30 hover:shadow-md"
               >
                 {post.thumbnail_url ? (
-                  <img src={post.thumbnail_url} alt={post.title} className="aspect-video w-full object-cover" />
+                  <img src={post.thumbnail_url} alt={`Ảnh bìa bài viết: ${post.title}`} loading="lazy" className="aspect-video w-full object-cover" />
                 ) : (
                   <div className="aspect-video bg-muted flex items-center justify-center">
                     <BookOpen className="h-12 w-12 text-muted-foreground/30" />
