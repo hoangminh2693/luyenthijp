@@ -63,6 +63,7 @@ export function Header() {
     { href: '/manage-subjects', label: 'Quản lý', icon: Settings },
     { href: '/manage-questions', label: 'Câu hỏi', icon: FileText },
     { href: '/import', label: 'Import', icon: Upload },
+    { href: '/manage-blog', label: 'Blog', icon: Newspaper },
   ];
 
   const NavLink = ({ href, label, icon: Icon, mobile = false }: { href: string; label: string; icon: React.ElementType; mobile?: boolean }) => (
