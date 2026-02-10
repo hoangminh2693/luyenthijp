@@ -3,6 +3,7 @@
  * Hiển thị biểu đồ chi tiết theo thời gian
  */
 import { useState, useEffect, useMemo } from 'react';
+import { useRobotsMeta } from '@/hooks/useRobotsMeta';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -109,6 +110,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 const StatisticsPage = () => {
+  useRobotsMeta('noindex, nofollow');
   const { user } = useAuth();
   
   // Filter states

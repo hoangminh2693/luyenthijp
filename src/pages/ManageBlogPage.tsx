@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRobotsMeta } from '@/hooks/useRobotsMeta';
 import { useAllPosts, useCreatePost, useUpdatePost, useDeletePost, BlogPost } from '@/hooks/useBlogPosts';
 import { Breadcrumb } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ function slugify(text: string): string {
 }
 
 const ManageBlogPage = () => {
+  useRobotsMeta('noindex, nofollow');
   const { user, isAdmin } = useAuth();
   const { data: posts, isLoading } = useAllPosts();
   const createPost = useCreatePost();

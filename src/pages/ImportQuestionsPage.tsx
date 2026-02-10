@@ -6,6 +6,7 @@
  * - Import đề thi 聴解 (Listening) với cấu trúc Mondai
  */
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useRobotsMeta } from '@/hooks/useRobotsMeta';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download, LogIn, Shield, Table2, FileText, Headphones, CopyCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -129,6 +130,7 @@ function isValidTableQuestion(q: TableQuestion): boolean {
 }
 
 const ImportQuestionsPage = () => {
+  useRobotsMeta('noindex, nofollow');
   const { user, isAdmin, isLoading: authLoading } = useAuth();
 
   const [file, setFile] = useState<File | null>(null);

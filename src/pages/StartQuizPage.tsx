@@ -10,6 +10,7 @@
  */
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Navigate, useNavigate, Link } from 'react-router-dom';
+import { useRobotsMeta } from '@/hooks/useRobotsMeta';
 import { 
   Play, 
   Clock, 
@@ -122,6 +123,7 @@ const getExamIntroduction = (
 };
 
 const StartQuizPage = () => {
+  useRobotsMeta('noindex, nofollow');
   const { subjectSlug, '*': wildcardPath } = useParams<{
     subjectSlug: string;
     '*': string;

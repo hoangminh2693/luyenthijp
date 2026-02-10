@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRobotsMeta } from '@/hooks/useRobotsMeta';
 import { Mail, Lock, User, Eye, EyeOff, Loader2, Calendar, Globe, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,6 +58,7 @@ const nicknameSchema = z.string()
   }, 'Nickname chứa từ ngữ không phù hợp');
 
 const AuthPage = () => {
+  useRobotsMeta('noindex, nofollow');
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
