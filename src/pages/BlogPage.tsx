@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, User, ArrowRight, Clock, BookOpen, Tag } from 'lucide-react';
+import { Calendar, User, ArrowRight, Clock, BookOpen, Tag, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Breadcrumb } from '@/components/layout/Header';
 import { usePublishedPosts } from '@/hooks/useBlogPosts';
+import { useAuth } from '@/contexts/AuthContext';
 
 const BlogPage = () => {
+  const { isAdmin } = useAuth();
   const { data: posts, isLoading } = usePublishedPosts();
   const [activeTag, setActiveTag] = useState<string | null>(null);
 
@@ -25,8 +27,15 @@ const BlogPage = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container py-8">
-        <div className="mb-8">
+        <div className="mb-8 flex items-center justify-between">
           <Breadcrumb items={[{ label: 'Blog' }]} />
+          {isAdmin && (
+            <Link to="/manage-blog">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings className="h-4 w-4" /> Quản lý bài viết
+              </Button>
+            </Link>
+          )}
         </div>
 
         <div className="mb-12 text-center max-w-3xl mx-auto">
