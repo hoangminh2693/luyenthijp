@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRobotsMeta } from '@/hooks/useRobotsMeta';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ const INAPPROPRIATE_WORDS = [
 ];
 
 export default function ProfilePage() {
+  useRobotsMeta('noindex, nofollow');
   const { user, profile, profilePrivate, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);

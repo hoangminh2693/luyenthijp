@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useParams, Navigate, Link, useSearchParams } from 'react-router-dom';
+import { useRobotsMeta } from '@/hooks/useRobotsMeta';
 import { ArrowLeft, Send, Loader2, Headphones, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
@@ -24,6 +25,7 @@ import { useQuery } from '@tanstack/react-query';
  * SECURE: Correct answers are only revealed after server-side submission
  */
 const QuizPage = () => {
+  useRobotsMeta('noindex, nofollow');
   const { subjectSlug, '*': wildcardPath } = useParams<{ 
     subjectSlug?: string;
     '*': string;

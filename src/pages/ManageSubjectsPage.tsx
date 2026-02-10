@@ -4,6 +4,7 @@
  */
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useRobotsMeta } from '@/hooks/useRobotsMeta';
 import type { CategoryModeSettings } from '@/components/admin/CategoryModeConfig';
 import {
   Plus,
@@ -28,6 +29,7 @@ import { CategoryTreeView } from '@/components/admin/CategoryTreeView';
 import type { Subject, SubjectLayer, Category } from '@/hooks/useSubjectLayers';
 
 const ManageSubjectsPage = () => {
+  useRobotsMeta('noindex, nofollow');
   const { user, isAdmin, isLoading: authLoading } = useAuth();
 
   const [subjects, setSubjects] = useState<Subject[]>([]);
