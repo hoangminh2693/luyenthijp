@@ -7,10 +7,13 @@ import { Breadcrumb } from '@/components/layout/Header';
 import { usePublishedPosts } from '@/hooks/useBlogPosts';
 import { useAuth } from '@/contexts/AuthContext';
 
+const VISIBLE_TAGS = 5;
+
 const BlogPage = () => {
   const { isAdmin } = useAuth();
   const { data: posts, isLoading } = usePublishedPosts();
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [showAllTags, setShowAllTags] = useState(false);
 
   // Collect all unique tags
   const allTags = Array.from(new Set((posts || []).flatMap(p => p.tags || [])));
@@ -58,7 +61,7 @@ const BlogPage = () => {
             >
               Tất cả
             </Button>
-            {allTags.map(tag => (
+            {(showAllTags ? allTags : allTags.slice(0, VISIBLE_TAGS)).map(tag => (
               <Button
                 key={tag}
                 variant={activeTag === tag ? 'default' : 'outline'}
@@ -68,6 +71,16 @@ const BlogPage = () => {
                 {tag}
               </Button>
             ))}
+            {allTags.length > VISIBLE_TAGS && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAllTags(!showAllTags)}
+                className="text-muted-foreground"
+              >
+                {showAllTags ? 'Thu gọn' : `+${allTags.length - VISIBLE_TAGS} khác`}
+              </Button>
+            )}
           </div>
         )}
 
