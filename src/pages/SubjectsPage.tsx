@@ -54,7 +54,7 @@ const SubjectsPage = () => {
         {/* Header */}
         <div className="mb-8">
           <h1 className="mb-2 text-3xl font-bold text-foreground">
-            Chọn môn học
+            Chọn môn luyện đề thi trắc nghiệm
           </h1>
           <p className="text-muted-foreground">
             Chọn môn học bạn muốn luyện tập để xem danh sách các cấp độ

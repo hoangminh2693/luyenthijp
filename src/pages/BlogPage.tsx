@@ -40,7 +40,7 @@ const BlogPage = () => {
 
         <div className="mb-12 text-center max-w-3xl mx-auto">
           <h1 className="mb-4 text-3xl font-bold text-foreground md:text-4xl">
-            Blog Chia Sẻ Kinh Nghiệm
+            Blog chia sẻ kinh nghiệm ôn thi tại Nhật
           </h1>
           <p className="text-lg text-muted-foreground leading-relaxed">
             Những bài viết hữu ích về kinh nghiệm ôn thi, phương pháp học tập hiệu quả
