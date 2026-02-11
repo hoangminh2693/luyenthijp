@@ -4,7 +4,7 @@
  * - Có toolbar để tự bôi đen và bấm In đậm/In nghiêng/Gạch chân
  * - Hỗ trợ hình ảnh, âm thanh và câu hỏi con
  */
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Plus, Trash2, Copy, ChevronDown, ChevronUp, Image, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -69,7 +69,7 @@ const emptyQuestion: TableQuestion = {
   option_count: 4,
 };
 
-type ActiveCell = { index: number; field: keyof TableQuestion } | null;
+
 
 // Helper to check if sub-question is valid based on option_count
 function isValidSubQuestion(sq: SubQuestion): boolean {
@@ -158,10 +158,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
   const [questions, setQuestions] = useState<TableQuestion[]>([{ ...emptyQuestion }]);
   const [pasteMode, setPasteMode] = useState(false);
   const [pasteText, setPasteText] = useState('');
-  const [activeCell, setActiveCell] = useState<ActiveCell>(null);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
-
-  const cellRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const toggleRowExpanded = useCallback((index: number) => {
     setExpandedRows(prev => {
@@ -443,33 +440,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
     [questions]
   );
 
-  const setCellRef = useCallback(
-    (index: number, field: keyof TableQuestion, el: HTMLDivElement | null) => {
-      const key = `${index}:${field}`;
-      if (!el) {
-        cellRefs.current.delete(key);
-        return;
-      }
-      cellRefs.current.set(key, el);
-    },
-    []
-  );
 
-  const applyFormat = useCallback(
-    (cmd: 'bold' | 'italic' | 'underline' | 'removeFormat') => {
-      if (!activeCell) return;
-
-      const key = `${activeCell.index}:${activeCell.field}`;
-      const el = cellRefs.current.get(key);
-      if (!el) return;
-
-      el.focus();
-      document.execCommand(cmd);
-
-      updateQuestion(activeCell.index, activeCell.field, el.innerHTML || '');
-    },
-    [activeCell, updateQuestion]
-  );
 
   return (
     <div className="space-y-4">
@@ -524,24 +495,6 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
       {/* Table input */}
       {!pasteMode && (
         <>
-          {/* Toolbar */}
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/20 p-2">
-            <span className="text-sm text-muted-foreground">Định dạng:</span>
-            <Button type="button" variant="outline" size="sm" onClick={() => applyFormat('bold')} disabled={!activeCell}>
-              <span className="font-bold">B</span>
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => applyFormat('italic')} disabled={!activeCell}>
-              <span className="italic">I</span>
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => applyFormat('underline')} disabled={!activeCell}>
-              <span className="underline">U</span>
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => applyFormat('removeFormat')} disabled={!activeCell}>
-              Xóa định dạng
-            </Button>
-            <span className="ml-auto text-xs text-muted-foreground">(Bôi đen text trong ô rồi bấm nút)</span>
-          </div>
-
           {/* Questions list - styled as table */}
           <div className="rounded-lg border border-border overflow-hidden">
             {/* Table header */}
@@ -568,11 +521,9 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                     
                     <div className="flex-1 space-y-3">
                       <RichTextEditable
-                        ref={(el) => setCellRef(index, 'content', el)}
                         value={q.content}
                         placeholder="Nội dung câu hỏi (đề bài)..."
                         className="min-h-[48px]"
-                        onFocus={() => setActiveCell({ index, field: 'content' })}
                         onChange={(v) => updateQuestion(index, 'content', v)}
                       />
                       
@@ -697,20 +648,16 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                             <div>
                               <label className="text-xs text-muted-foreground">Đáp án A</label>
                               <RichTextEditable
-                                ref={(el) => setCellRef(index, 'option_a', el)}
                                 value={q.option_a}
                                 placeholder={q.question_type === 'audio_only' ? '(có thể để trống)' : 'Đáp án A'}
-                                onFocus={() => setActiveCell({ index, field: 'option_a' })}
                                 onChange={(v) => updateQuestion(index, 'option_a', v)}
                               />
                             </div>
                             <div>
                               <label className="text-xs text-muted-foreground">Đáp án B</label>
                               <RichTextEditable
-                                ref={(el) => setCellRef(index, 'option_b', el)}
                                 value={q.option_b}
                                 placeholder={q.question_type === 'audio_only' ? '(có thể để trống)' : 'Đáp án B'}
-                                onFocus={() => setActiveCell({ index, field: 'option_b' })}
                                 onChange={(v) => updateQuestion(index, 'option_b', v)}
                               />
                             </div>
@@ -718,10 +665,8 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                               <div>
                                 <label className="text-xs text-muted-foreground">Đáp án C</label>
                                 <RichTextEditable
-                                  ref={(el) => setCellRef(index, 'option_c', el)}
                                   value={q.option_c}
                                   placeholder={q.question_type === 'audio_only' ? '(có thể để trống)' : 'Đáp án C'}
-                                  onFocus={() => setActiveCell({ index, field: 'option_c' })}
                                   onChange={(v) => updateQuestion(index, 'option_c', v)}
                                 />
                               </div>
@@ -730,10 +675,8 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                               <div>
                                 <label className="text-xs text-muted-foreground">Đáp án D</label>
                                 <RichTextEditable
-                                  ref={(el) => setCellRef(index, 'option_d', el)}
                                   value={q.option_d}
                                   placeholder={q.question_type === 'audio_only' ? '(có thể để trống)' : 'Đáp án D'}
-                                  onFocus={() => setActiveCell({ index, field: 'option_d' })}
                                   onChange={(v) => updateQuestion(index, 'option_d', v)}
                                 />
                               </div>
@@ -757,10 +700,8 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                             <div>
                               <label className="text-xs text-muted-foreground">Giải thích</label>
                               <RichTextEditable
-                                ref={(el) => setCellRef(index, 'explanation', el)}
                                 value={q.explanation}
                                 placeholder="Giải thích (tùy chọn)"
-                                onFocus={() => setActiveCell({ index, field: 'explanation' })}
                                 onChange={(v) => updateQuestion(index, 'explanation', v)}
                               />
                             </div>
