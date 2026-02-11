@@ -5,6 +5,7 @@
  * - Hỗ trợ hình ảnh, âm thanh và câu hỏi con
  */
 import { useCallback, useMemo, useState } from 'react';
+import type { Editor } from '@tiptap/react';
 import { Plus, Trash2, Copy, ChevronDown, ChevronUp, Image, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -24,6 +25,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { RichTextEditable } from '@/components/admin/RichTextEditable';
+import { RichTextToolbar } from '@/components/admin/RichTextToolbar';
 import { MediaUpload } from '@/components/admin/MediaUpload';
 import { SubQuestionInput, type SubQuestion } from '@/components/admin/SubQuestionInput';
 import {
@@ -159,6 +161,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
   const [pasteMode, setPasteMode] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
 
   const toggleRowExpanded = useCallback((index: number) => {
     setExpandedRows(prev => {
@@ -495,6 +498,11 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
       {/* Table input */}
       {!pasteMode && (
         <>
+          {/* Shared formatting toolbar */}
+          <div className="sticky top-0 z-10">
+            <RichTextToolbar editor={activeEditor} />
+          </div>
+
           {/* Questions list - styled as table */}
           <div className="rounded-lg border border-border overflow-hidden">
             {/* Table header */}
@@ -525,6 +533,8 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                         placeholder="Nội dung câu hỏi (đề bài)..."
                         className="min-h-[48px]"
                         onChange={(v) => updateQuestion(index, 'content', v)}
+                        showToolbar={false}
+                        onEditorReady={setActiveEditor}
                       />
                       
                       {/* Quick info badges */}
@@ -652,6 +662,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                                 placeholder={q.question_type === 'audio_only' ? '(có thể để trống)' : 'Đáp án A'}
                                 onChange={(v) => updateQuestion(index, 'option_a', v)}
                                 showToolbar={false}
+                                onEditorReady={setActiveEditor}
                               />
                             </div>
                             <div>
@@ -661,6 +672,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                                 placeholder={q.question_type === 'audio_only' ? '(có thể để trống)' : 'Đáp án B'}
                                 onChange={(v) => updateQuestion(index, 'option_b', v)}
                                 showToolbar={false}
+                                onEditorReady={setActiveEditor}
                               />
                             </div>
                             {(q.option_count ?? 4) >= 3 && (
@@ -671,6 +683,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                                   placeholder={q.question_type === 'audio_only' ? '(có thể để trống)' : 'Đáp án C'}
                                   onChange={(v) => updateQuestion(index, 'option_c', v)}
                                   showToolbar={false}
+                                  onEditorReady={setActiveEditor}
                                 />
                               </div>
                             )}
@@ -682,6 +695,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                                   placeholder={q.question_type === 'audio_only' ? '(có thể để trống)' : 'Đáp án D'}
                                   onChange={(v) => updateQuestion(index, 'option_d', v)}
                                   showToolbar={false}
+                                  onEditorReady={setActiveEditor}
                                 />
                               </div>
                             )}
@@ -707,6 +721,8 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                                 value={q.explanation}
                                 placeholder="Giải thích (tùy chọn)"
                                 onChange={(v) => updateQuestion(index, 'explanation', v)}
+                                showToolbar={false}
+                                onEditorReady={setActiveEditor}
                               />
                             </div>
                           </div>

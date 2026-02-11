@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
@@ -71,6 +71,7 @@ export type RichTextEditableProps = {
   className?: string;
   onFocus?: () => void;
   showToolbar?: boolean;
+  onEditorReady?: (editor: Editor) => void;
 };
 
 const FONT_SIZES = ["12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px", "36px", "48px"];
@@ -122,7 +123,7 @@ function ToolbarDivider() {
 }
 
 export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditableProps>(
-  ({ value, onChange, placeholder, className, onFocus, showToolbar = true }, ref) => {
+  ({ value, onChange, placeholder, className, onFocus, showToolbar = true, onEditorReady }, ref) => {
     const [linkDialogOpen, setLinkDialogOpen] = React.useState(false);
     const [linkUrl, setLinkUrl] = React.useState("");
     const [imageDialogOpen, setImageDialogOpen] = React.useState(false);
@@ -173,8 +174,9 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       onUpdate: ({ editor: e }) => {
         onChange(e.getHTML());
       },
-      onFocus: () => {
+      onFocus: ({ editor: e }) => {
         onFocus?.();
+        onEditorReady?.(e);
       },
     });
 
