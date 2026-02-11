@@ -258,30 +258,30 @@ export function RichTextToolbar({ editor, className }: RichTextToolbarProps) {
         <ToolbarDivider />
 
         {/* Lists */}
-        <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="Danh sách bullet">
+        <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="Danh sách bullet (Ctrl+Shift+8)">
           <List className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="Danh sách đánh số">
+        <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="Danh sách đánh số (Ctrl+Shift+7)">
           <ListOrdered className="h-4 w-4" />
         </ToolbarButton>
 
         <ToolbarDivider />
 
         {/* Alignment */}
-        <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="Căn trái">
+        <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="Căn trái (Ctrl+L)">
           <AlignLeft className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="Căn giữa">
+        <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="Căn giữa (Ctrl+E)">
           <AlignCenter className="h-4 w-4" />
         </ToolbarButton>
-        <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("right").run()} active={editor.isActive({ textAlign: "right" })} title="Căn phải">
+        <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("right").run()} active={editor.isActive({ textAlign: "right" })} title="Căn phải (Ctrl+R)">
           <AlignRight className="h-4 w-4" />
         </ToolbarButton>
 
         <ToolbarDivider />
 
         {/* Link */}
-        <ToolbarButton onClick={() => { const existingHref = editor.getAttributes("link").href || ""; setLinkUrl(existingHref); setLinkDialogOpen(true); }} active={editor.isActive("link")} title="Chèn liên kết">
+        <ToolbarButton onClick={() => { const existingHref = editor.getAttributes("link").href || ""; setLinkUrl(existingHref); setLinkDialogOpen(true); }} active={editor.isActive("link")} title="Chèn liên kết (Ctrl+K)">
           <LinkIcon className="h-4 w-4" />
         </ToolbarButton>
 

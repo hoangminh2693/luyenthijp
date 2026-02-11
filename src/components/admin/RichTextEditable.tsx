@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEditor, EditorContent, type Editor } from "@tiptap/react";
+import { useEditor, EditorContent, type Editor, Extension } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
@@ -72,6 +72,7 @@ export type RichTextEditableProps = {
   onFocus?: () => void;
   showToolbar?: boolean;
   onEditorReady?: (editor: Editor) => void;
+  onLinkShortcut?: () => void;
 };
 
 const FONT_SIZES = ["12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px", "36px", "48px"];
@@ -123,13 +124,55 @@ function ToolbarDivider() {
 }
 
 export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditableProps>(
-  ({ value, onChange, placeholder, className, onFocus, showToolbar = true, onEditorReady }, ref) => {
+  ({ value, onChange, placeholder, className, onFocus, showToolbar = true, onEditorReady, onLinkShortcut }, ref) => {
     const [linkDialogOpen, setLinkDialogOpen] = React.useState(false);
     const [linkUrl, setLinkUrl] = React.useState("");
     const [imageDialogOpen, setImageDialogOpen] = React.useState(false);
     const [imageUrl, setImageUrl] = React.useState<string | undefined>();
     const [tableDialogOpen, setTableDialogOpen] = React.useState(false);
     const [tableSize, setTableSize] = React.useState({ rows: 3, cols: 3 });
+
+    const linkShortcutRef = React.useRef(onLinkShortcut);
+    linkShortcutRef.current = onLinkShortcut;
+
+    const linkDialogRef = React.useRef(setLinkDialogOpen);
+    linkDialogRef.current = setLinkDialogOpen;
+
+    const CustomKeyboardShortcuts = React.useMemo(() => Extension.create({
+      name: 'customKeyboardShortcuts',
+      addKeyboardShortcuts() {
+        return {
+          'Mod-k': ({ editor: e }) => {
+            if (linkShortcutRef.current) {
+              linkShortcutRef.current();
+            } else {
+              linkDialogRef.current(true);
+            }
+            return true;
+          },
+          'Mod-Shift-7': ({ editor: e }) => {
+            e.chain().focus().toggleOrderedList().run();
+            return true;
+          },
+          'Mod-Shift-8': ({ editor: e }) => {
+            e.chain().focus().toggleBulletList().run();
+            return true;
+          },
+          'Mod-e': ({ editor: e }) => {
+            e.chain().focus().setTextAlign('center').run();
+            return true;
+          },
+          'Mod-l': ({ editor: e }) => {
+            e.chain().focus().setTextAlign('left').run();
+            return true;
+          },
+          'Mod-r': ({ editor: e }) => {
+            e.chain().focus().setTextAlign('right').run();
+            return true;
+          },
+        };
+      },
+    }), []);
 
     const editor = useEditor({
       extensions: [
@@ -155,6 +198,7 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
         TableRow,
         TableCell,
         TableHeader,
+        CustomKeyboardShortcuts,
       ],
       content: value || "",
       editorProps: {
@@ -382,23 +426,23 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
             <ToolbarDivider />
 
             {/* Lists */}
-            <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="Danh sách bullet">
+            <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="Danh sách bullet (Ctrl+Shift+8)">
               <List className="h-4 w-4" />
             </ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="Danh sách đánh số">
+            <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="Danh sách đánh số (Ctrl+Shift+7)">
               <ListOrdered className="h-4 w-4" />
             </ToolbarButton>
 
             <ToolbarDivider />
 
             {/* Alignment */}
-            <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="Căn trái">
+            <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="Căn trái (Ctrl+L)">
               <AlignLeft className="h-4 w-4" />
             </ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="Căn giữa">
+            <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="Căn giữa (Ctrl+E)">
               <AlignCenter className="h-4 w-4" />
             </ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("right").run()} active={editor.isActive({ textAlign: "right" })} title="Căn phải">
+            <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("right").run()} active={editor.isActive({ textAlign: "right" })} title="Căn phải (Ctrl+R)">
               <AlignRight className="h-4 w-4" />
             </ToolbarButton>
 
@@ -412,7 +456,7 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
                 setLinkDialogOpen(true);
               }}
               active={editor.isActive("link")}
-              title="Chèn liên kết"
+              title="Chèn liên kết (Ctrl+K)"
             >
               <LinkIcon className="h-4 w-4" />
             </ToolbarButton>
