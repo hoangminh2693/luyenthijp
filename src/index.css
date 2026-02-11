@@ -1,17 +1,16 @@
+@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* Vietnamese Quiz Platform Design System */
 
-@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800&display=swap');
-
 @layer base {
   :root {
     /* Primary - Deep Blue for focus and trust */
     --primary: 217 91% 40%;
     --primary-foreground: 0 0% 100%;
-    
+
     /* Background - Clean white with subtle warmth */
     --background: 220 20% 98%;
     --foreground: 222 47% 11%;
@@ -83,7 +82,7 @@
   .dark {
     --primary: 217 91% 60%;
     --primary-foreground: 222 47% 11%;
-    
+
     --background: 222 47% 8%;
     --foreground: 210 40% 98%;
 
@@ -139,7 +138,7 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Be Vietnam Pro', sans-serif;
+    font-family: "Be Vietnam Pro", sans-serif;
   }
 }
 
@@ -181,7 +180,8 @@
 }
 
 @keyframes pulse-soft {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -213,11 +213,21 @@
 }
 
 /* Stagger animation delays */
-.stagger-1 { animation-delay: 0.1s; }
-.stagger-2 { animation-delay: 0.2s; }
-.stagger-3 { animation-delay: 0.3s; }
-.stagger-4 { animation-delay: 0.4s; }
-.stagger-5 { animation-delay: 0.5s; }
+.stagger-1 {
+  animation-delay: 0.1s;
+}
+.stagger-2 {
+  animation-delay: 0.2s;
+}
+.stagger-3 {
+  animation-delay: 0.3s;
+}
+.stagger-4 {
+  animation-delay: 0.4s;
+}
+.stagger-5 {
+  animation-delay: 0.5s;
+}
 
 /* Responsive images in rich text content */
 .prose img,
