@@ -1,8 +1,21 @@
 import * as React from "react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Underline from "@tiptap/extension-underline";
+import TextAlign from "@tiptap/extension-text-align";
+import { TextStyle } from "@tiptap/extension-text-style";
+import Color from "@tiptap/extension-color";
+import Highlight from "@tiptap/extension-highlight";
+import Link from "@tiptap/extension-link";
+import Image from "@tiptap/extension-image";
+import { Table } from "@tiptap/extension-table";
+import TableRow from "@tiptap/extension-table-row";
+import TableCell from "@tiptap/extension-table-cell";
+import TableHeader from "@tiptap/extension-table-header";
+import FontSize from "@tiptap/extension-font-size";
 import { cn } from "@/lib/utils";
-import { sanitizeRichText } from "@/lib/richText";
-import { Bold, Italic, Underline, Table, Plus, Minus, Columns, Rows, Merge, SplitSquareHorizontal, Trash2, Undo } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -10,16 +23,46 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { toast } from "@/hooks/use-toast";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Bold,
+  Italic,
+  Underline as UnderlineIcon,
+  Heading1,
+  Heading2,
+  Heading3,
+  List,
+  ListOrdered,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Link as LinkIcon,
+  ImageIcon,
+  Table as TableIcon,
+  Undo,
+  Redo,
+  Palette,
+  Highlighter,
+  Type,
+  Plus,
+  Minus,
+  Trash2,
+  Columns,
+  Rows,
+  Merge,
+  SplitSquareHorizontal,
+} from "lucide-react";
+import { MediaUpload } from "@/components/admin/MediaUpload";
 
 export type RichTextEditableProps = {
   value: string;
@@ -30,1201 +73,491 @@ export type RichTextEditableProps = {
   showToolbar?: boolean;
 };
 
-// Cell selection state
-interface CellSelection {
-  startRow: number;
-  startCol: number;
-  endRow: number;
-  endCol: number;
-  table: HTMLTableElement;
+const FONT_SIZES = ["12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px", "36px", "48px"];
+
+const TEXT_COLORS = [
+  "#000000", "#434343", "#666666", "#999999", "#cccccc",
+  "#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6",
+  "#8b5cf6", "#ec4899", "#14b8a6", "#6366f1", "#a855f7",
+];
+
+const HIGHLIGHT_COLORS = [
+  "transparent", "#fef08a", "#bbf7d0", "#bfdbfe", "#fecaca",
+  "#fed7aa", "#e9d5ff", "#fbcfe8", "#ccfbf1", "#fde68a",
+];
+
+// Toolbar button component
+function ToolbarButton({
+  onClick,
+  active = false,
+  disabled = false,
+  title,
+  children,
+}: {
+  onClick: () => void;
+  active?: boolean;
+  disabled?: boolean;
+  title?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={cn(
+        "inline-flex items-center justify-center rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-40 disabled:pointer-events-none",
+        active && "bg-accent text-accent-foreground"
+      )}
+    >
+      {children}
+    </button>
+  );
 }
 
-/**
- * RichTextEditable - Excel-like Table Editor
- * - Multi-cell selection with visual borders
- * - Clear merge/split functionality
- * - Excel/Sheets paste support
- * - Context menu for table operations
- */
+function ToolbarDivider() {
+  return <div className="mx-1 h-6 w-px bg-border" />;
+}
+
 export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditableProps>(
   ({ value, onChange, placeholder, className, onFocus, showToolbar = true }, ref) => {
-    const innerRef = React.useRef<HTMLDivElement | null>(null);
-    const [isFocused, setIsFocused] = React.useState(false);
+    const [linkDialogOpen, setLinkDialogOpen] = React.useState(false);
+    const [linkUrl, setLinkUrl] = React.useState("");
+    const [imageDialogOpen, setImageDialogOpen] = React.useState(false);
+    const [imageUrl, setImageUrl] = React.useState<string | undefined>();
     const [tableDialogOpen, setTableDialogOpen] = React.useState(false);
-    const [splitDialogOpen, setSplitDialogOpen] = React.useState(false);
-    const [tableSize, setTableSize] = React.useState({ rows: 2, cols: 2 });
-    const [splitSize, setSplitSize] = React.useState({ rows: 2, cols: 1 });
-    const savedSelectionRef = React.useRef<Range | null>(null);
-    const clickedCellRef = React.useRef<HTMLTableCellElement | null>(null);
-    const [isInTable, setIsInTable] = React.useState(false);
-    
-    // Multi-cell selection state
-    const [cellSelection, setCellSelection] = React.useState<CellSelection | null>(null);
-    const [isSelecting, setIsSelecting] = React.useState(false);
-    const selectionStartRef = React.useRef<{ row: number; col: number; table: HTMLTableElement } | null>(null);
+    const [tableSize, setTableSize] = React.useState({ rows: 3, cols: 3 });
 
-    React.useImperativeHandle(ref, () => innerRef.current as HTMLDivElement);
-
-    // Sync từ state vào DOM khi không focus
-    React.useEffect(() => {
-      const el = innerRef.current;
-      if (!el) return;
-      if (document.activeElement === el) return;
-      if ((el.innerHTML || "") !== (value || "")) {
-        el.innerHTML = value || "";
-      }
-    }, [value]);
-
-    // Update selection highlighting
-    React.useEffect(() => {
-      const el = innerRef.current;
-      if (!el) return;
-
-      // Clear all selection highlights
-      el.querySelectorAll('[data-selected="true"]').forEach(cell => {
-        (cell as HTMLElement).removeAttribute('data-selected');
-        (cell as HTMLElement).style.outline = '';
-        (cell as HTMLElement).style.background = '';
-      });
-
-      if (!cellSelection) return;
-
-      const { table, startRow, startCol, endRow, endCol } = cellSelection;
-      const minRow = Math.min(startRow, endRow);
-      const maxRow = Math.max(startRow, endRow);
-      const minCol = Math.min(startCol, endCol);
-      const maxCol = Math.max(startCol, endCol);
-
-      const rows = Array.from(table.rows);
-      rows.forEach((row, rowIndex) => {
-        if (rowIndex < minRow || rowIndex > maxRow) return;
-        
-        let currentCol = 0;
-        Array.from(row.cells).forEach(cell => {
-          const cellColSpan = cell.colSpan || 1;
-          const cellRowSpan = cell.rowSpan || 1;
-          
-          // Check if this cell is within selection range
-          const cellEndCol = currentCol + cellColSpan - 1;
-          const cellEndRow = rowIndex + cellRowSpan - 1;
-          
-          if (currentCol <= maxCol && cellEndCol >= minCol && rowIndex <= maxRow && cellEndRow >= minRow) {
-            cell.setAttribute('data-selected', 'true');
-            cell.style.outline = '2px solid hsl(var(--primary))';
-            cell.style.background = 'hsl(var(--primary) / 0.1)';
-          }
-          
-          currentCol += cellColSpan;
-        });
-      });
-    }, [cellSelection]);
-
-    const emitChange = React.useCallback(() => {
-      const el = innerRef.current;
-      if (!el) return;
-      const sanitized = sanitizeRichText(el.innerHTML || "");
-      onChange(sanitized);
-    }, [onChange]);
-
-    // ============= PASTE HANDLING (Excel/Sheets) =============
-    const handlePaste = React.useCallback(
-      (e: React.ClipboardEvent<HTMLDivElement>) => {
-        const html = e.clipboardData.getData("text/html");
-        const text = e.clipboardData.getData("text/plain");
-
-        // Check if pasting into a table cell
-        const sel = window.getSelection();
-        const anchorNode = sel?.anchorNode;
-        const cell = anchorNode instanceof HTMLElement 
-          ? anchorNode.closest('td, th')
-          : anchorNode?.parentElement?.closest('td, th');
-
-        // If pasting tabular data (from Excel/Sheets) into an existing table
-        if (cell && text && text.includes('\t')) {
-          e.preventDefault();
-          
-          const table = cell.closest('table');
-          if (!table) return;
-
-          const lines = text.split('\n').filter(l => l.trim());
-          if (lines.length === 0) return;
-
-          // Get starting position
-          const { row: startRow, col: startCol } = getCellPosition(cell as HTMLTableCellElement);
-          const rows = Array.from(table.rows);
-
-          lines.forEach((line, lineIdx) => {
-            const rowIdx = startRow + lineIdx;
-            if (rowIdx >= rows.length) {
-              // Add new row if needed
-              const newRow = document.createElement('tr');
-              const colCount = lines[0].split('\t').length;
-              for (let i = 0; i < Math.max(colCount, startCol + lines[0].split('\t').length); i++) {
-                const td = document.createElement('td');
-                td.style.cssText = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 40px;';
-                td.innerHTML = '&nbsp;';
-                newRow.appendChild(td);
-              }
-              table.appendChild(newRow);
-            }
-
-            const cols = line.split('\t');
-            cols.forEach((content, colIdx) => {
-              const targetCol = startCol + colIdx;
-              const targetRow = table.rows[rowIdx];
-              if (!targetRow) return;
-
-              let currentCol = 0;
-              for (let i = 0; i < targetRow.cells.length; i++) {
-                if (currentCol === targetCol) {
-                  targetRow.cells[i].innerHTML = content.trim() || '&nbsp;';
-                  break;
-                }
-                currentCol += targetRow.cells[i].colSpan || 1;
-              }
-            });
-          });
-
-          setTimeout(emitChange, 0);
-          return;
-        }
-
-        // Standard HTML/text paste
-        if (html) {
-          e.preventDefault();
-          const safe = sanitizeRichText(html);
-          document.execCommand("insertHTML", false, safe);
-          setTimeout(emitChange, 0);
-          return;
-        }
-
-        if (text) {
-          e.preventDefault();
-          document.execCommand("insertText", false, text);
-          setTimeout(emitChange, 0);
-        }
+    const editor = useEditor({
+      extensions: [
+        StarterKit.configure({
+          heading: { levels: [1, 2, 3, 4, 5, 6] },
+        }),
+        Underline,
+        TextStyle,
+        FontSize,
+        Color,
+        Highlight.configure({ multicolor: true }),
+        TextAlign.configure({
+          types: ["heading", "paragraph"],
+        }),
+        Link.configure({
+          openOnClick: false,
+          HTMLAttributes: { rel: "noopener noreferrer nofollow", target: "_blank" },
+        }),
+        Image.configure({
+          HTMLAttributes: { class: "max-w-full h-auto rounded" },
+        }),
+        Table.configure({ resizable: true }),
+        TableRow,
+        TableCell,
+        TableHeader,
+      ],
+      content: value || "",
+      editorProps: {
+        attributes: {
+          class: cn(
+            "prose prose-sm max-w-none focus:outline-none min-h-[120px] px-3 py-2",
+            "prose-headings:font-bold prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg",
+            "prose-table:border-collapse prose-td:border prose-td:border-border prose-td:p-2",
+            "prose-th:border prose-th:border-border prose-th:p-2 prose-th:bg-muted/50",
+            "[&_table]:w-full [&_table]:border-collapse",
+            "[&_td]:border [&_td]:border-border [&_td]:p-2 [&_td]:min-w-[40px]",
+            "[&_th]:border [&_th]:border-border [&_th]:p-2 [&_th]:bg-muted/50 [&_th]:font-semibold",
+            "[&_.selectedCell]:bg-primary/10 [&_.selectedCell]:outline [&_.selectedCell]:outline-2 [&_.selectedCell]:outline-primary",
+          ),
+        },
       },
-      [emitChange]
-    );
-
-    const applyFormat = React.useCallback(
-      (command: string) => {
-        const el = innerRef.current;
-        if (!el) return;
-        el.focus();
-        document.execCommand(command, false);
-        setTimeout(emitChange, 0);
+      onUpdate: ({ editor: e }) => {
+        onChange(e.getHTML());
       },
-      [emitChange]
-    );
+      onFocus: () => {
+        onFocus?.();
+      },
+    });
 
-    const generateTableHtml = React.useCallback((rows: number, cols: number) => {
-      const cellStyle = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 40px;';
-      let html = '<table style="border-collapse: collapse; width: 100%;">';
-      for (let r = 0; r < rows; r++) {
-        html += '<tr>';
-        for (let c = 0; c < cols; c++) {
-          html += `<td style="${cellStyle}">&nbsp;</td>`;
-        }
-        html += '</tr>';
+    // Sync external value changes
+    React.useEffect(() => {
+      if (!editor) return;
+      if (editor.isFocused) return;
+      const currentHtml = editor.getHTML();
+      if (currentHtml !== value) {
+        editor.commands.setContent(value || "", { emitUpdate: false });
       }
-      html += '</table><br>';
-      return html;
-    }, []);
+    }, [value, editor]);
 
-    const saveSelection = React.useCallback(() => {
-      const sel = window.getSelection();
-      if (sel && sel.rangeCount > 0) {
-        savedSelectionRef.current = sel.getRangeAt(0).cloneRange();
-      }
-    }, []);
+    React.useImperativeHandle(ref, () => {
+      return (editor?.view?.dom as HTMLDivElement) ?? document.createElement("div");
+    });
 
-    const insertTable = React.useCallback((rows: number, cols: number) => {
-      const el = innerRef.current;
-      if (!el) return;
-      
-      el.focus();
-      
-      if (savedSelectionRef.current) {
-        const sel = window.getSelection();
-        if (sel) {
-          sel.removeAllRanges();
-          sel.addRange(savedSelectionRef.current);
-        }
+    if (!editor) return null;
+
+    const isInTable = editor.isActive("table");
+
+    const handleInsertLink = () => {
+      if (!linkUrl.trim()) {
+        editor.chain().focus().unsetLink().run();
+      } else {
+        editor.chain().focus().setLink({ href: linkUrl.trim() }).run();
       }
-      
-      const tableHtml = generateTableHtml(rows, cols);
-      document.execCommand("insertHTML", false, tableHtml);
-      setTimeout(emitChange, 0);
+      setLinkDialogOpen(false);
+      setLinkUrl("");
+    };
+
+    const handleInsertImage = () => {
+      if (imageUrl) {
+        editor.chain().focus().setImage({ src: imageUrl }).run();
+      }
+      setImageDialogOpen(false);
+      setImageUrl(undefined);
+    };
+
+    const handleInsertTable = () => {
+      editor
+        .chain()
+        .focus()
+        .insertTable({ rows: tableSize.rows, cols: tableSize.cols, withHeaderRow: true })
+        .run();
       setTableDialogOpen(false);
-      savedSelectionRef.current = null;
-    }, [generateTableHtml, emitChange]);
-
-    const openTableDialog = React.useCallback(() => {
-      saveSelection();
-      setTableDialogOpen(true);
-    }, [saveSelection]);
-
-    const handleFocus = React.useCallback(() => {
-      setIsFocused(true);
-      onFocus?.();
-    }, [onFocus]);
-
-    const handleBlur = React.useCallback(() => {
-      setTimeout(() => {
-        const el = innerRef.current;
-        if (!el) return;
-        if (tableDialogOpen || splitDialogOpen) return;
-        if (!el.contains(document.activeElement)) {
-          setIsFocused(false);
-          setCellSelection(null);
-        }
-      }, 150);
-      emitChange();
-    }, [emitChange, tableDialogOpen, splitDialogOpen]);
-
-    const handleKeyDown = React.useCallback(
-      (e: React.KeyboardEvent<HTMLDivElement>) => {
-        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
-          switch (e.key.toLowerCase()) {
-            case 'b':
-              e.preventDefault();
-              applyFormat('bold');
-              break;
-            case 'i':
-              e.preventDefault();
-              applyFormat('italic');
-              break;
-            case 'u':
-              e.preventDefault();
-              applyFormat('underline');
-              break;
-            case 't':
-              e.preventDefault();
-              openTableDialog();
-              break;
-          }
-        }
-        
-        // Escape to clear selection
-        if (e.key === 'Escape' && cellSelection) {
-          setCellSelection(null);
-        }
-      },
-      [applyFormat, openTableDialog, cellSelection]
-    );
-
-    // ============= TABLE HELPERS =============
-
-    const findTableCell = (target: EventTarget | null): HTMLTableCellElement | null => {
-      if (!target || !(target instanceof HTMLElement)) return null;
-      return target.closest('td, th') as HTMLTableCellElement | null;
+      setTableSize({ rows: 3, cols: 3 });
     };
 
-    const findTable = (cell: HTMLTableCellElement | null): HTMLTableElement | null => {
-      if (!cell) return null;
-      return cell.closest('table') as HTMLTableElement | null;
+    const currentHeading = (() => {
+      for (let i = 1; i <= 6; i++) {
+        if (editor.isActive("heading", { level: i })) return `h${i}`;
+      }
+      return "paragraph";
+    })();
+
+    const handleHeadingChange = (val: string) => {
+      if (val === "paragraph") {
+        editor.chain().focus().setParagraph().run();
+      } else {
+        const level = parseInt(val.replace("h", "")) as 1 | 2 | 3 | 4 | 5 | 6;
+        editor.chain().focus().toggleHeading({ level }).run();
+      }
     };
-
-    const getCellPosition = (cell: HTMLTableCellElement): { row: number; col: number } => {
-      const table = findTable(cell);
-      if (!table) return { row: 0, col: 0 };
-
-      const rows = Array.from(table.rows);
-      let rowIndex = -1;
-      let colIndex = -1;
-
-      for (let r = 0; r < rows.length; r++) {
-        const cells = Array.from(rows[r].cells);
-        let currentCol = 0;
-        
-        for (let c = 0; c < cells.length; c++) {
-          if (cells[c] === cell) {
-            rowIndex = r;
-            colIndex = currentCol;
-            break;
-          }
-          currentCol += cells[c].colSpan || 1;
-        }
-        if (rowIndex >= 0) break;
-      }
-
-      return { row: rowIndex, col: colIndex };
-    };
-
-    // ============= MULTI-CELL SELECTION =============
-
-    const handleMouseDown = React.useCallback((e: React.MouseEvent) => {
-      const cell = findTableCell(e.target);
-      if (!cell) {
-        setCellSelection(null);
-        return;
-      }
-
-      const table = findTable(cell);
-      if (!table) return;
-
-      const pos = getCellPosition(cell);
-      selectionStartRef.current = { ...pos, table };
-      setIsSelecting(true);
-      
-      // Single cell selection on mousedown
-      setCellSelection({
-        startRow: pos.row,
-        startCol: pos.col,
-        endRow: pos.row,
-        endCol: pos.col,
-        table
-      });
-    }, []);
-
-    const handleMouseMove = React.useCallback((e: React.MouseEvent) => {
-      if (!isSelecting || !selectionStartRef.current) return;
-
-      const cell = findTableCell(e.target);
-      if (!cell) return;
-
-      const table = findTable(cell);
-      if (table !== selectionStartRef.current.table) return;
-
-      const pos = getCellPosition(cell);
-      
-      setCellSelection({
-        startRow: selectionStartRef.current.row,
-        startCol: selectionStartRef.current.col,
-        endRow: pos.row,
-        endCol: pos.col,
-        table
-      });
-    }, [isSelecting]);
-
-    const handleMouseUp = React.useCallback(() => {
-      setIsSelecting(false);
-    }, []);
-
-    // Global mouseup listener
-    React.useEffect(() => {
-      const handleGlobalMouseUp = () => setIsSelecting(false);
-      document.addEventListener('mouseup', handleGlobalMouseUp);
-      return () => document.removeEventListener('mouseup', handleGlobalMouseUp);
-    }, []);
-
-    const handleContextMenu = React.useCallback((e: React.MouseEvent) => {
-      const cell = findTableCell(e.target);
-      clickedCellRef.current = cell;
-      setIsInTable(!!cell);
-    }, []);
-
-    // ============= ROW OPERATIONS =============
-
-    const addRowAbove = React.useCallback(() => {
-      const cell = clickedCellRef.current;
-      const table = findTable(cell);
-      if (!cell || !table) return;
-
-      const row = cell.closest('tr');
-      if (!row) return;
-
-      const numCols = Array.from(row.cells).reduce((sum, c) => sum + (c.colSpan || 1), 0);
-      const newRow = document.createElement('tr');
-      
-      for (let i = 0; i < numCols; i++) {
-        const td = document.createElement('td');
-        td.style.cssText = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 40px;';
-        td.innerHTML = '&nbsp;';
-        newRow.appendChild(td);
-      }
-
-      row.parentNode?.insertBefore(newRow, row);
-      setTimeout(emitChange, 0);
-    }, [emitChange]);
-
-    const addRowBelow = React.useCallback(() => {
-      const cell = clickedCellRef.current;
-      const table = findTable(cell);
-      if (!cell || !table) return;
-
-      const row = cell.closest('tr');
-      if (!row) return;
-
-      const numCols = Array.from(row.cells).reduce((sum, c) => sum + (c.colSpan || 1), 0);
-      const newRow = document.createElement('tr');
-      
-      for (let i = 0; i < numCols; i++) {
-        const td = document.createElement('td');
-        td.style.cssText = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 40px;';
-        td.innerHTML = '&nbsp;';
-        newRow.appendChild(td);
-      }
-
-      row.parentNode?.insertBefore(newRow, row.nextSibling);
-      setTimeout(emitChange, 0);
-    }, [emitChange]);
-
-    const deleteRow = React.useCallback(() => {
-      const cell = clickedCellRef.current;
-      const table = findTable(cell);
-      if (!cell || !table) return;
-
-      const row = cell.closest('tr');
-      if (!row) return;
-
-      if (table.rows.length <= 1) {
-        toast({ title: "Không thể xóa", description: "Bảng cần ít nhất 1 hàng", variant: "destructive" });
-        return;
-      }
-
-      row.remove();
-      setCellSelection(null);
-      setTimeout(emitChange, 0);
-    }, [emitChange]);
-
-    // ============= COLUMN OPERATIONS =============
-
-    const addColumnLeft = React.useCallback(() => {
-      const cell = clickedCellRef.current;
-      const table = findTable(cell);
-      if (!cell || !table) return;
-
-      const { col } = getCellPosition(cell);
-      
-      Array.from(table.rows).forEach(row => {
-        let currentCol = 0;
-        const cells = Array.from(row.cells);
-        
-        for (let i = 0; i < cells.length; i++) {
-          if (currentCol === col) {
-            const td = document.createElement('td');
-            td.style.cssText = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 40px;';
-            td.innerHTML = '&nbsp;';
-            cells[i].parentNode?.insertBefore(td, cells[i]);
-            break;
-          }
-          currentCol += cells[i].colSpan || 1;
-          if (currentCol > col) {
-            cells[i].colSpan = (cells[i].colSpan || 1) + 1;
-            break;
-          }
-        }
-      });
-
-      setTimeout(emitChange, 0);
-    }, [emitChange]);
-
-    const addColumnRight = React.useCallback(() => {
-      const cell = clickedCellRef.current;
-      const table = findTable(cell);
-      if (!cell || !table) return;
-
-      const { col } = getCellPosition(cell);
-      const cellColSpan = cell.colSpan || 1;
-      const targetCol = col + cellColSpan;
-      
-      Array.from(table.rows).forEach(row => {
-        let currentCol = 0;
-        const cells = Array.from(row.cells);
-        let inserted = false;
-        
-        for (let i = 0; i < cells.length; i++) {
-          const cellSpan = cells[i].colSpan || 1;
-          if (currentCol + cellSpan === targetCol) {
-            const td = document.createElement('td');
-            td.style.cssText = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 40px;';
-            td.innerHTML = '&nbsp;';
-            cells[i].parentNode?.insertBefore(td, cells[i].nextSibling);
-            inserted = true;
-            break;
-          }
-          if (currentCol < targetCol && currentCol + cellSpan > targetCol) {
-            cells[i].colSpan = cellSpan + 1;
-            inserted = true;
-            break;
-          }
-          currentCol += cellSpan;
-        }
-        
-        if (!inserted) {
-          const td = document.createElement('td');
-          td.style.cssText = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 40px;';
-          td.innerHTML = '&nbsp;';
-          row.appendChild(td);
-        }
-      });
-
-      setTimeout(emitChange, 0);
-    }, [emitChange]);
-
-    const deleteColumn = React.useCallback(() => {
-      const cell = clickedCellRef.current;
-      const table = findTable(cell);
-      if (!cell || !table) return;
-
-      // Check if this is the last column
-      const firstRow = table.rows[0];
-      if (firstRow && firstRow.cells.length <= 1) {
-        toast({ title: "Không thể xóa", description: "Bảng cần ít nhất 1 cột", variant: "destructive" });
-        return;
-      }
-
-      const { col } = getCellPosition(cell);
-      
-      Array.from(table.rows).forEach(row => {
-        let currentCol = 0;
-        const cells = Array.from(row.cells);
-        
-        for (let i = 0; i < cells.length; i++) {
-          const cellSpan = cells[i].colSpan || 1;
-          if (currentCol === col) {
-            if (cellSpan > 1) {
-              cells[i].colSpan = cellSpan - 1;
-            } else {
-              cells[i].remove();
-            }
-            break;
-          }
-          if (currentCol < col && currentCol + cellSpan > col) {
-            cells[i].colSpan = cellSpan - 1;
-            break;
-          }
-          currentCol += cellSpan;
-        }
-      });
-
-      setCellSelection(null);
-      setTimeout(emitChange, 0);
-    }, [emitChange]);
-
-    // ============= MERGE OPERATIONS =============
-
-    // Get selected cells info
-    const getSelectedCellsInfo = React.useCallback(() => {
-      if (!cellSelection) return null;
-
-      const { table, startRow, startCol, endRow, endCol } = cellSelection;
-      const minRow = Math.min(startRow, endRow);
-      const maxRow = Math.max(startRow, endRow);
-      const minCol = Math.min(startCol, endCol);
-      const maxCol = Math.max(startCol, endCol);
-
-      const selectedCells: HTMLTableCellElement[] = [];
-      const rows = Array.from(table.rows);
-
-      rows.forEach((row, rowIndex) => {
-        if (rowIndex < minRow || rowIndex > maxRow) return;
-        
-        let currentCol = 0;
-        Array.from(row.cells).forEach(cell => {
-          const cellColSpan = cell.colSpan || 1;
-          const cellEndCol = currentCol + cellColSpan - 1;
-          
-          if (currentCol <= maxCol && cellEndCol >= minCol) {
-            selectedCells.push(cell);
-          }
-          
-          currentCol += cellColSpan;
-        });
-      });
-
-      return {
-        cells: selectedCells,
-        minRow,
-        maxRow,
-        minCol,
-        maxCol,
-        rowCount: maxRow - minRow + 1,
-        colCount: maxCol - minCol + 1
-      };
-    }, [cellSelection]);
-
-    // Merge selected cells horizontally (by columns)
-    const mergeHorizontal = React.useCallback(() => {
-      const info = getSelectedCellsInfo();
-      if (!info || info.colCount < 2 || !cellSelection) {
-        toast({ title: "Chọn ít nhất 2 cột", description: "Để hợp ô theo hàng, hãy chọn nhiều ô trên cùng 1 hàng", variant: "destructive" });
-        return;
-      }
-
-      const { table } = cellSelection;
-      const { minRow, maxRow, minCol, maxCol } = info;
-      const rows = Array.from(table.rows);
-
-      for (let r = minRow; r <= maxRow; r++) {
-        const row = rows[r];
-        if (!row) continue;
-
-        let currentCol = 0;
-        const cells = Array.from(row.cells);
-        let firstCellInRange: HTMLTableCellElement | null = null;
-        let combinedContent: string[] = [];
-        let totalColSpan = 0;
-        const cellsToRemove: HTMLTableCellElement[] = [];
-
-        for (const cell of cells) {
-          const cellSpan = cell.colSpan || 1;
-          const cellEndCol = currentCol + cellSpan - 1;
-
-          if (currentCol >= minCol && cellEndCol <= maxCol) {
-            if (!firstCellInRange) {
-              firstCellInRange = cell;
-            } else {
-              cellsToRemove.push(cell);
-            }
-            const content = cell.innerHTML.trim();
-            if (content && content !== '&nbsp;') {
-              combinedContent.push(content);
-            }
-            totalColSpan += cellSpan;
-          }
-
-          currentCol += cellSpan;
-        }
-
-        if (firstCellInRange && totalColSpan > 1) {
-          firstCellInRange.colSpan = totalColSpan;
-          firstCellInRange.innerHTML = combinedContent.join(' ') || '&nbsp;';
-          cellsToRemove.forEach(c => c.remove());
-        }
-      }
-
-      setCellSelection(null);
-      setTimeout(emitChange, 0);
-      toast({ title: "Đã hợp ô", description: "Các ô đã được hợp theo hàng" });
-    }, [cellSelection, getSelectedCellsInfo, emitChange]);
-
-    // Merge selected cells vertically (by rows)
-    const mergeVertical = React.useCallback(() => {
-      const info = getSelectedCellsInfo();
-      if (!info || info.rowCount < 2 || !cellSelection) {
-        toast({ title: "Chọn ít nhất 2 hàng", description: "Để hợp ô theo cột, hãy chọn nhiều ô trên cùng 1 cột", variant: "destructive" });
-        return;
-      }
-
-      const { table } = cellSelection;
-      const { minRow, maxRow, minCol, maxCol } = info;
-      const rows = Array.from(table.rows);
-
-      // For each column in range
-      for (let c = minCol; c <= maxCol; c++) {
-        let firstCellInRange: HTMLTableCellElement | null = null;
-        let combinedContent: string[] = [];
-        let totalRowSpan = 0;
-        const cellsToRemove: HTMLTableCellElement[] = [];
-
-        for (let r = minRow; r <= maxRow; r++) {
-          const row = rows[r];
-          if (!row) continue;
-
-          let currentCol = 0;
-          for (const cell of Array.from(row.cells)) {
-            const cellSpan = cell.colSpan || 1;
-            
-            if (currentCol === c) {
-              if (!firstCellInRange) {
-                firstCellInRange = cell;
-              } else {
-                cellsToRemove.push(cell);
-              }
-              const content = cell.innerHTML.trim();
-              if (content && content !== '&nbsp;') {
-                combinedContent.push(content);
-              }
-              totalRowSpan += cell.rowSpan || 1;
-              break;
-            }
-            
-            currentCol += cellSpan;
-          }
-        }
-
-        if (firstCellInRange && totalRowSpan > 1) {
-          firstCellInRange.rowSpan = totalRowSpan;
-          firstCellInRange.innerHTML = combinedContent.join('<br>') || '&nbsp;';
-          cellsToRemove.forEach(c => c.remove());
-        }
-      }
-
-      setCellSelection(null);
-      setTimeout(emitChange, 0);
-      toast({ title: "Đã hợp ô", description: "Các ô đã được hợp theo cột" });
-    }, [cellSelection, getSelectedCellsInfo, emitChange]);
-
-    // Unmerge/split a merged cell back to individual cells
-    const unmergeCells = React.useCallback(() => {
-      const cell = clickedCellRef.current;
-      if (!cell) return;
-
-      const colSpan = cell.colSpan || 1;
-      const rowSpan = cell.rowSpan || 1;
-
-      if (colSpan === 1 && rowSpan === 1) {
-        toast({ title: "Ô chưa được hợp", description: "Ô này không cần tách", variant: "destructive" });
-        return;
-      }
-
-      const table = findTable(cell);
-      if (!table) return;
-
-      const { row: startRow, col: startCol } = getCellPosition(cell);
-      const rows = Array.from(table.rows);
-      const content = cell.innerHTML;
-
-      // Reset the original cell
-      cell.colSpan = 1;
-      cell.rowSpan = 1;
-      cell.innerHTML = content;
-
-      // Add cells to fill the colspan in the same row
-      for (let c = 1; c < colSpan; c++) {
-        const newCell = document.createElement('td');
-        newCell.style.cssText = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 40px;';
-        newCell.innerHTML = '&nbsp;';
-        cell.after(newCell);
-      }
-
-      // Add cells to fill the rowspan in subsequent rows
-      for (let r = 1; r < rowSpan; r++) {
-        const targetRow = rows[startRow + r];
-        if (!targetRow) continue;
-
-        // Find position to insert
-        let currentCol = 0;
-        let insertBefore: HTMLTableCellElement | null = null;
-        
-        for (const existingCell of Array.from(targetRow.cells)) {
-          if (currentCol >= startCol) {
-            insertBefore = existingCell;
-            break;
-          }
-          currentCol += existingCell.colSpan || 1;
-        }
-
-        for (let c = 0; c < colSpan; c++) {
-          const newCell = document.createElement('td');
-          newCell.style.cssText = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 40px;';
-          newCell.innerHTML = '&nbsp;';
-          
-          if (insertBefore) {
-            targetRow.insertBefore(newCell, insertBefore);
-          } else {
-            targetRow.appendChild(newCell);
-          }
-        }
-      }
-
-      setCellSelection(null);
-      setTimeout(emitChange, 0);
-      toast({ title: "Đã tách ô", description: "Ô đã được tách về trạng thái ban đầu" });
-    }, [emitChange]);
-
-    // Open split dialog for nested table
-    const openSplitDialog = React.useCallback(() => {
-      setSplitSize({ rows: 2, cols: 2 });
-      setSplitDialogOpen(true);
-    }, []);
-
-    // Split cell into nested table
-    const splitCell = React.useCallback((rows: number, cols: number) => {
-      const cell = clickedCellRef.current;
-      if (!cell) return;
-
-      const textContent = cell.textContent?.trim() || '';
-      const isEmptyCell = !textContent || textContent === '\u00A0';
-      const cellContent = isEmptyCell ? '' : cell.innerHTML.trim();
-      
-      const cellStyle = 'border: 1px solid currentColor; padding: 4px 8px; min-width: 30px;';
-      let nestedTableHtml = '<table style="border-collapse: collapse; width: 100%; margin: 0;">';
-      
-      for (let r = 0; r < rows; r++) {
-        nestedTableHtml += '<tr>';
-        for (let c = 0; c < cols; c++) {
-          const content = (r === 0 && c === 0 && cellContent) 
-            ? cellContent 
-            : '&nbsp;';
-          nestedTableHtml += `<td style="${cellStyle}">${content}</td>`;
-        }
-        nestedTableHtml += '</tr>';
-      }
-      nestedTableHtml += '</table>';
-
-      cell.innerHTML = nestedTableHtml;
-      cell.style.padding = '0';
-
-      setSplitDialogOpen(false);
-      setTimeout(emitChange, 0);
-    }, [emitChange]);
-
-    const deleteTable = React.useCallback(() => {
-      const cell = clickedCellRef.current;
-      const table = findTable(cell);
-      if (!table) return;
-
-      table.remove();
-      setCellSelection(null);
-      setTimeout(emitChange, 0);
-    }, [emitChange]);
-
-    // Check if current selection can be merged
-    const canMergeHorizontal = cellSelection && Math.abs(cellSelection.endCol - cellSelection.startCol) >= 1;
-    const canMergeVertical = cellSelection && Math.abs(cellSelection.endRow - cellSelection.startRow) >= 1;
-    const hasSelection = cellSelection && (canMergeHorizontal || canMergeVertical);
-
-    // Check if clicked cell is merged
-    const isMergedCell = clickedCellRef.current && 
-      ((clickedCellRef.current.colSpan || 1) > 1 || (clickedCellRef.current.rowSpan || 1) > 1);
 
     return (
-      <div className="relative">
-        {/* Toolbar */}
-        {showToolbar && isFocused && (
-          <div className="absolute -top-8 left-0 z-10 flex gap-0.5 rounded-md border border-border bg-popover p-0.5 shadow-md">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                applyFormat("bold");
-              }}
-              title="In đậm (Ctrl+B)"
-            >
-              <Bold className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                applyFormat("italic");
-              }}
-              title="In nghiêng (Ctrl+I)"
-            >
-              <Italic className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                applyFormat("underline");
-              }}
-              title="Gạch chân (Ctrl+U)"
-            >
-              <Underline className="h-3.5 w-3.5" />
-            </Button>
-            
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                openTableDialog();
-              }}
-              title="Chèn bảng (Ctrl+T)"
-            >
-              <Table className="h-3.5 w-3.5" />
-            </Button>
+      <div className={cn("rounded-md border border-input bg-background", className)} ref={ref}>
+        {showToolbar && (
+          <div className="flex flex-wrap items-center gap-0.5 border-b border-border bg-muted/30 px-2 py-1.5">
+            {/* Heading select */}
+            <Select value={currentHeading} onValueChange={handleHeadingChange}>
+              <SelectTrigger className="h-8 w-[110px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="paragraph">Đoạn văn</SelectItem>
+                <SelectItem value="h1">Heading 1</SelectItem>
+                <SelectItem value="h2">Heading 2</SelectItem>
+                <SelectItem value="h3">Heading 3</SelectItem>
+                <SelectItem value="h4">Heading 4</SelectItem>
+                <SelectItem value="h5">Heading 5</SelectItem>
+                <SelectItem value="h6">Heading 6</SelectItem>
+              </SelectContent>
+            </Select>
 
-            {/* Merge buttons when cells are selected */}
-            {hasSelection && (
+            <ToolbarDivider />
+
+            {/* Font size */}
+            <Select
+              value={editor.getAttributes("textStyle").fontSize || ""}
+              onValueChange={(val) => {
+                if (val === "default") {
+                  editor.chain().focus().unsetFontSize().run();
+                } else {
+                  editor.chain().focus().setFontSize(val).run();
+                }
+              }}
+            >
+              <SelectTrigger className="h-8 w-[75px] text-xs">
+                <SelectValue placeholder="Cỡ chữ" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Mặc định</SelectItem>
+                {FONT_SIZES.map((size) => (
+                  <SelectItem key={size} value={size}>
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <ToolbarDivider />
+
+            {/* Bold / Italic / Underline */}
+            <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="In đậm (Ctrl+B)">
+              <Bold className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="In nghiêng (Ctrl+I)">
+              <Italic className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title="Gạch chân (Ctrl+U)">
+              <UnderlineIcon className="h-4 w-4" />
+            </ToolbarButton>
+
+            <ToolbarDivider />
+
+            {/* Text color */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="inline-flex items-center justify-center rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  title="Màu chữ"
+                >
+                  <div className="flex flex-col items-center">
+                    <Type className="h-4 w-4" />
+                    <div
+                      className="mt-0.5 h-1 w-4 rounded-sm"
+                      style={{ backgroundColor: editor.getAttributes("textStyle").color || "#000" }}
+                    />
+                  </div>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-2" align="start">
+                <div className="grid grid-cols-5 gap-1">
+                  {TEXT_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      className="h-6 w-6 rounded border border-border hover:scale-110 transition-transform"
+                      style={{ backgroundColor: color }}
+                      onClick={() => editor.chain().focus().setColor(color).run()}
+                    />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="mt-2 w-full text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => editor.chain().focus().unsetColor().run()}
+                >
+                  Xóa màu
+                </button>
+              </PopoverContent>
+            </Popover>
+
+            {/* Highlight */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="inline-flex items-center justify-center rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  title="Tô nền chữ"
+                >
+                  <Highlighter className="h-4 w-4" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-2" align="start">
+                <div className="grid grid-cols-5 gap-1">
+                  {HIGHLIGHT_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      className={cn(
+                        "h-6 w-6 rounded border border-border hover:scale-110 transition-transform",
+                        color === "transparent" && "bg-[repeating-conic-gradient(#ccc_0%_25%,transparent_0%_50%)] bg-[length:8px_8px]"
+                      )}
+                      style={color !== "transparent" ? { backgroundColor: color } : undefined}
+                      onClick={() => {
+                        if (color === "transparent") {
+                          editor.chain().focus().unsetHighlight().run();
+                        } else {
+                          editor.chain().focus().toggleHighlight({ color }).run();
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <ToolbarDivider />
+
+            {/* Lists */}
+            <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="Danh sách bullet">
+              <List className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="Danh sách đánh số">
+              <ListOrdered className="h-4 w-4" />
+            </ToolbarButton>
+
+            <ToolbarDivider />
+
+            {/* Alignment */}
+            <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="Căn trái">
+              <AlignLeft className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="Căn giữa">
+              <AlignCenter className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("right").run()} active={editor.isActive({ textAlign: "right" })} title="Căn phải">
+              <AlignRight className="h-4 w-4" />
+            </ToolbarButton>
+
+            <ToolbarDivider />
+
+            {/* Link */}
+            <ToolbarButton
+              onClick={() => {
+                const existingHref = editor.getAttributes("link").href || "";
+                setLinkUrl(existingHref);
+                setLinkDialogOpen(true);
+              }}
+              active={editor.isActive("link")}
+              title="Chèn liên kết"
+            >
+              <LinkIcon className="h-4 w-4" />
+            </ToolbarButton>
+
+            {/* Image */}
+            <ToolbarButton onClick={() => setImageDialogOpen(true)} title="Chèn hình ảnh">
+              <ImageIcon className="h-4 w-4" />
+            </ToolbarButton>
+
+            {/* Table */}
+            <ToolbarButton onClick={() => setTableDialogOpen(true)} title="Chèn bảng">
+              <TableIcon className="h-4 w-4" />
+            </ToolbarButton>
+
+            {/* Table operations (show when in table) */}
+            {isInTable && (
               <>
-                <div className="w-px bg-border mx-1" />
-                {canMergeHorizontal && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      mergeHorizontal();
-                    }}
-                    title="Hợp ô theo hàng"
-                  >
-                    <Merge className="h-3.5 w-3.5 rotate-90" />
-                  </Button>
-                )}
-                {canMergeVertical && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      mergeVertical();
-                    }}
-                    title="Hợp ô theo cột"
-                  >
-                    <Merge className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Selection info badge */}
-        {hasSelection && (
-          <div className="absolute -top-8 right-0 z-10 rounded-md border border-border bg-popover px-2 py-1 text-xs shadow-md">
-            Đã chọn: {Math.abs(cellSelection!.endRow - cellSelection!.startRow) + 1} hàng × {Math.abs(cellSelection!.endCol - cellSelection!.startCol) + 1} cột
-          </div>
-        )}
-
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
-            <div
-              ref={innerRef}
-              contentEditable
-              suppressContentEditableWarning
-              onInput={emitChange}
-              onBlur={handleBlur}
-              onFocus={handleFocus}
-              onPaste={handlePaste}
-              onKeyDown={handleKeyDown}
-              onContextMenu={handleContextMenu}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              data-placeholder={placeholder || ""}
-              className={cn(
-                "min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                "empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground empty:before:pointer-events-none",
-                "[&_table]:border-collapse [&_table]:w-full [&_td]:border [&_td]:border-border [&_td]:p-1 [&_th]:border [&_th]:border-border [&_th]:p-1 [&_th]:font-medium",
-                // Table cursor
-                "[&_td]:cursor-cell [&_th]:cursor-cell",
-                showToolbar && isFocused && "mt-8",
-                className
-              )}
-            />
-          </ContextMenuTrigger>
-          
-          <ContextMenuContent className="w-64 bg-popover">
-            {isInTable ? (
-              <>
-                {/* Row operations */}
-                <ContextMenuSub>
-                  <ContextMenuSubTrigger className="flex items-center gap-2">
-                    <Rows className="h-4 w-4" />
-                    <span>Hàng</span>
-                  </ContextMenuSubTrigger>
-                  <ContextMenuSubContent className="bg-popover">
-                    <ContextMenuItem onClick={addRowAbove} className="flex items-center gap-2">
-                      <Plus className="h-4 w-4" />
-                      <span>Thêm hàng phía trên</span>
-                    </ContextMenuItem>
-                    <ContextMenuItem onClick={addRowBelow} className="flex items-center gap-2">
-                      <Plus className="h-4 w-4" />
-                      <span>Thêm hàng phía dưới</span>
-                    </ContextMenuItem>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem onClick={deleteRow} className="flex items-center gap-2 text-destructive">
-                      <Minus className="h-4 w-4" />
-                      <span>Xóa hàng</span>
-                    </ContextMenuItem>
-                  </ContextMenuSubContent>
-                </ContextMenuSub>
-
-                {/* Column operations */}
-                <ContextMenuSub>
-                  <ContextMenuSubTrigger className="flex items-center gap-2">
-                    <Columns className="h-4 w-4" />
-                    <span>Cột</span>
-                  </ContextMenuSubTrigger>
-                  <ContextMenuSubContent className="bg-popover">
-                    <ContextMenuItem onClick={addColumnLeft} className="flex items-center gap-2">
-                      <Plus className="h-4 w-4" />
-                      <span>Thêm cột bên trái</span>
-                    </ContextMenuItem>
-                    <ContextMenuItem onClick={addColumnRight} className="flex items-center gap-2">
-                      <Plus className="h-4 w-4" />
-                      <span>Thêm cột bên phải</span>
-                    </ContextMenuItem>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem onClick={deleteColumn} className="flex items-center gap-2 text-destructive">
-                      <Minus className="h-4 w-4" />
-                      <span>Xóa cột</span>
-                    </ContextMenuItem>
-                  </ContextMenuSubContent>
-                </ContextMenuSub>
-
-                <ContextMenuSeparator />
-
-                {/* Merge operations - only show when multiple cells selected */}
-                {hasSelection && (
-                  <>
-                    <ContextMenuSub>
-                      <ContextMenuSubTrigger className="flex items-center gap-2">
-                        <Merge className="h-4 w-4" />
-                        <span>Hợp ô ({Math.abs(cellSelection!.endRow - cellSelection!.startRow) + 1}×{Math.abs(cellSelection!.endCol - cellSelection!.startCol) + 1})</span>
-                      </ContextMenuSubTrigger>
-                      <ContextMenuSubContent className="bg-popover">
-                        {canMergeHorizontal && (
-                          <ContextMenuItem onClick={mergeHorizontal} className="flex items-center gap-2">
-                            <Merge className="h-4 w-4 rotate-90" />
-                            <span>Hợp ô theo hàng (ngang)</span>
-                          </ContextMenuItem>
-                        )}
-                        {canMergeVertical && (
-                          <ContextMenuItem onClick={mergeVertical} className="flex items-center gap-2">
-                            <Merge className="h-4 w-4" />
-                            <span>Hợp ô theo cột (dọc)</span>
-                          </ContextMenuItem>
-                        )}
-                      </ContextMenuSubContent>
-                    </ContextMenuSub>
-                    <ContextMenuSeparator />
-                  </>
-                )}
-
-                {/* Unmerge - only show for merged cells */}
-                {isMergedCell && (
-                  <ContextMenuItem onClick={unmergeCells} className="flex items-center gap-2">
-                    <Undo className="h-4 w-4" />
-                    <span>Bỏ hợp ô (tách về ban đầu)</span>
-                  </ContextMenuItem>
-                )}
-
-                {/* Split cell into nested table */}
-                <ContextMenuItem onClick={openSplitDialog} className="flex items-center gap-2">
+                <ToolbarDivider />
+                <ToolbarButton onClick={() => editor.chain().focus().addRowBefore().run()} title="Thêm hàng trên">
+                  <Plus className="h-3 w-3" />
+                  <Rows className="h-3 w-3" />
+                </ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().addRowAfter().run()} title="Thêm hàng dưới">
+                  <Rows className="h-3 w-3" />
+                  <Plus className="h-3 w-3" />
+                </ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().addColumnBefore().run()} title="Thêm cột trái">
+                  <Plus className="h-3 w-3" />
+                  <Columns className="h-3 w-3" />
+                </ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().addColumnAfter().run()} title="Thêm cột phải">
+                  <Columns className="h-3 w-3" />
+                  <Plus className="h-3 w-3" />
+                </ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().deleteRow().run()} title="Xóa hàng">
+                  <Minus className="h-3 w-3" />
+                  <Rows className="h-3 w-3" />
+                </ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().deleteColumn().run()} title="Xóa cột">
+                  <Minus className="h-3 w-3" />
+                  <Columns className="h-3 w-3" />
+                </ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().mergeCells().run()} title="Gộp ô">
+                  <Merge className="h-4 w-4" />
+                </ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().splitCell().run()} title="Tách ô">
                   <SplitSquareHorizontal className="h-4 w-4" />
-                  <span>Chia ô thành bảng con...</span>
-                </ContextMenuItem>
-
-                <ContextMenuSeparator />
-
-                {/* Delete table */}
-                <ContextMenuItem onClick={deleteTable} className="flex items-center gap-2 text-destructive">
-                  <Trash2 className="h-4 w-4" />
-                  <span>Xóa bảng</span>
-                </ContextMenuItem>
-              </>
-            ) : (
-              <>
-                <ContextMenuItem onClick={() => applyFormat("bold")} className="flex items-center gap-2">
-                  <Bold className="h-4 w-4" />
-                  <span>In đậm</span>
-                </ContextMenuItem>
-                <ContextMenuItem onClick={() => applyFormat("italic")} className="flex items-center gap-2">
-                  <Italic className="h-4 w-4" />
-                  <span>In nghiêng</span>
-                </ContextMenuItem>
-                <ContextMenuItem onClick={() => applyFormat("underline")} className="flex items-center gap-2">
-                  <Underline className="h-4 w-4" />
-                  <span>Gạch chân</span>
-                </ContextMenuItem>
-                <ContextMenuSeparator />
-                <ContextMenuItem onClick={openTableDialog} className="flex items-center gap-2">
-                  <Table className="h-4 w-4" />
-                  <span>Chèn bảng</span>
-                </ContextMenuItem>
+                </ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().deleteTable().run()} title="Xóa bảng">
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </ToolbarButton>
               </>
             )}
-          </ContextMenuContent>
-        </ContextMenu>
 
-        {/* Table Creation Dialog */}
-        <Dialog open={tableDialogOpen} onOpenChange={setTableDialogOpen}>
-          <DialogContent className="sm:max-w-[280px]">
+            <ToolbarDivider />
+
+            {/* Undo / Redo */}
+            <ToolbarButton onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} title="Hoàn tác (Ctrl+Z)">
+              <Undo className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} title="Làm lại (Ctrl+Y)">
+              <Redo className="h-4 w-4" />
+            </ToolbarButton>
+          </div>
+        )}
+
+        {/* Editor content */}
+        <EditorContent editor={editor} className="rich-text-editor" />
+
+        {/* Link dialog */}
+        <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+          <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Chèn bảng</DialogTitle>
+              <DialogTitle>Chèn liên kết</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-2">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Số hàng</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={tableSize.rows}
-                    onChange={(e) => setTableSize(prev => ({ 
-                      ...prev, 
-                      rows: Math.max(1, Math.min(20, parseInt(e.target.value) || 1)) 
-                    }))}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Số cột</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={tableSize.cols}
-                    onChange={(e) => setTableSize(prev => ({ 
-                      ...prev, 
-                      cols: Math.max(1, Math.min(20, parseInt(e.target.value) || 1)) 
-                    }))}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
+            <div className="space-y-4">
+              <Input
+                placeholder="https://example.com"
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleInsertLink()}
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setLinkDialogOpen(false)}>
+                  Hủy
+                </Button>
+                <Button onClick={handleInsertLink}>Chèn</Button>
               </div>
-              <Button
-                type="button"
-                className="w-full"
-                onClick={() => insertTable(tableSize.rows, tableSize.cols)}
-              >
-                Chèn bảng
-              </Button>
             </div>
           </DialogContent>
         </Dialog>
 
-        {/* Split Cell Dialog */}
-        <Dialog open={splitDialogOpen} onOpenChange={setSplitDialogOpen}>
-          <DialogContent className="sm:max-w-[280px]">
+        {/* Image dialog */}
+        <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
+          <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Chia ô thành bảng con</DialogTitle>
+              <DialogTitle>Chèn hình ảnh</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-2">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Số hàng</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={splitSize.rows}
-                    onChange={(e) => setSplitSize(prev => ({ 
-                      ...prev, 
-                      rows: Math.max(1, Math.min(10, parseInt(e.target.value) || 1)) 
-                    }))}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Số cột</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={splitSize.cols}
-                    onChange={(e) => setSplitSize(prev => ({ 
-                      ...prev, 
-                      cols: Math.max(1, Math.min(10, parseInt(e.target.value) || 1)) 
-                    }))}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
+            <div className="space-y-4">
+              <MediaUpload type="image" value={imageUrl} onChange={(url) => setImageUrl(url)} />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setImageDialogOpen(false)}>
+                  Hủy
+                </Button>
+                <Button onClick={handleInsertImage} disabled={!imageUrl}>
+                  Chèn
+                </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Chia ô thành bảng {splitSize.rows} hàng × {splitSize.cols} cột bên trong
-              </p>
-              <Button
-                type="button"
-                className="w-full"
-                onClick={() => splitCell(splitSize.rows, splitSize.cols)}
-                disabled={splitSize.rows === 1 && splitSize.cols === 1}
-              >
-                Chia ô
-              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Table dialog */}
+        <Dialog open={tableDialogOpen} onOpenChange={setTableDialogOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Chèn bảng</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <label className="text-sm font-medium w-16">Hàng:</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={tableSize.rows}
+                  onChange={(e) => setTableSize((s) => ({ ...s, rows: parseInt(e.target.value) || 1 }))}
+                  className="w-20"
+                />
+              </div>
+              <div className="flex items-center gap-4">
+                <label className="text-sm font-medium w-16">Cột:</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={tableSize.cols}
+                  onChange={(e) => setTableSize((s) => ({ ...s, cols: parseInt(e.target.value) || 1 }))}
+                  className="w-20"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setTableDialogOpen(false)}>
+                  Hủy
+                </Button>
+                <Button onClick={handleInsertTable}>Chèn</Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
