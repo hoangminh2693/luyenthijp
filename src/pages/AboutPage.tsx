@@ -10,12 +10,18 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/layout/Header';
+import { useSEO } from '@/hooks/useSEO';
 
 /**
  * AboutPage - Trang giới thiệu về website
  * Chuẩn SEO, nội dung đầy đủ
  */
 const AboutPage = () => {
+  useSEO({
+    title: 'Giới thiệu | Luyện Đề Thi - Luyện thi trắc nghiệm tại Nhật',
+    description: 'Tìm hiểu về Luyện Đề Thi - nền tảng luyện thi trực tuyến miễn phí cho người Việt tại Nhật Bản. Sứ mệnh và tính năng.',
+  });
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container py-8">

@@ -17,12 +17,26 @@ import { Button } from "@/components/ui/button";
 import { useSubjects, useLayersBySubject, useCategoriesByLayer } from "@/hooks/useSubjectLayers";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ActivityWidget } from "@/components/ui/ActivityWidget";
+import { useSEO, buildWebsiteSchema, buildFAQSchema, SITE_URL } from "@/hooks/useSEO";
 
 /**
  * Index Page - Trang chủ của ứng dụng luyện đề thi
  * Chuẩn SEO, content-first, sẵn sàng cho AdSense
  */
 const Index = () => {
+  useSEO({
+    title: 'Luyện đề thi trắc nghiệm các kỳ thi tại Nhật | Luyện Đề Thi',
+    description: 'Nền tảng luyện thi trực tuyến miễn phí dành cho người Việt tại Nhật Bản. Luyện tập JLPT, BJT, 宅建 với hàng nghìn câu hỏi chất lượng.',
+    canonical: SITE_URL,
+    jsonLd: [
+      buildWebsiteSchema(),
+      buildFAQSchema([
+        { question: 'Luyện Đề Thi có miễn phí không?', answer: 'Có, Luyện Đề Thi hoàn toàn miễn phí cho tất cả người dùng.' },
+        { question: 'Luyện Đề Thi hỗ trợ những kỳ thi nào?', answer: 'Hiện tại hỗ trợ JLPT (N5-N1), BJT và đang mở rộng thêm các kỳ thi khác tại Nhật Bản.' },
+        { question: 'Tôi có cần đăng ký tài khoản không?', answer: 'Bạn cần đăng ký tài khoản miễn phí để làm bài và lưu lịch sử học tập.' },
+      ]),
+    ],
+  });
   const features = [
     {
       icon: GraduationCap,
@@ -246,8 +260,54 @@ const Index = () => {
         </div>
       </section>
 
+      {/* Internal Linking Section - SEO boost */}
+      <section className="border-t border-border py-12">
+        <div className="container">
+          <h2 className="mb-6 text-xl font-bold text-foreground">Luyện thi nhanh</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {subjects.map((subject) => (
+              <Link
+                key={subject.id}
+                to={`/subjects/${subject.slug}`}
+                className="rounded-lg border border-border bg-card p-4 text-sm font-medium text-foreground hover:border-primary/30 hover:text-primary transition-colors"
+              >
+                {subject.icon} Luyện thi {subject.name}
+              </Link>
+            ))}
+            <Link to="/blog" className="rounded-lg border border-border bg-card p-4 text-sm font-medium text-foreground hover:border-primary/30 hover:text-primary transition-colors">
+              📝 Kinh nghiệm ôn thi
+            </Link>
+            <Link to="/leaderboard" className="rounded-lg border border-border bg-card p-4 text-sm font-medium text-foreground hover:border-primary/30 hover:text-primary transition-colors">
+              🏆 Bảng xếp hạng
+            </Link>
+            <Link to="/statistics" className="rounded-lg border border-border bg-card p-4 text-sm font-medium text-foreground hover:border-primary/30 hover:text-primary transition-colors">
+              📊 Thống kê học tập
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section - SEO content */}
+      <section className="border-t border-border bg-muted/30 py-12">
+        <div className="container max-w-3xl">
+          <h2 className="mb-8 text-2xl font-bold text-foreground text-center">Câu hỏi thường gặp</h2>
+          <div className="space-y-6">
+            {[
+              { q: 'Luyện Đề Thi có miễn phí không?', a: 'Có, Luyện Đề Thi hoàn toàn miễn phí cho tất cả người dùng. Bạn chỉ cần đăng ký tài khoản để bắt đầu luyện tập.' },
+              { q: 'Luyện Đề Thi hỗ trợ những kỳ thi nào?', a: 'Hiện tại hỗ trợ JLPT (N5-N1), BJT và đang mở rộng thêm các kỳ thi khác tại Nhật Bản như 宅建, IT Passport...' },
+              { q: 'Tôi có cần đăng ký tài khoản không?', a: 'Bạn cần đăng ký tài khoản miễn phí để làm bài và lưu lịch sử học tập. Việc đăng ký rất nhanh chóng.' },
+              { q: 'Đề thi có được cập nhật thường xuyên không?', a: 'Có, chúng tôi liên tục cập nhật và bổ sung đề thi mới để phục vụ nhu cầu luyện tập của cộng đồng.' },
+            ].map(faq => (
+              <div key={faq.q} className="rounded-lg border border-border bg-card p-5">
+                <h3 className="font-semibold text-foreground mb-2">{faq.q}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{faq.a}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Ad placeholder - future AdSense location */}
-      {/* This space intentionally left for future ad placement */}
       <div className="container pb-8">
         {/* Ad slot placeholder - do not remove */}
       </div>
