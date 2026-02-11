@@ -651,6 +651,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                                 value={q.option_a}
                                 placeholder={q.question_type === 'audio_only' ? '(có thể để trống)' : 'Đáp án A'}
                                 onChange={(v) => updateQuestion(index, 'option_a', v)}
+                                showToolbar={false}
                               />
                             </div>
                             <div>
@@ -659,6 +660,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                                 value={q.option_b}
                                 placeholder={q.question_type === 'audio_only' ? '(có thể để trống)' : 'Đáp án B'}
                                 onChange={(v) => updateQuestion(index, 'option_b', v)}
+                                showToolbar={false}
                               />
                             </div>
                             {(q.option_count ?? 4) >= 3 && (
@@ -668,6 +670,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                                   value={q.option_c}
                                   placeholder={q.question_type === 'audio_only' ? '(có thể để trống)' : 'Đáp án C'}
                                   onChange={(v) => updateQuestion(index, 'option_c', v)}
+                                  showToolbar={false}
                                 />
                               </div>
                             )}
@@ -678,6 +681,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                                   value={q.option_d}
                                   placeholder={q.question_type === 'audio_only' ? '(có thể để trống)' : 'Đáp án D'}
                                   onChange={(v) => updateQuestion(index, 'option_d', v)}
+                                  showToolbar={false}
                                 />
                               </div>
                             )}
