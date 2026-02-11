@@ -68,6 +68,7 @@ export function ListeningExamView({ exam, examName, onRetry }: ListeningExamView
   // Audio refs
   const examAudioRef = useRef<HTMLAudioElement>(null);
   const [audioStarted, setAudioStarted] = useState(false);
+  const [audioEnded, setAudioEnded] = useState(false);
 
   // Group questions by mondai
   const mondaiPages = useMemo(() => groupByMondai(exam.questions), [exam.questions]);
@@ -227,6 +228,7 @@ export function ListeningExamView({ exam, examName, onRetry }: ListeningExamView
     setRevealedAnswers({});
     setCurrentMondaiPage(0);
     setAudioStarted(false);
+    setAudioEnded(false);
     onRetry();
   };
 
@@ -295,21 +297,28 @@ export function ListeningExamView({ exam, examName, onRetry }: ListeningExamView
         ref={examAudioRef}
         src={exam.audioUrl}
         preload="auto"
+        onEnded={() => setAudioEnded(true)}
       />
 
       {/* Audio status bar during exam */}
       {phase === 'exam' && (
-        <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+        <div className={cn(
+          "rounded-xl border p-4",
+          audioEnded ? "border-amber-500/30 bg-amber-500/5" : "border-primary/30 bg-primary/5"
+        )}>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary animate-pulse">
+            <div className={cn(
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
+              audioEnded ? "bg-amber-500" : "bg-primary animate-pulse"
+            )}>
               <Volume2 className="h-5 w-5 text-primary-foreground" />
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium text-foreground">
-                🎧 Audio đang phát — Không thể tua lại
+                {audioEnded ? '⏹ Audio đã phát xong — Chỉ được nghe 1 lần' : '🎧 Audio đang phát — Không thể tua lại'}
               </p>
               <p className="text-xs text-muted-foreground">
-                Hãy tập trung nghe và chọn đáp án cho từng câu hỏi
+                {audioEnded ? 'Hãy hoàn thành các câu hỏi và nộp bài' : 'Hãy tập trung nghe và chọn đáp án cho từng câu hỏi'}
               </p>
             </div>
           </div>
