@@ -5,6 +5,7 @@ import { SubjectCard } from '@/components/ui/SubjectCard';
 import { Breadcrumb } from '@/components/layout/Header';
 import { ActivityWidget } from '@/components/ui/ActivityWidget';
 import { supabase } from '@/integrations/supabase/client';
+import { useSEO, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
 
 interface Subject {
   id: string;
@@ -19,6 +20,15 @@ interface Subject {
  * SubjectsPage - Trang danh sách môn học
  */
 const SubjectsPage = () => {
+  useSEO({
+    title: 'Chọn môn luyện đề thi trắc nghiệm | Luyện Đề Thi',
+    description: 'Chọn môn học bạn muốn luyện tập: JLPT (N5-N1), BJT, 宅建 và nhiều kỳ thi khác tại Nhật Bản. Đề thi cập nhật thường xuyên.',
+    jsonLd: buildBreadcrumbSchema([
+      { name: 'Trang chủ', url: SITE_URL },
+      { name: 'Chọn môn học' },
+    ]),
+  });
+
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
 

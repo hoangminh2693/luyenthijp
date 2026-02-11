@@ -6,10 +6,20 @@ import { Badge } from '@/components/ui/badge';
 import { Breadcrumb } from '@/components/layout/Header';
 import { usePublishedPosts } from '@/hooks/useBlogPosts';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSEO, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
 
 const VISIBLE_TAGS = 5;
 
 const BlogPage = () => {
+  useSEO({
+    title: 'Blog chia sẻ kinh nghiệm ôn thi tại Nhật | Luyện Đề Thi',
+    description: 'Những bài viết hữu ích về kinh nghiệm ôn thi JLPT, phương pháp học tập hiệu quả và cuộc sống tại Nhật Bản dành cho cộng đồng người Việt.',
+    jsonLd: buildBreadcrumbSchema([
+      { name: 'Trang chủ', url: SITE_URL },
+      { name: 'Blog' },
+    ]),
+  });
+
   const { isAdmin } = useAuth();
   const { data: posts, isLoading } = usePublishedPosts();
   const [activeTag, setActiveTag] = useState<string | null>(null);

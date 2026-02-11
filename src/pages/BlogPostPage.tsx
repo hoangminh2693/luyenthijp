@@ -6,18 +6,38 @@ import { Calendar, User, ArrowLeft, ArrowRight, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { sanitizeRichText } from '@/lib/richText';
 import { useMemo } from 'react';
+import { useSEO, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
 
 const BlogPostPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const { data: post, isLoading, error } = usePostBySlug(slug);
   const { data: allPosts } = usePublishedPosts();
 
-  // Update document title for SEO
-  if (post) {
-    document.title = post.meta_title || post.title;
-    const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) metaDesc.setAttribute('content', post.meta_description || post.excerpt || '');
-  }
+  // SEO with dynamic metadata
+  useSEO({
+    title: post ? (post.meta_title || post.title) : 'Đang tải...',
+    description: post ? (post.meta_description || post.excerpt || '') : '',
+    ogType: 'article',
+    ogImage: post?.thumbnail_url || undefined,
+    jsonLd: post ? [
+      buildBreadcrumbSchema([
+        { name: 'Trang chủ', url: SITE_URL },
+        { name: 'Blog', url: `${SITE_URL}/blog` },
+        { name: post.title },
+      ]),
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BlogPosting',
+        headline: post.title,
+        description: post.meta_description || post.excerpt,
+        image: post.thumbnail_url,
+        datePublished: post.published_at,
+        dateModified: post.updated_at,
+        author: { '@type': 'Organization', name: 'Luyện Đề Thi' },
+        publisher: { '@type': 'Organization', name: 'Luyện Đề Thi', url: SITE_URL },
+      },
+    ] : undefined,
+  });
 
   // Related posts: cùng tag, loại trừ bài hiện tại
   const relatedPosts = useMemo(() => {
@@ -62,18 +82,6 @@ const BlogPostPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* JSON-LD for SEO */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'BlogPosting',
-        headline: post.title,
-        description: post.meta_description || post.excerpt,
-        image: post.thumbnail_url,
-        datePublished: post.published_at,
-        dateModified: post.updated_at,
-        author: { '@type': 'Organization', name: 'Luyện Đề Thi' },
-        publisher: { '@type': 'Organization', name: 'Luyện Đề Thi', url: 'https://luyenthijp.lovable.app' },
-      }) }} />
 
       <div className="container py-8">
         <div className="mb-6">
