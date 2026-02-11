@@ -37,9 +37,10 @@ interface QuestionCardProps {
 function AudioPlayer({ src, locked = false }: { src: string; locked?: boolean }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [hasPlayed, setHasPlayed] = useState(false);
 
   const togglePlay = () => {
-    if (audioRef.current) {
+    if (audioRef.current && !hasPlayed) {
       if (isPlaying) {
         audioRef.current.pause();
       } else {
@@ -49,7 +50,7 @@ function AudioPlayer({ src, locked = false }: { src: string; locked?: boolean })
     }
   };
 
-  // Locked mode: chỉ play/pause, không cho tua
+  // Locked mode: chỉ play 1 lần, không cho tua
   if (locked) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-3">
@@ -58,6 +59,7 @@ function AudioPlayer({ src, locked = false }: { src: string; locked?: boolean })
           variant="outline"
           size="icon"
           onClick={togglePlay}
+          disabled={hasPlayed}
           className="h-10 w-10 shrink-0"
         >
           {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
@@ -65,12 +67,12 @@ function AudioPlayer({ src, locked = false }: { src: string; locked?: boolean })
         <audio
           ref={audioRef}
           src={src}
-          onEnded={() => setIsPlaying(false)}
+          onEnded={() => { setIsPlaying(false); setHasPlayed(true); }}
           className="hidden"
         />
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Volume2 className="h-4 w-4" />
-          <span>Nghe audio</span>
+          <span>{hasPlayed ? 'Đã nghe (chỉ 1 lần)' : 'Nghe audio'}</span>
         </div>
       </div>
     );
