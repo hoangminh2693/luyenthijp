@@ -531,10 +531,11 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                       <RichTextEditable
                         value={q.content}
                         placeholder="Nội dung câu hỏi (đề bài)..."
-                        className="min-h-[48px]"
+                        className="min-h-[32px]"
                         onChange={(v) => updateQuestion(index, 'content', v)}
                         showToolbar={false}
                         onEditorReady={setActiveEditor}
+                        compact
                       />
                       
                       {/* Quick info badges */}
@@ -663,6 +664,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                                 onChange={(v) => updateQuestion(index, 'option_a', v)}
                                 showToolbar={false}
                                 onEditorReady={setActiveEditor}
+                                compact
                               />
                             </div>
                             <div>
@@ -673,6 +675,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                                 onChange={(v) => updateQuestion(index, 'option_b', v)}
                                 showToolbar={false}
                                 onEditorReady={setActiveEditor}
+                                compact
                               />
                             </div>
                             {(q.option_count ?? 4) >= 3 && (
@@ -684,6 +687,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                                   onChange={(v) => updateQuestion(index, 'option_c', v)}
                                   showToolbar={false}
                                   onEditorReady={setActiveEditor}
+                                  compact
                                 />
                               </div>
                             )}
@@ -696,6 +700,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                                   onChange={(v) => updateQuestion(index, 'option_d', v)}
                                   showToolbar={false}
                                   onEditorReady={setActiveEditor}
+                                  compact
                                 />
                               </div>
                             )}
@@ -723,6 +728,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                                 onChange={(v) => updateQuestion(index, 'explanation', v)}
                                 showToolbar={false}
                                 onEditorReady={setActiveEditor}
+                                compact
                               />
                             </div>
                           </div>
