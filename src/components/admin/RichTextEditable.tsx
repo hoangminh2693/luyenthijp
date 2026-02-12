@@ -73,6 +73,8 @@ export type RichTextEditableProps = {
   showToolbar?: boolean;
   onEditorReady?: (editor: Editor) => void;
   onLinkShortcut?: () => void;
+  /** Compact mode: smaller min-height, auto-sizing */
+  compact?: boolean;
 };
 
 const FONT_SIZES = ["12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px", "36px", "48px"];
@@ -124,7 +126,7 @@ function ToolbarDivider() {
 }
 
 export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditableProps>(
-  ({ value, onChange, placeholder, className, onFocus, showToolbar = true, onEditorReady, onLinkShortcut }, ref) => {
+  ({ value, onChange, placeholder, className, onFocus, showToolbar = true, onEditorReady, onLinkShortcut, compact = false }, ref) => {
     const [linkDialogOpen, setLinkDialogOpen] = React.useState(false);
     const [linkUrl, setLinkUrl] = React.useState("");
     const [imageDialogOpen, setImageDialogOpen] = React.useState(false);
@@ -204,7 +206,8 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       editorProps: {
         attributes: {
           class: cn(
-            "prose prose-sm max-w-none focus:outline-none min-h-[120px] px-3 py-2",
+            "prose prose-sm max-w-none focus:outline-none px-3 py-2",
+            compact ? "min-h-[32px]" : "min-h-[120px]",
             "prose-headings:font-bold prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg",
             "prose-table:border-collapse prose-td:border prose-td:border-border prose-td:p-2",
             "prose-th:border prose-th:border-border prose-th:p-2 prose-th:bg-muted/50",
@@ -214,6 +217,15 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
             "[&_.selectedCell]:bg-primary/10 [&_.selectedCell]:outline [&_.selectedCell]:outline-2 [&_.selectedCell]:outline-primary",
           ),
         },
+        handlePaste: compact ? (view, event) => {
+          // In compact mode, strip all formatting and paste as plain text
+          event.preventDefault();
+          const text = event.clipboardData?.getData('text/plain') || '';
+          if (text) {
+            view.dispatch(view.state.tr.insertText(text));
+          }
+          return true;
+        } : undefined,
       },
       onUpdate: ({ editor: e }) => {
         onChange(e.getHTML());
