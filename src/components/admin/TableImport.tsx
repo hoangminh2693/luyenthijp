@@ -531,7 +531,7 @@ export function TableImport({ onQuestionsChange }: TableImportProps) {
                       <RichTextEditable
                         value={q.content}
                         placeholder="Nội dung câu hỏi (đề bài)..."
-                        className="min-h-[32px]"
+                        className="min-h-0"
                         onChange={(v) => updateQuestion(index, 'content', v)}
                         showToolbar={false}
                         onEditorReady={setActiveEditor}
