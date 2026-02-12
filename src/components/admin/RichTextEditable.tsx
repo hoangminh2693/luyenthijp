@@ -206,8 +206,8 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
       editorProps: {
         attributes: {
           class: cn(
-            "prose prose-sm max-w-none focus:outline-none px-3 py-2",
-            compact ? "min-h-[32px]" : "min-h-[120px]",
+            "prose prose-sm max-w-none focus:outline-none",
+            compact ? "min-h-[24px] px-2 py-1 text-sm" : "min-h-[120px] px-3 py-2",
             "prose-headings:font-bold prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg",
             "prose-table:border-collapse prose-td:border prose-td:border-border prose-td:p-2",
             "prose-th:border prose-th:border-border prose-th:p-2 prose-th:bg-muted/50",
