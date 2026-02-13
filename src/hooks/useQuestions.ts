@@ -244,22 +244,30 @@ export function useListeningExams(sectionId: string | undefined, categoryId?: st
     queryFn: async () => {
       if (!sectionId && !categoryId) return [];
       
-      // Get all questions from this section/category (parents have audio_url, children may not)
-      let query = supabase
-        .from('questions_safe')
-        .select('*');
+      // Fetch from both sources and merge
+      let allQuestions: DbQuestionSafe[] = [];
       
       if (sectionId) {
-        query = query.eq('section_id', sectionId);
-      } else if (categoryId) {
-        query = query.eq('category_id', categoryId);
+        const { data, error } = await supabase
+          .from('questions_safe')
+          .select('*')
+          .eq('section_id', sectionId);
+        if (!error && data) allQuestions.push(...(data as DbQuestionSafe[]));
       }
       
-      const { data: allData, error } = await query;
-      
-      if (error) throw error;
-      
-      const allQuestions = (allData as DbQuestionSafe[]) || [];
+      if (categoryId) {
+        const { data, error } = await supabase
+          .from('questions_safe')
+          .select('*')
+          .eq('category_id', categoryId);
+        if (!error && data) {
+          // Deduplicate by id
+          const existingIds = new Set(allQuestions.map(q => q.id));
+          for (const q of data as DbQuestionSafe[]) {
+            if (!existingIds.has(q.id)) allQuestions.push(q);
+          }
+        }
+      }
       const parentQuestions = allQuestions.filter(q => !q.parent_id && q.audio_url);
       
       // Nhóm theo audio_url - mỗi audio = 1 đề nghe

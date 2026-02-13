@@ -235,7 +235,7 @@ const StartQuizPage = () => {
   
   const { data: listeningExams = [], isLoading: loadingListening } = useListeningExams(
     isListeningSection ? matchingSection?.id : undefined,
-    isListeningSection && !matchingSection?.id ? leafCategory?.id : undefined
+    isListeningSection ? leafCategory?.id : undefined
   );
 
   // Get audio URLs for duration calculation
