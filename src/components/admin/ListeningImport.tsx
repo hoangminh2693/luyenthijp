@@ -238,7 +238,7 @@ function MondaiQuestionEditor({
               value={question.content}
               placeholder={type === 'audio_only' ? '(Để trống nếu câu hỏi trong audio)' : 'Nội dung câu hỏi...'}
               onChange={(v) => updateField('content', v)}
-              className="min-h-[36px] text-sm"
+              compact
             />
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -307,6 +307,7 @@ function MondaiQuestionEditor({
                         value={question[`option_${opt.toLowerCase()}` as keyof ListeningMondaiQuestion] as string}
                         placeholder={type === 'audio_only' ? '—' : opt}
                         onChange={(v) => updateField(`option_${opt.toLowerCase()}` as keyof ListeningMondaiQuestion, v)}
+                        compact
                       />
                     </div>
                   ))}
@@ -329,6 +330,7 @@ function MondaiQuestionEditor({
                       value={question.explanation}
                       placeholder="(tùy chọn)"
                       onChange={(v) => updateField('explanation', v)}
+                      compact
                     />
                   </div>
                 </div>
@@ -359,7 +361,7 @@ function MondaiQuestionEditor({
                       value={sq.content}
                       placeholder={sqType === 'audio_only' ? '(Để trống)' : 'Nội dung câu con...'}
                       onChange={(v) => updateSub(si, 'content', v)}
-                      className="text-sm"
+                      compact
                     />
                     <div className="grid grid-cols-2 gap-2">
                       <Select value={sqType} onValueChange={(v) => updateSub(si, 'question_type', v)}>
@@ -390,6 +392,7 @@ function MondaiQuestionEditor({
                             value={sq[`option_${opt.toLowerCase()}` as keyof ListeningSubQuestion] as string}
                             placeholder={sqType === 'audio_only' ? '—' : opt}
                             onChange={(v) => updateSub(si, `option_${opt.toLowerCase()}` as keyof ListeningSubQuestion, v)}
+                            compact
                           />
                         </div>
                       ))}
@@ -407,6 +410,7 @@ function MondaiQuestionEditor({
                         value={sq.explanation}
                         placeholder="Giải thích"
                         onChange={(v) => updateSub(si, 'explanation', v)}
+                        compact
                       />
                     </div>
                   </div>
