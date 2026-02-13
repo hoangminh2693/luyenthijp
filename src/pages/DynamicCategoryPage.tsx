@@ -134,6 +134,51 @@ const DynamicCategoryPage = () => {
   });
   
   const isLoading = loadingSubject || loadingLayers || loadingPath || loadingCategories;
+
+  // SEO - compute values (hooks must be called before any return)
+  const pageTitle = parentCategory
+    ? `${parentCategory.name} - ${subject?.name || ''} | Luyện Đề Thi`
+    : `${subject?.name || ''} - Luyện đề thi trắc nghiệm | Luyện Đề Thi`;
+  const pageDesc = parentCategory?.description || subject?.description 
+    || `Luyện tập ${subject?.name || ''} với nhiều cấp độ và kỹ năng khác nhau. Đề thi trắc nghiệm chất lượng, chấm điểm tự động.`;
+  
+  const seoPath = categorySlugs.length > 0
+    ? `/subjects/${subject?.slug || subjectSlug}/${categorySlugs.join('/')}`
+    : `/subjects/${subject?.slug || subjectSlug}`;
+
+  const breadcrumbSchemaItems: { name: string; url?: string }[] = [
+    { name: 'Trang chủ', url: SITE_URL },
+    { name: 'Chọn môn học', url: `${SITE_URL}/subjects` },
+  ];
+  if (resolvedPath && resolvedPath.length > 0 && subject) {
+    breadcrumbSchemaItems.push({ name: subject.name, url: `${SITE_URL}/subjects/${subject.slug}` });
+    let p = '';
+    resolvedPath.forEach((cat, idx) => {
+      p = p ? `${p}/${cat.slug}` : cat.slug;
+      breadcrumbSchemaItems.push({
+        name: cat.name,
+        url: idx < resolvedPath.length - 1 ? `${SITE_URL}/subjects/${subject.slug}/${p}` : undefined,
+      });
+    });
+  } else if (subject) {
+    breadcrumbSchemaItems.push({ name: subject.name });
+  }
+
+  useSEO({
+    title: pageTitle,
+    description: pageDesc,
+    canonical: `${SITE_URL}${seoPath}`,
+    jsonLd: [
+      buildBreadcrumbSchema(breadcrumbSchemaItems),
+      ...(parentCategory && subject ? [buildPracticeTestSchema({
+        name: `Luyện thi ${parentCategory.name} - ${subject.name}`,
+        description: pageDesc,
+        url: `${SITE_URL}${seoPath}`,
+        educationalLevel: parentCategory.name,
+        about: subject.name,
+      })] : []),
+    ],
+  });
   
   // Loading state
   if (isLoading) {
@@ -155,9 +200,7 @@ const DynamicCategoryPage = () => {
   }
   
   // Nếu không còn categories và đang ở leaf category → có thể redirect đến trang làm bài
-  // (Hoặc hiển thị thông tin category + nút làm bài)
   if (categories.length === 0 && parentCategory) {
-    // Đây là leaf category - redirect đến StartQuizPage hoặc ExamsPage
     const categoryPath = categorySlugs.join('/');
     return <Navigate to={`/start/${subjectSlug}/${categoryPath}`} replace />;
   }
@@ -168,13 +211,11 @@ const DynamicCategoryPage = () => {
   ];
   
   if (resolvedPath && resolvedPath.length > 0) {
-    // Add subject
     breadcrumbItems.push({ 
       label: subject.name, 
       href: `/subjects/${subject.slug}` 
     });
     
-    // Add each category in path
     let pathSoFar = '';
     resolvedPath.forEach((cat, idx) => {
       pathSoFar = pathSoFar ? `${pathSoFar}/${cat.slug}` : cat.slug;
@@ -185,7 +226,6 @@ const DynamicCategoryPage = () => {
       });
     });
   } else {
-    // Just subject name at root
     breadcrumbItems.push({ label: subject.name });
   }
   
@@ -194,58 +234,11 @@ const DynamicCategoryPage = () => {
   const displayDescription = parentCategory?.description || subject.description;
   const displayIcon = parentCategory?.icon || subject.icon || '📚';
   
-  // Layer name để hiển thị (VD: "Chọn cấp độ", "Chọn kỹ năng")
   const layerTitle = currentLayer 
     ? `Chọn ${currentLayer.name.toLowerCase()} (${categories.length} ${currentLayer.name.toLowerCase()})`
     : `Chọn mục (${categories.length} mục)`;
   
-  // Parent path cho CategoryCard
   const parentPathForCards = categorySlugs.join('/');
-  
-  // SEO
-  const pageTitle = parentCategory
-    ? `${parentCategory.name} - ${subject.name} | Luyện Đề Thi`
-    : `${subject.name} - Luyện đề thi trắc nghiệm | Luyện Đề Thi`;
-  const pageDesc = parentCategory?.description || subject.description 
-    || `Luyện tập ${subject.name} với nhiều cấp độ và kỹ năng khác nhau. Đề thi trắc nghiệm chất lượng, chấm điểm tự động.`;
-  
-  const seoPath = categorySlugs.length > 0
-    ? `/subjects/${subject.slug}/${categorySlugs.join('/')}`
-    : `/subjects/${subject.slug}`;
-
-  const breadcrumbSchemaItems: { name: string; url?: string }[] = [
-    { name: 'Trang chủ', url: SITE_URL },
-    { name: 'Chọn môn học', url: `${SITE_URL}/subjects` },
-  ];
-  if (resolvedPath && resolvedPath.length > 0) {
-    breadcrumbSchemaItems.push({ name: subject.name, url: `${SITE_URL}/subjects/${subject.slug}` });
-    let p = '';
-    resolvedPath.forEach((cat, idx) => {
-      p = p ? `${p}/${cat.slug}` : cat.slug;
-      breadcrumbSchemaItems.push({
-        name: cat.name,
-        url: idx < resolvedPath.length - 1 ? `${SITE_URL}/subjects/${subject.slug}/${p}` : undefined,
-      });
-    });
-  } else {
-    breadcrumbSchemaItems.push({ name: subject.name });
-  }
-
-  useSEO({
-    title: pageTitle,
-    description: pageDesc,
-    canonical: `${SITE_URL}${seoPath}`,
-    jsonLd: [
-      buildBreadcrumbSchema(breadcrumbSchemaItems),
-      ...(parentCategory ? [buildPracticeTestSchema({
-        name: `Luyện thi ${parentCategory.name} - ${subject.name}`,
-        description: pageDesc,
-        url: `${SITE_URL}${seoPath}`,
-        educationalLevel: parentCategory.name,
-        about: subject.name,
-      })] : []),
-    ],
-  });
 
   return (
     <div className="min-h-screen bg-background">
