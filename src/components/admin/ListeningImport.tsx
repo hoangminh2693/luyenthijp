@@ -11,6 +11,7 @@
  * ISOLATED: Không ảnh hưởng đến các module import khác
  */
 import { useCallback, useState, useMemo } from 'react';
+import type { Editor } from '@tiptap/react';
 import { 
   Plus, Trash2, ChevronDown, ChevronUp, Copy, Check, X, 
   Headphones, Image, Volume2, AlertCircle, FileText
@@ -31,6 +32,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { RichTextEditable } from '@/components/admin/RichTextEditable';
+import { RichTextToolbar } from '@/components/admin/RichTextToolbar';
 import { MediaUpload } from '@/components/admin/MediaUpload';
 import { cn } from '@/lib/utils';
 
@@ -185,12 +187,14 @@ function MondaiQuestionEditor({
   onChange,
   onRemove,
   canRemove,
+  onEditorReady,
 }: {
   question: ListeningMondaiQuestion;
   index: number;
   onChange: (q: ListeningMondaiQuestion) => void;
   onRemove: () => void;
   canRemove: boolean;
+  onEditorReady?: (editor: Editor) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const type = question.question_type ?? 'standard';
@@ -239,6 +243,8 @@ function MondaiQuestionEditor({
               placeholder={type === 'audio_only' ? '(Để trống nếu câu hỏi trong audio)' : 'Nội dung câu hỏi...'}
               onChange={(v) => updateField('content', v)}
               compact
+              showToolbar={false}
+              onEditorReady={onEditorReady}
             />
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -308,6 +314,8 @@ function MondaiQuestionEditor({
                         placeholder={type === 'audio_only' ? '—' : opt}
                         onChange={(v) => updateField(`option_${opt.toLowerCase()}` as keyof ListeningMondaiQuestion, v)}
                         compact
+                        showToolbar={false}
+                        onEditorReady={onEditorReady}
                       />
                     </div>
                   ))}
@@ -331,6 +339,8 @@ function MondaiQuestionEditor({
                       placeholder="(tùy chọn)"
                       onChange={(v) => updateField('explanation', v)}
                       compact
+                      showToolbar={false}
+                      onEditorReady={onEditorReady}
                     />
                   </div>
                 </div>
@@ -362,6 +372,8 @@ function MondaiQuestionEditor({
                       placeholder={sqType === 'audio_only' ? '(Để trống)' : 'Nội dung câu con...'}
                       onChange={(v) => updateSub(si, 'content', v)}
                       compact
+                      showToolbar={false}
+                      onEditorReady={onEditorReady}
                     />
                     <div className="grid grid-cols-2 gap-2">
                       <Select value={sqType} onValueChange={(v) => updateSub(si, 'question_type', v)}>
@@ -393,6 +405,8 @@ function MondaiQuestionEditor({
                             placeholder={sqType === 'audio_only' ? '—' : opt}
                             onChange={(v) => updateSub(si, `option_${opt.toLowerCase()}` as keyof ListeningSubQuestion, v)}
                             compact
+                            showToolbar={false}
+                            onEditorReady={onEditorReady}
                           />
                         </div>
                       ))}
@@ -411,6 +425,8 @@ function MondaiQuestionEditor({
                         placeholder="Giải thích"
                         onChange={(v) => updateSub(si, 'explanation', v)}
                         compact
+                        showToolbar={false}
+                        onEditorReady={onEditorReady}
                       />
                     </div>
                   </div>
@@ -616,6 +632,7 @@ export function ListeningImport({ onDataChange }: ListeningImportProps) {
     { ...defaultMondai, title: '問題1' },
   ]);
   const [expandedMondais, setExpandedMondais] = useState<Set<number>>(new Set([0]));
+  const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
 
   // Notify parent on any change
   const notifyChange = useCallback((newAudio: string, newMondais: MondaiGroup[]) => {
@@ -773,6 +790,11 @@ export function ListeningImport({ onDataChange }: ListeningImportProps) {
         )}
       </div>
 
+      {/* Shared formatting toolbar */}
+      <div className="sticky top-0 z-10">
+        <RichTextToolbar editor={activeEditor} />
+      </div>
+
       {/* Mondai sections */}
       <div className="space-y-4">
         {mondais.map((mondai, mIdx) => {
@@ -836,6 +858,7 @@ export function ListeningImport({ onDataChange }: ListeningImportProps) {
                           onChange={(updated) => updateMondaiQuestion(mIdx, qIdx, updated)}
                           onRemove={() => removeQuestion(mIdx, qIdx)}
                           canRemove={mondai.questions.length > 1}
+                          onEditorReady={setActiveEditor}
                         />
                       ))}
                     </div>
