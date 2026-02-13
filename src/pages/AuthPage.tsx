@@ -386,8 +386,6 @@ const AuthPage = () => {
                       }}
                       className="pl-10"
                       disabled={isLoading}
-                      max={maxDateStr}
-                      min={minDateStr}
                     />
                   </div>
                   {errors.dateOfBirth && (
