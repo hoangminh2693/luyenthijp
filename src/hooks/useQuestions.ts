@@ -173,23 +173,32 @@ export function useRandomQuestions(sectionId: string | undefined, count: number,
     queryFn: async () => {
       if (!sectionId && !categoryId) return [];
       
-      // Use the SAFE view that excludes correct_option and explanation
-      let query = supabase
-        .from('questions_safe')
-        .select('*');
+      // Fetch from both sources and merge
+      let allData: DbQuestionSafe[] = [];
       
       if (sectionId) {
-        query = query.eq('section_id', sectionId);
-      } else if (categoryId) {
-        query = query.eq('category_id', categoryId);
+        const { data, error } = await supabase
+          .from('questions_safe')
+          .select('*')
+          .eq('section_id', sectionId);
+        if (!error && data) allData.push(...(data as DbQuestionSafe[]));
       }
       
-      const { data, error } = await query;
-      
-      if (error) throw error;
+      if (categoryId) {
+        const { data, error } = await supabase
+          .from('questions_safe')
+          .select('*')
+          .eq('category_id', categoryId);
+        if (!error && data) {
+          const existingIds = new Set(allData.map(q => q.id));
+          for (const q of data as DbQuestionSafe[]) {
+            if (!existingIds.has(q.id)) allData.push(q);
+          }
+        }
+      }
       
       // Nhóm câu hỏi cha với câu con
-      const grouped = groupQuestionsWithChildrenSafe(data as DbQuestionSafe[] || []);
+      const grouped = groupQuestionsWithChildrenSafe(allData);
       
       if (shuffle) {
         // Shuffle và lấy số lượng câu cha cần thiết
@@ -321,24 +330,33 @@ export function useRandomListeningExam(
     queryFn: async () => {
       if (!sectionId && !categoryId) return null;
       
-      // Step 1: Get parent questions with audio_url, ordered by creation
-      let query = supabase
-        .from('questions_safe')
-        .select('*')
-        .not('audio_url', 'is', null)
-        .order('created_at', { ascending: true });
+      // Step 1: Get parent questions with audio_url from both sources
+      let parentQuestions: DbQuestionSafe[] = [];
       
       if (sectionId) {
-        query = query.eq('section_id', sectionId);
-      } else if (categoryId) {
-        query = query.eq('category_id', categoryId);
+        const { data, error } = await supabase
+          .from('questions_safe')
+          .select('*')
+          .eq('section_id', sectionId)
+          .not('audio_url', 'is', null)
+          .order('created_at', { ascending: true });
+        if (!error && data) parentQuestions.push(...(data as DbQuestionSafe[]));
       }
       
-      const { data: parentData, error: parentError } = await query;
-      
-      if (parentError) throw parentError;
-      
-      const parentQuestions = (parentData as DbQuestionSafe[]) || [];
+      if (categoryId) {
+        const { data, error } = await supabase
+          .from('questions_safe')
+          .select('*')
+          .eq('category_id', categoryId)
+          .not('audio_url', 'is', null)
+          .order('created_at', { ascending: true });
+        if (!error && data) {
+          const existingIds = new Set(parentQuestions.map(q => q.id));
+          for (const q of data as DbQuestionSafe[]) {
+            if (!existingIds.has(q.id)) parentQuestions.push(q);
+          }
+        }
+      }
       
       // Nhóm theo audio_url
       const examsByAudio = new Map<string, DbQuestionSafe[]>();

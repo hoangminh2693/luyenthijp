@@ -106,8 +106,8 @@ const QuizPage = () => {
   
   const sectionId = matchingSection?.id;
   
-  // Determine categoryId fallback for subjects without legacy sections (e.g., BJT)
-  const categoryIdForQuiz = !sectionId ? leafCategory?.id : undefined;
+  // Always pass categoryId alongside sectionId — questions may be in either
+  const categoryIdForQuiz = leafCategory?.id;
   
   // Determine if questions should be shuffled
   const shouldShuffle = !leafCategory?.fixed_exam_mode;
