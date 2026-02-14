@@ -270,14 +270,15 @@ export function SubQuestionInput({ subQuestions, onChange, disabled }: SubQuesti
             </div>
 
             {expandedIndexes.has(index) && (
-              <div className="px-4 pb-4 space-y-3">
+              <div className="px-4 pb-3 space-y-2">
                 <div>
                   <label className="text-xs text-muted-foreground">Nội dung câu hỏi</label>
                   <RichTextEditable
                     value={sq.content}
                     placeholder={sq.question_type === 'audio_only' ? '(Để trống nếu trong audio)' : 'Nội dung câu hỏi con...'}
                     onChange={(v) => updateSubQuestion(index, 'content', v)}
-                    className="min-h-[48px]"
+                    compact
+                    showToolbar={false}
                   />
                 </div>
 
@@ -325,6 +326,8 @@ export function SubQuestionInput({ subQuestions, onChange, disabled }: SubQuesti
                       value={sq.option_a}
                       placeholder={sq.question_type === 'audio_only' ? '—' : 'A'}
                       onChange={(v) => updateSubQuestion(index, 'option_a', v)}
+                      compact
+                      showToolbar={false}
                     />
                   </div>
                   <div>
@@ -333,6 +336,8 @@ export function SubQuestionInput({ subQuestions, onChange, disabled }: SubQuesti
                       value={sq.option_b}
                       placeholder={sq.question_type === 'audio_only' ? '—' : 'B'}
                       onChange={(v) => updateSubQuestion(index, 'option_b', v)}
+                      compact
+                      showToolbar={false}
                     />
                   </div>
                   {(sq.option_count ?? 4) >= 3 && (
@@ -342,6 +347,8 @@ export function SubQuestionInput({ subQuestions, onChange, disabled }: SubQuesti
                         value={sq.option_c}
                         placeholder={sq.question_type === 'audio_only' ? '—' : 'C'}
                         onChange={(v) => updateSubQuestion(index, 'option_c', v)}
+                        compact
+                        showToolbar={false}
                       />
                     </div>
                   )}
@@ -352,6 +359,8 @@ export function SubQuestionInput({ subQuestions, onChange, disabled }: SubQuesti
                         value={sq.option_d}
                         placeholder={sq.question_type === 'audio_only' ? '—' : 'D'}
                         onChange={(v) => updateSubQuestion(index, 'option_d', v)}
+                        compact
+                        showToolbar={false}
                       />
                     </div>
                   )}
@@ -386,6 +395,8 @@ export function SubQuestionInput({ subQuestions, onChange, disabled }: SubQuesti
                       value={sq.explanation}
                       placeholder="Giải thích (tùy chọn)"
                       onChange={(v) => updateSubQuestion(index, 'explanation', v)}
+                      compact
+                      showToolbar={false}
                     />
                   </div>
                 </div>
