@@ -336,7 +336,8 @@ const LeaderboardPage = () => {
     return Array.from(map.entries()).map(([levelId, users]) => ({
       level_id: levelId,
       level_name: users[0]?.level_name || 'Unknown',
-      users: users.slice(0, 20)
+      users: users.slice(0, 10),
+      totalParticipants: users.length
     }));
   }, [leaderboardData]);
 
@@ -706,7 +707,7 @@ const LeaderboardPage = () => {
                         <div>
                           <span className="text-lg">{group.level_name}</span>
                           <p className="text-sm font-normal text-muted-foreground mt-0.5">
-                            {group.users.length} người tham gia
+                            {group.totalParticipants} người tham gia
                           </p>
                         </div>
                       </CardTitle>
@@ -867,6 +868,14 @@ const LeaderboardPage = () => {
                           })}
                         </TableBody>
                       </Table>
+                      
+                      {/* Remaining participants count */}
+                      {group.totalParticipants > 10 && (
+                        <div className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground border-t bg-muted/20">
+                          <User className="h-4 w-4" />
+                          <span>và {group.totalParticipants - 10} người khác đã tham gia</span>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
