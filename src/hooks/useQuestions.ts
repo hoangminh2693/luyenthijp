@@ -424,7 +424,9 @@ export function useListeningExamCountByCategory(categoryId: string | undefined) 
     queryFn: async () => {
       if (!categoryId) return 0;
 
-      // Step 1: Thử đếm trực tiếp theo category_id (cho môn học mới)
+      const allAudioUrls = new Set<string>();
+
+      // Step 1: Đếm trực tiếp theo category_id
       const { data: directData, error: directError } = await supabase
         .from('questions_safe')
         .select('audio_url')
@@ -432,65 +434,66 @@ export function useListeningExamCountByCategory(categoryId: string | undefined) 
         .not('audio_url', 'is', null)
         .is('parent_id', null);
 
-      if (!directError && directData && directData.length > 0) {
-        const uniqueUrls = new Set(directData.map(q => q.audio_url));
-        return uniqueUrls.size;
+      if (!directError && directData) {
+        directData.forEach(q => { if (q.audio_url) allAudioUrls.add(q.audio_url); });
       }
 
-      // Step 2: Fallback legacy bridge cho môn học cũ (category → level → section)
+      // Step 2: Legacy bridge (category → level → section)
       const { data: cat } = await supabase
         .from('categories')
         .select('subject_id, slug, parent_id')
         .eq('id', categoryId)
         .single();
-      if (!cat) return 0;
 
-      // Find root ancestor
-      let rootSlug = cat.slug;
-      let currentParentId = cat.parent_id;
-      while (currentParentId) {
-        const { data: parent } = await supabase
-          .from('categories')
-          .select('slug, parent_id')
-          .eq('id', currentParentId)
-          .single();
-        if (!parent) break;
-        rootSlug = parent.slug;
-        currentParentId = parent.parent_id;
-      }
+      if (cat) {
+        // Find root ancestor
+        let rootSlug = cat.slug;
+        let currentParentId = cat.parent_id;
+        while (currentParentId) {
+          const { data: parent } = await supabase
+            .from('categories')
+            .select('slug, parent_id')
+            .eq('id', currentParentId)
+            .single();
+          if (!parent) break;
+          rootSlug = parent.slug;
+          currentParentId = parent.parent_id;
+        }
 
-      // Find legacy level
-      const { data: level } = await supabase
-        .from('levels')
-        .select('id')
-        .eq('subject_id', cat.subject_id)
-        .eq('slug', rootSlug)
-        .maybeSingle();
-
-      // Find legacy section
-      let sectionId: string | null = null;
-      if (level) {
-        const { data: section } = await supabase
-          .from('sections')
+        // Find legacy level
+        const { data: level } = await supabase
+          .from('levels')
           .select('id')
-          .eq('level_id', level.id)
-          .eq('slug', cat.slug)
+          .eq('subject_id', cat.subject_id)
+          .eq('slug', rootSlug)
           .maybeSingle();
-        sectionId = section?.id ?? null;
+
+        // Find legacy section
+        let sectionId: string | null = null;
+        if (level) {
+          const { data: section } = await supabase
+            .from('sections')
+            .select('id')
+            .eq('level_id', level.id)
+            .eq('slug', cat.slug)
+            .maybeSingle();
+          sectionId = section?.id ?? null;
+        }
+
+        if (sectionId) {
+          const { data, error } = await supabase
+            .from('questions_safe')
+            .select('audio_url')
+            .eq('section_id', sectionId)
+            .not('audio_url', 'is', null);
+
+          if (!error && data) {
+            data.forEach(q => { if (q.audio_url) allAudioUrls.add(q.audio_url); });
+          }
+        }
       }
 
-      if (!sectionId) return 0;
-
-      // Count distinct audio_url in that section
-      const { data, error } = await supabase
-        .from('questions_safe')
-        .select('audio_url')
-        .eq('section_id', sectionId)
-        .not('audio_url', 'is', null);
-
-      if (error) return 0;
-      const uniqueUrls = new Set((data || []).map(q => q.audio_url));
-      return uniqueUrls.size;
+      return allAudioUrls.size;
     },
     enabled: !!categoryId,
   });
