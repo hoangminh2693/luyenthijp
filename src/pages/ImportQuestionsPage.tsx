@@ -7,7 +7,7 @@
  */
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useRobotsMeta } from '@/hooks/useRobotsMeta';
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download, LogIn, Shield, Table2, FileText, Headphones, CopyCheck } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download, LogIn, Shield, Table2, FileText, Headphones, CopyCheck, Car, Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/layout/Header';
@@ -32,6 +32,12 @@ interface ParsedQuestion {
   option_c: string;
   option_d: string;
   correct_option: string;
+  explanation?: string;
+}
+
+interface DrivingQuestion {
+  content: string;
+  correct_option: 'A' | 'B'; // A = O (Đúng), B = X (Sai)
   explanation?: string;
 }
 
@@ -138,8 +144,19 @@ const ImportQuestionsPage = () => {
   const [tableQuestions, setTableQuestions] = useState<TableQuestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const [importMode, setImportMode] = useState<'table' | 'file' | 'listening'>('table');
+  const [importMode, setImportMode] = useState<'table' | 'file' | 'listening' | 'driving'>('table');
   const [allowDuplicates, setAllowDuplicates] = useState(false);
+
+  // Driving import state
+  const [drivingImportTab, setDrivingImportTab] = useState<'manual' | 'json'>('manual');
+  const [drivingQuestions, setDrivingQuestions] = useState<DrivingQuestion[]>([
+    { content: '', correct_option: 'A', explanation: '' }
+  ]);
+  const [drivingJsonText, setDrivingJsonText] = useState('');
+  const validDrivingCount = useMemo(
+    () => drivingQuestions.filter(q => q.content.trim().length > 0).length,
+    [drivingQuestions]
+  );
 
   // Listening import data
   const [listeningData, setListeningData] = useState<ListeningExamData>({ audioUrl: '', mondais: [] });
@@ -241,6 +258,8 @@ const ImportQuestionsPage = () => {
     setFile(null);
     setImportResult(null);
     setListeningData({ audioUrl: '', mondais: [] });
+    setDrivingQuestions([{ content: '', correct_option: 'A', explanation: '' }]);
+    setDrivingJsonText('');
   }, [importTarget]);
 
   // Filter levels and sections based on selection (legacy)
@@ -374,6 +393,44 @@ const ImportQuestionsPage = () => {
     if (importMode === 'listening') {
       listeningQuestions = flattenListeningExam(listeningData);
       questionsToImport = listeningQuestions;
+    } else if (importMode === 'driving') {
+      // Parse driving questions from manual or JSON
+      if (drivingImportTab === 'json') {
+        try {
+          const parsed = JSON.parse(drivingJsonText);
+          const arr = Array.isArray(parsed) ? parsed : [];
+          questionsToImport = arr.map((item: any) => ({
+            content: item.content || item.question || item.câu_hỏi || '',
+            option_a: 'Đúng (○)',
+            option_b: 'Sai (✕)',
+            option_c: null,
+            option_d: null,
+            correct_option: (item.correct_option || item.answer || item.đáp_án || 'A').toUpperCase() === 'A' || 
+                           (item.correct_option || item.answer || item.đáp_án || '') === 'O' || 
+                           (item.correct_option || '') === '○' ? 'A' : 'B',
+            explanation: item.explanation || item.giải_thích || null,
+            option_count: 2,
+            question_type: 'standard',
+          }));
+        } catch {
+          toast.error('JSON không hợp lệ. Vui lòng kiểm tra lại định dạng.');
+          return;
+        }
+      } else {
+        questionsToImport = drivingQuestions
+          .filter(q => q.content.trim().length > 0)
+          .map(q => ({
+            content: q.content.trim(),
+            option_a: 'Đúng (○)',
+            option_b: 'Sai (✕)',
+            option_c: null,
+            option_d: null,
+            correct_option: q.correct_option,
+            explanation: q.explanation || null,
+            option_count: 2,
+            question_type: 'standard',
+          }));
+      }
     } else if (importMode === 'table') {
       questionsToImport = tableQuestions.filter(isValidTableQuestion);
     } else {
@@ -534,7 +591,7 @@ const ImportQuestionsPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedSectionId, parsedQuestions, tableQuestions, importMode, listeningData, usesLayers, selectedLeafCategory, isReadyToImport, allowDuplicates]);
+  }, [selectedSectionId, parsedQuestions, tableQuestions, importMode, listeningData, usesLayers, selectedLeafCategory, isReadyToImport, allowDuplicates, drivingQuestions, drivingImportTab, drivingJsonText]);
 
   // Download sample template
   const downloadTemplate = useCallback(() => {
@@ -759,7 +816,139 @@ const ImportQuestionsPage = () => {
               <h2 className="mb-3 font-semibold text-foreground">
                 {stepNumber++}. Nhập câu hỏi
               </h2>
-              
+
+              {/* Driving mode: special O/X input UI */}
+              {selectedSubject?.slug === 'bang-lai-xe' ? (
+                <div className="space-y-4">
+                  <Tabs value={drivingImportTab} onValueChange={(v) => setDrivingImportTab(v as 'manual' | 'json')}>
+                    <TabsList className="mb-4 grid w-full grid-cols-2">
+                      <TabsTrigger value="manual" className="gap-2">
+                        <Table2 className="h-4 w-4" />
+                        Nhập trực tiếp
+                      </TabsTrigger>
+                      <TabsTrigger value="json" className="gap-2">
+                        <FileText className="h-4 w-4" />
+                        Import JSON đề trọn vẹn
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="manual" className="mt-0 space-y-3">
+                      <p className="text-xs text-muted-foreground">Nhập nội dung câu hỏi và chọn đáp án Đúng (○) hoặc Sai (✕)</p>
+                      {drivingQuestions.map((q, idx) => (
+                        <div key={idx} className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-muted-foreground">Câu {idx + 1}</span>
+                            {drivingQuestions.length > 1 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                                onClick={() => setDrivingQuestions(prev => prev.filter((_, i) => i !== idx))}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                          <textarea
+                            value={q.content}
+                            onChange={(e) => setDrivingQuestions(prev => prev.map((item, i) => i === idx ? { ...item, content: e.target.value } : item))}
+                            placeholder="Nhập nội dung câu hỏi..."
+                            className="w-full min-h-[60px] rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                            rows={2}
+                          />
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs text-muted-foreground">Đáp án:</span>
+                            <button
+                              onClick={() => setDrivingQuestions(prev => prev.map((item, i) => i === idx ? { ...item, correct_option: 'A' } : item))}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold border-2 transition-all"
+                              style={{
+                                backgroundColor: q.correct_option === 'A' ? '#dbeafe' : '#f3f4f6',
+                                borderColor: q.correct_option === 'A' ? '#2563eb' : '#d1d5db',
+                                color: q.correct_option === 'A' ? '#1d4ed8' : '#6b7280',
+                              }}
+                            >
+                              ○ Đúng
+                            </button>
+                            <button
+                              onClick={() => setDrivingQuestions(prev => prev.map((item, i) => i === idx ? { ...item, correct_option: 'B' } : item))}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold border-2 transition-all"
+                              style={{
+                                backgroundColor: q.correct_option === 'B' ? '#fee2e2' : '#f3f4f6',
+                                borderColor: q.correct_option === 'B' ? '#dc2626' : '#d1d5db',
+                                color: q.correct_option === 'B' ? '#dc2626' : '#6b7280',
+                              }}
+                            >
+                              ✕ Sai
+                            </button>
+                          </div>
+                          <input
+                            value={q.explanation || ''}
+                            onChange={(e) => setDrivingQuestions(prev => prev.map((item, i) => i === idx ? { ...item, explanation: e.target.value } : item))}
+                            placeholder="Giải thích (tùy chọn)..."
+                            className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-2"
+                        onClick={() => setDrivingQuestions(prev => [...prev, { content: '', correct_option: 'A', explanation: '' }])}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Thêm câu hỏi
+                      </Button>
+                      {validDrivingCount > 0 && (
+                        <p className="text-sm text-success flex items-center gap-1">
+                          <CheckCircle2 className="h-4 w-4" />
+                          {validDrivingCount} câu hỏi hợp lệ
+                        </p>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="json" className="mt-0 space-y-3">
+                      <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-xs text-yellow-800 space-y-1">
+                        <p className="font-semibold">Định dạng JSON mảng câu hỏi:</p>
+                        <pre className="font-mono text-[10px] overflow-x-auto">{`[
+  {
+    "content": "シートベルトは運転者のみ装着すれば良い。",
+    "correct_option": "B",
+    "explanation": "全員が着用する必要がある。"
+  },
+  ...
+]`}</pre>
+                        <p>Trường <code>correct_option</code>: <strong>A</strong> = Đúng (○), <strong>B</strong> = Sai (✕)</p>
+                        <p>Cũng chấp nhận: <code>"O"</code> hoặc <code>"○"</code> cho Đúng.</p>
+                      </div>
+                      <textarea
+                        value={drivingJsonText}
+                        onChange={(e) => setDrivingJsonText(e.target.value)}
+                        placeholder='Dán JSON mảng câu hỏi vào đây...'
+                        className="w-full min-h-[200px] rounded-md border border-border bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-y"
+                        rows={10}
+                      />
+                      {drivingJsonText.trim() && (() => {
+                        try {
+                          const arr = JSON.parse(drivingJsonText);
+                          return (
+                            <p className="text-sm text-success flex items-center gap-1">
+                              <CheckCircle2 className="h-4 w-4" />
+                              JSON hợp lệ: {Array.isArray(arr) ? arr.length : 0} câu hỏi
+                            </p>
+                          );
+                        } catch {
+                          return (
+                            <p className="text-sm text-destructive flex items-center gap-1">
+                              <AlertCircle className="h-4 w-4" />
+                              JSON không hợp lệ
+                            </p>
+                          );
+                        }
+                      })()}
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              ) : (
               <Tabs value={importMode} onValueChange={(v) => setImportMode(v as 'table' | 'file' | 'listening')} className="w-full">
                 <TabsList className="mb-4 grid w-full grid-cols-3">
                   <TabsTrigger value="table" className="gap-2">
@@ -843,6 +1032,7 @@ const ImportQuestionsPage = () => {
                   <ListeningImport onDataChange={setListeningData} />
                 </TabsContent>
               </Tabs>
+              )}
             </div>
           )}
 
@@ -869,7 +1059,11 @@ const ImportQuestionsPage = () => {
               onClick={handleImport}
               disabled={
                 isLoading ||
-                (importMode === 'table'
+                (selectedSubject?.slug === 'bang-lai-xe'
+                  ? drivingImportTab === 'json'
+                    ? !drivingJsonText.trim()
+                    : validDrivingCount === 0
+                  : importMode === 'table'
                   ? validTableQuestionsCount === 0
                   : importMode === 'listening'
                   ? validListeningCount === 0 || !listeningData.audioUrl
@@ -882,7 +1076,11 @@ const ImportQuestionsPage = () => {
               {isLoading
                 ? 'Đang import...'
                 : `Import ${
-                    importMode === 'table'
+                    selectedSubject?.slug === 'bang-lai-xe'
+                      ? drivingImportTab === 'json'
+                        ? (() => { try { const a = JSON.parse(drivingJsonText); return Array.isArray(a) ? a.length : 0; } catch { return 0; } })()
+                        : validDrivingCount
+                      : importMode === 'table'
                       ? validTableQuestionsCount
                       : importMode === 'listening'
                       ? validListeningCount

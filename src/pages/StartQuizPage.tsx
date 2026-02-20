@@ -305,8 +305,13 @@ const StartQuizPage = () => {
     );
   }
 
+  const isDrivingSubject = subjectSlug === 'bang-lai-xe';
+
   const handleStartQuiz = () => {
-    if (isListeningSection) {
+    if (isDrivingSubject) {
+      // Driving exam: always use all questions (50 or 95)
+      navigate(`/quiz/${subjectSlug}/${categoryPath}?count=${effectiveQuestionCount}`);
+    } else if (isListeningSection) {
       navigate(`/quiz/${subjectSlug}/${categoryPath}?mode=listening`);
     } else {
       navigate(`/quiz/${subjectSlug}/${categoryPath}?count=${questionCount}`);
@@ -384,9 +389,22 @@ const StartQuizPage = () => {
                 </div>
               )}
 
-              {/* Question count selector hoặc Listening exam selector */}
+              {/* Question count selector hoặc Listening exam selector hoặc Driving */}
               <div className="mb-8">
-                {isListeningSection ? (
+                {isDrivingSubject ? (
+                  <div className="rounded-xl border-2 border-yellow-300 bg-yellow-50 p-5 text-center space-y-3">
+                    <div className="text-4xl">🚗</div>
+                    <p className="font-semibold text-foreground">
+                      {leafCategory.name === '仮免許' ? '50 câu' : leafCategory.name === '本免許' ? '95 câu' : `${effectiveQuestionCount} câu`}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Làm toàn bộ đề thi với định dạng Đúng (○) / Sai (✕)
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Cần đạt ≥ 90% để đậu (tiêu chuẩn thi thật tại Nhật)
+                    </p>
+                  </div>
+                ) : isListeningSection ? (
                   <ListeningExamSelector
                     totalExams={listeningExams.length}
                     estimatedMinutes={avgAudioDuration > 0 ? Math.ceil(avgAudioDuration / 60) : 0}
@@ -406,20 +424,30 @@ const StartQuizPage = () => {
                 onClick={handleStartQuiz}
                 size="lg"
                 className="w-full gap-2"
-                disabled={isListeningSection ? listeningExams.length === 0 : effectiveQuestionCount === 0}
+                disabled={
+                  isDrivingSubject
+                    ? effectiveQuestionCount === 0
+                    : isListeningSection
+                    ? listeningExams.length === 0
+                    : effectiveQuestionCount === 0
+                }
               >
-                {isListeningSection ? (
+                {isDrivingSubject ? (
+                  <span className="text-lg">🚗</span>
+                ) : isListeningSection ? (
                   <Headphones className="h-5 w-5" />
                 ) : (
                   <Play className="h-5 w-5" />
                 )}
-                {isListeningSection 
+                {isDrivingSubject
+                  ? `Bắt đầu thi (${effectiveQuestionCount} câu)`
+                  : isListeningSection
                   ? 'Bắt đầu làm đề nghe'
                   : `Bắt đầu làm bài (${questionCount} câu)`
                 }
               </Button>
 
-              {!isListeningSection && effectiveQuestionCount === 0 && (
+              {effectiveQuestionCount === 0 && (
                 <p className="mt-4 text-center text-sm text-muted-foreground">
                   Chưa có câu hỏi nào cho phần này. Vui lòng quay lại sau.
                 </p>

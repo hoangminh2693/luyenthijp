@@ -7,6 +7,7 @@ import { QuestionCard } from '@/components/quiz/QuestionCard';
 import { QuizProgress } from '@/components/quiz/QuizProgress';
 import { ResultSummary } from '@/components/quiz/ResultSummary';
 import { ListeningExamView } from '@/components/quiz/ListeningExamView';
+import { DrivingExamView } from '@/components/quiz/DrivingExamView';
 import { Breadcrumb } from '@/components/layout/Header';
 import { useQuestionHistory } from '@/hooks/useQuestionHistory';
 import { useLeafCategory } from '@/hooks/useCategoryPath';
@@ -315,6 +316,37 @@ const QuizPage = () => {
   breadcrumbItems.push({ label: isListeningMode ? 'Làm đề nghe' : 'Làm bài' });
 
   const mappedQuestions = questions;
+
+  // ======= DRIVING MODE: Use DrivingExamView for 'bang-lai-xe' subject =======
+  if (subjectSlug === 'bang-lai-xe' && questions.length > 0) {
+    return (
+      <div className="min-h-screen bg-background pb-8">
+        <div className="container py-8">
+          <div className="mb-6">
+            <Breadcrumb items={breadcrumbItems} />
+          </div>
+          <div className="mb-6">
+            <Link
+              to={backUrl}
+              className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Quay lại
+            </Link>
+            <h1 className="text-2xl font-bold text-foreground sm:text-3xl mt-2">
+              🚗 {pageTitle}
+            </h1>
+            <p className="text-muted-foreground">{totalQuestionCount} câu hỏi Đúng/Sai</p>
+          </div>
+          <DrivingExamView
+            questions={questions}
+            examName={pageTitle}
+            onRetry={handleRetry}
+          />
+        </div>
+      </div>
+    );
+  }
 
   // ======= LISTENING MODE: Use dedicated ListeningExamView =======
   if (isListeningMode && listeningExam) {
