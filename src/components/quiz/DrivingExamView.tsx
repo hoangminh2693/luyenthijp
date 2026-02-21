@@ -7,10 +7,12 @@
  * - Auto-next sau khi chọn đáp án
  */
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Send, ArrowLeft, ArrowRight, RotateCcw, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, Send, ArrowLeft, ArrowRight, RotateCcw, CheckCircle2, XCircle, Lock, Lightbulb } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import type { Question } from '@/hooks/useQuestions';
 
@@ -40,6 +42,7 @@ interface DrivingExamViewProps {
 }
 
 export function DrivingExamView({ questions, examName, onRetry }: DrivingExamViewProps) {
+  const { user } = useAuth();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, 'A' | 'B'>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -84,7 +87,9 @@ export function DrivingExamView({ questions, examName, onRetry }: DrivingExamVie
         selected_answer: answers[q.id] || 'A',
       }));
 
-      const { data, error } = await supabase.rpc('submit_quiz_answers', {
+      // Use different RPC based on auth status
+      const rpcName = user ? 'submit_quiz_answers' : 'check_quiz_answers';
+      const { data, error } = await supabase.rpc(rpcName, {
         p_answers: answersToSubmit,
       });
 
@@ -229,8 +234,27 @@ export function DrivingExamView({ questions, examName, onRetry }: DrivingExamVie
                       }
                     </div>
                     {detail?.explanation && (
-                      <p className="mt-2 text-xs text-muted-foreground bg-white/60 rounded-lg p-2"
-                        dangerouslySetInnerHTML={{ __html: detail.explanation }} />
+                      user ? (
+                        <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 p-2">
+                          <div className="flex items-start gap-1.5">
+                            <Lightbulb className="h-3.5 w-3.5 shrink-0 text-primary mt-0.5" />
+                            <p className="text-xs text-foreground/80"
+                              dangerouslySetInnerHTML={{ __html: detail.explanation }} />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="relative mt-2 rounded-lg border border-primary/20 bg-primary/5 p-2">
+                          <p className="text-xs text-foreground/80 select-none filter blur-sm"
+                            dangerouslySetInnerHTML={{ __html: detail.explanation }}
+                            aria-hidden="true" />
+                          <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/60 backdrop-blur-[1px]">
+                            <Link to="/auth" className="flex items-center gap-1.5 text-xs font-medium text-primary hover:underline">
+                              <Lock className="h-3 w-3" />
+                              Đăng nhập để xem giải thích
+                            </Link>
+                          </div>
+                        </div>
+                      )
                     )}
                   </div>
                 </div>
