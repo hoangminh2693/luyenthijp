@@ -61,6 +61,7 @@ interface ListeningExamManagerProps {
   questions: QuestionRow[];
   onQuestionsChanged: () => void;
   onEditQuestion: (question: any) => void;
+  variant?: 'listening' | 'driving';
 }
 
 function groupByExam(questions: QuestionRow[]): ListeningExamGroup[] {
@@ -104,7 +105,9 @@ export function ListeningExamManager({
   questions,
   onQuestionsChanged,
   onEditQuestion,
+  variant = 'listening',
 }: ListeningExamManagerProps) {
+  const isDriving = variant === 'driving';
   const [expandedExams, setExpandedExams] = useState<Set<string>>(new Set());
   const [deletingExam, setDeletingExam] = useState<ListeningExamGroup | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -112,7 +115,7 @@ export function ListeningExamManager({
   const exams = useMemo(() => groupByExam(questions), [questions]);
 
   const audioUrls = useMemo(() => exams.map(e => e.audioUrl), [exams]);
-  const { durations } = useAudioDurations(audioUrls);
+  const { durations } = useAudioDurations(isDriving ? [] : audioUrls);
 
   const toggleExam = (audioUrl: string) => {
     setExpandedExams(prev => {
@@ -203,8 +206,12 @@ export function ListeningExamManager({
   if (exams.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-12 text-center">
-        <Headphones className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-        <p className="text-muted-foreground">Chưa có đề nghe nào</p>
+        {isDriving ? (
+          <span className="mx-auto mb-4 block text-4xl">🚗</span>
+        ) : (
+          <Headphones className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+        )}
+        <p className="text-muted-foreground">{isDriving ? 'Chưa có đề thi nào' : 'Chưa có đề nghe nào'}</p>
       </div>
     );
   }
@@ -214,8 +221,11 @@ export function ListeningExamManager({
       {/* Summary bar */}
       <div className="px-4 py-2 bg-muted/20 rounded-lg border border-border">
         <p className="text-sm text-muted-foreground">
-          <Headphones className="inline h-4 w-4 mr-1" />
-          {exams.length} đề nghe • {questions.filter(q => !q.parent_id).length} câu hỏi chính
+          {isDriving ? (
+            <><span className="inline mr-1">🚗</span>{exams.length} đề thi • {questions.filter(q => !q.parent_id).length} câu hỏi</>
+          ) : (
+            <><Headphones className="inline h-4 w-4 mr-1" />{exams.length} đề nghe • {questions.filter(q => !q.parent_id).length} câu hỏi chính</>
+          )}
         </p>
       </div>
 
@@ -236,13 +246,17 @@ export function ListeningExamManager({
                   </Button>
                 </CollapsibleTrigger>
 
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                  <Headphones className="h-5 w-5 text-primary" />
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDriving ? 'bg-yellow-100' : 'bg-primary/10'}`}>
+                  {isDriving ? (
+                    <span className="text-xl">🚗</span>
+                  ) : (
+                    <Headphones className="h-5 w-5 text-primary" />
+                  )}
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-foreground text-sm">
-                    Đề nghe #{idx + 1}
+                    {isDriving ? `Đề thi #${idx + 1}` : `Đề nghe #${idx + 1}`}
                   </p>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
                     <span className="flex items-center gap-1">
@@ -275,14 +289,16 @@ export function ListeningExamManager({
               {/* Exam content */}
               <CollapsibleContent>
                 <div className="border-t border-border">
-                  {/* Audio player */}
-                  <div className="px-4 py-3 bg-card border-b border-border">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Volume2 className="h-4 w-4 text-primary" />
-                      <span className="text-xs font-medium text-foreground">Audio</span>
+                  {/* Audio player - only for listening exams */}
+                  {!isDriving && (
+                    <div className="px-4 py-3 bg-card border-b border-border">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Volume2 className="h-4 w-4 text-primary" />
+                        <span className="text-xs font-medium text-foreground">Audio</span>
+                      </div>
+                      <audio src={exam.audioUrl} controls className="w-full h-8" />
                     </div>
-                    <audio src={exam.audioUrl} controls className="w-full h-8" />
-                  </div>
+                  )}
 
                   {/* Questions grouped by Mondai */}
                   {mondaiGroups.map((mondai) => (
@@ -391,10 +407,12 @@ export function ListeningExamManager({
       <AlertDialog open={!!deletingExam} onOpenChange={(open) => !open && setDeletingExam(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xóa đề nghe?</AlertDialogTitle>
+            <AlertDialogTitle>{isDriving ? 'Xóa đề thi?' : 'Xóa đề nghe?'}</AlertDialogTitle>
             <AlertDialogDescription>
-              Bạn có chắc muốn xóa toàn bộ đề nghe này? 
-              Tất cả {deletingExam?.totalCount || 0} câu hỏi và file audio sẽ bị xóa vĩnh viễn.
+              {isDriving
+                ? `Bạn có chắc muốn xóa toàn bộ đề thi này? Tất cả ${deletingExam?.totalCount || 0} câu hỏi sẽ bị xóa vĩnh viễn.`
+                : `Bạn có chắc muốn xóa toàn bộ đề nghe này? Tất cả ${deletingExam?.totalCount || 0} câu hỏi và file audio sẽ bị xóa vĩnh viễn.`
+              }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -405,7 +423,7 @@ export function ListeningExamManager({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Xóa đề
+              {isDriving ? 'Xóa đề' : 'Xóa đề'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

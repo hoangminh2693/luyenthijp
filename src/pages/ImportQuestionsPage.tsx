@@ -398,6 +398,9 @@ const ImportQuestionsPage = () => {
       listeningQuestions = flattenListeningExam(listeningData);
       questionsToImport = listeningQuestions;
     } else if (importMode === 'driving') {
+      // Generate a unique exam group key for this batch
+      const drivingExamKey = `driving-exam-${Date.now()}`;
+      
       // Parse driving questions from manual or excel/csv/json
       if (drivingImportTab === 'excel') {
         // If drivingJsonText has parsed data from file, use it; otherwise try as JSON
@@ -414,6 +417,7 @@ const ImportQuestionsPage = () => {
               correct_option: q.correct_option,
               explanation: q.explanation || null,
               image_url: q.image_url || null,
+              audio_url: drivingExamKey,
               option_count: 2,
               question_type: 'standard',
             }));
@@ -432,6 +436,7 @@ const ImportQuestionsPage = () => {
                              (item.correct_option || '') === '○' ? 'A' : 'B',
               explanation: item.explanation || item.giải_thích || null,
               image_url: item.image_url || item.hình_ảnh || null,
+              audio_url: drivingExamKey,
               option_count: 2,
               question_type: 'standard',
             }));
@@ -455,6 +460,7 @@ const ImportQuestionsPage = () => {
             correct_option: q.correct_option,
             explanation: q.explanation || null,
             image_url: q.image_url || null,
+            audio_url: drivingExamKey,
             option_count: 2,
             question_type: 'standard',
           }));

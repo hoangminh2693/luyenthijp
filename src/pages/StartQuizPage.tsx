@@ -194,7 +194,7 @@ const StartQuizPage = () => {
   
   const effectiveQuestionCount = totalQuestions > 0 ? totalQuestions : sectionQuestionCount;
   
-  // Fetch listening exams nếu là phần nghe (fixed_exam_mode)
+  // Fetch listening exams nếu là phần nghe (fixed_exam_mode) hoặc driving
   const isListeningSection = leafCategory?.fixed_exam_mode ?? false;
   
   // Tìm section_id để fetch listening exams (trong giai đoạn chuyển đổi)
@@ -230,7 +230,7 @@ const StartQuizPage = () => {
       const { data } = await query.limit(1).maybeSingle();
       return data;
     },
-    enabled: !!leafCategory && !!subject && isListeningSection,
+    enabled: !!leafCategory && !!subject && (isListeningSection || subjectSlug === 'bang-lai-xe'),
   });
   
   const { data: listeningExams = [], isLoading: loadingListening } = useListeningExams(
@@ -247,18 +247,26 @@ const StartQuizPage = () => {
     isListeningSection ? listeningAudioUrls : []
   );
 
+  const isDrivingSubject = subjectSlug === 'bang-lai-xe';
+
+  // Fetch driving exams (grouped by audio_url like listening exams)
+  const { data: drivingExams = [], isLoading: loadingDrivingExams } = useListeningExams(
+    isDrivingSubject ? matchingSection?.id : undefined,
+    isDrivingSubject ? leafCategory?.id : undefined
+  );
+
   // State
   const [questionCount, setQuestionCount] = useState<number>(5);
 
   // Set default count based on available questions
   useEffect(() => {
-    if (!isListeningSection && effectiveQuestionCount > 0) {
+    if (!isListeningSection && !isDrivingSubject && effectiveQuestionCount > 0) {
       const defaultCount = QUESTION_COUNTS.find((c) => c <= effectiveQuestionCount) || effectiveQuestionCount;
       setQuestionCount(Math.min(defaultCount, effectiveQuestionCount));
     }
-  }, [effectiveQuestionCount, isListeningSection]);
+  }, [effectiveQuestionCount, isListeningSection, isDrivingSubject]);
 
-  const isLoading = authLoading || loadingPath || loadingCount || (isListeningSection && loadingListening);
+  const isLoading = authLoading || loadingPath || loadingCount || (isListeningSection && loadingListening) || (isDrivingSubject && loadingDrivingExams);
 
   // Loading state
   if (isLoading) {
@@ -276,12 +284,9 @@ const StartQuizPage = () => {
 
   // Guest users can now access quizzes freely (no login gate)
 
-  const isDrivingSubject = subjectSlug === 'bang-lai-xe';
-
   const handleStartQuiz = () => {
     if (isDrivingSubject) {
-      // Driving exam: always use all questions (50 or 95)
-      navigate(`/quiz/${subjectSlug}/${categoryPath}?count=${effectiveQuestionCount}`);
+      navigate(`/quiz/${subjectSlug}/${categoryPath}?mode=driving`);
     } else if (isListeningSection) {
       navigate(`/quiz/${subjectSlug}/${categoryPath}?mode=listening`);
     } else {
@@ -362,11 +367,11 @@ const StartQuizPage = () => {
 
               {/* Question count selector hoặc Listening exam selector hoặc Driving */}
               <div className="mb-8">
-                {isDrivingSubject ? (
+              {isDrivingSubject ? (
                   <div className="rounded-xl border-2 border-yellow-300 bg-yellow-50 p-5 text-center space-y-3">
                     <div className="text-4xl">🚗</div>
                     <p className="font-semibold text-foreground">
-                      {leafCategory.name === '仮免許' ? '50 câu' : leafCategory.name === '本免許' ? '95 câu' : `${effectiveQuestionCount} câu`}
+                      {drivingExams.length} đề thi
                     </p>
                     <p className="text-sm text-muted-foreground">
                       Làm toàn bộ đề thi với định dạng Đúng (○) / Sai (✕)
@@ -397,7 +402,7 @@ const StartQuizPage = () => {
                 className="w-full gap-2"
                 disabled={
                   isDrivingSubject
-                    ? effectiveQuestionCount === 0
+                    ? drivingExams.length === 0
                     : isListeningSection
                     ? listeningExams.length === 0
                     : effectiveQuestionCount === 0
@@ -411,7 +416,7 @@ const StartQuizPage = () => {
                   <Play className="h-5 w-5" />
                 )}
                 {isDrivingSubject
-                  ? `Bắt đầu thi (${effectiveQuestionCount} câu)`
+                  ? `Bắt đầu thi (${drivingExams.length} đề)`
                   : isListeningSection
                   ? 'Bắt đầu làm đề nghe'
                   : `Bắt đầu làm bài (${questionCount} câu)`

@@ -411,9 +411,13 @@ const ManageQuestionsPage = () => {
 
   const groupedQuestions = useMemo(() => groupQuestionsWithChildren(questions), [questions]);
 
-  // Detect if this section/category is a listening section
+  // Detect if this section/category is a listening section or driving exam section
   const isListeningSection = useMemo(() => {
-    return questions.some(q => q.audio_url && !q.parent_id);
+    return questions.some(q => q.audio_url && !q.parent_id && !q.audio_url.startsWith('driving-exam-'));
+  }, [questions]);
+
+  const isDrivingExamSection = useMemo(() => {
+    return questions.some(q => q.audio_url && !q.parent_id && q.audio_url.startsWith('driving-exam-'));
   }, [questions]);
 
   const reloadQuestions = useCallback(async () => {
@@ -971,6 +975,13 @@ const ManageQuestionsPage = () => {
                   questions={questions}
                   onQuestionsChanged={reloadQuestions}
                   onEditQuestion={openEditDialog}
+                />
+              ) : isDrivingExamSection ? (
+                <ListeningExamManager
+                  questions={questions}
+                  onQuestionsChanged={reloadQuestions}
+                  onEditQuestion={openEditDialog}
+                  variant="driving"
                 />
               ) : filteredQuestions.length === 0 ? (
                 <div className="rounded-xl border border-border bg-card p-12 text-center">
