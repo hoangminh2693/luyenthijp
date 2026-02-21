@@ -683,28 +683,34 @@ const ImportQuestionsPage = () => {
         setDrivingQuestions(parsed);
         toast.success(`Đã đọc ${parsed.length} câu hỏi từ CSV`);
       } else if (ext === 'xlsx') {
-        const { read, utils } = await import('xlsx');
+        const ExcelJS = await import('exceljs');
+        const workbook = new ExcelJS.Workbook();
         const buffer = await file.arrayBuffer();
-        const wb = read(buffer);
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = utils.sheet_to_json<any>(ws, { header: 1 });
+        await workbook.xlsx.load(buffer);
+        const worksheet = workbook.worksheets[0];
         
-        if (rows.length < 2) {
+        if (!worksheet || worksheet.rowCount < 2) {
           toast.error('File Excel không có dữ liệu');
           return;
         }
         
-        const dataRows = rows.slice(1);
-        const parsed: DrivingQuestion[] = dataRows.map((row: any[]) => {
-          const correctRaw = String(row[2] || 'A').toUpperCase();
+        const parsed: DrivingQuestion[] = [];
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return; // skip header
+          const values = row.values as any[];
+          // exceljs row.values is 1-indexed (index 0 is undefined)
+          const correctRaw = String(values[3] || 'A').toUpperCase();
           const correctOption: 'A' | 'B' = correctRaw === 'B' || correctRaw === 'X' || correctRaw === '✕' || correctRaw === 'SAI' ? 'B' : 'A';
-          return {
-            content: String(row[0] || ''),
-            image_url: String(row[1] || ''),
-            correct_option: correctOption,
-            explanation: String(row[3] || ''),
-          };
-        }).filter(q => q.content.trim().length > 0);
+          const content = String(values[1] || '').trim();
+          if (content.length > 0) {
+            parsed.push({
+              content,
+              image_url: String(values[2] || ''),
+              correct_option: correctOption,
+              explanation: String(values[4] || ''),
+            });
+          }
+        });
         
         setDrivingQuestions(parsed);
         toast.success(`Đã đọc ${parsed.length} câu hỏi từ Excel`);
