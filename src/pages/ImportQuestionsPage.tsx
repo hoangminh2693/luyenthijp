@@ -7,9 +7,10 @@
  */
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useRobotsMeta } from '@/hooks/useRobotsMeta';
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download, LogIn, Shield, Table2, FileText, Headphones, CopyCheck, Car, Plus, Trash2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download, LogIn, Shield, Table2, FileText, Headphones, CopyCheck, Car, Plus, Trash2, Image } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { MediaUpload } from '@/components/admin/MediaUpload';
 import { Breadcrumb } from '@/components/layout/Header';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -39,6 +40,7 @@ interface DrivingQuestion {
   content: string;
   correct_option: 'A' | 'B'; // A = O (Đúng), B = X (Sai)
   explanation?: string;
+  image_url?: string;
 }
 
 interface ImportResult {
@@ -148,11 +150,12 @@ const ImportQuestionsPage = () => {
   const [allowDuplicates, setAllowDuplicates] = useState(false);
 
   // Driving import state
-  const [drivingImportTab, setDrivingImportTab] = useState<'manual' | 'json'>('manual');
+  const [drivingImportTab, setDrivingImportTab] = useState<'manual' | 'excel'>('manual');
   const [drivingQuestions, setDrivingQuestions] = useState<DrivingQuestion[]>([
-    { content: '', correct_option: 'A', explanation: '' }
+    { content: '', correct_option: 'A', explanation: '', image_url: '' }
   ]);
   const [drivingJsonText, setDrivingJsonText] = useState('');
+  const [drivingExcelFile, setDrivingExcelFile] = useState<File | null>(null);
   const validDrivingCount = useMemo(
     () => drivingQuestions.filter(q => q.content.trim().length > 0).length,
     [drivingQuestions]
@@ -258,8 +261,9 @@ const ImportQuestionsPage = () => {
     setFile(null);
     setImportResult(null);
     setListeningData({ audioUrl: '', mondais: [] });
-    setDrivingQuestions([{ content: '', correct_option: 'A', explanation: '' }]);
+    setDrivingQuestions([{ content: '', correct_option: 'A', explanation: '', image_url: '' }]);
     setDrivingJsonText('');
+    setDrivingExcelFile(null);
   }, [importTarget]);
 
   // Filter levels and sections based on selection (legacy)
@@ -394,26 +398,49 @@ const ImportQuestionsPage = () => {
       listeningQuestions = flattenListeningExam(listeningData);
       questionsToImport = listeningQuestions;
     } else if (importMode === 'driving') {
-      // Parse driving questions from manual or JSON
-      if (drivingImportTab === 'json') {
-        try {
-          const parsed = JSON.parse(drivingJsonText);
-          const arr = Array.isArray(parsed) ? parsed : [];
-          questionsToImport = arr.map((item: any) => ({
-            content: item.content || item.question || item.câu_hỏi || '',
-            option_a: 'Đúng (○)',
-            option_b: 'Sai (✕)',
-            option_c: null,
-            option_d: null,
-            correct_option: (item.correct_option || item.answer || item.đáp_án || 'A').toUpperCase() === 'A' || 
-                           (item.correct_option || item.answer || item.đáp_án || '') === 'O' || 
-                           (item.correct_option || '') === '○' ? 'A' : 'B',
-            explanation: item.explanation || item.giải_thích || null,
-            option_count: 2,
-            question_type: 'standard',
-          }));
-        } catch {
-          toast.error('JSON không hợp lệ. Vui lòng kiểm tra lại định dạng.');
+      // Parse driving questions from manual or excel/csv/json
+      if (drivingImportTab === 'excel') {
+        // If drivingJsonText has parsed data from file, use it; otherwise try as JSON
+        if (drivingQuestions.length > 0 && drivingExcelFile) {
+          // Already parsed from Excel/CSV into drivingQuestions
+          questionsToImport = drivingQuestions
+            .filter(q => q.content.trim().length > 0)
+            .map(q => ({
+              content: q.content.trim(),
+              option_a: 'Đúng (○)',
+              option_b: 'Sai (✕)',
+              option_c: null,
+              option_d: null,
+              correct_option: q.correct_option,
+              explanation: q.explanation || null,
+              image_url: q.image_url || null,
+              option_count: 2,
+              question_type: 'standard',
+            }));
+        } else if (drivingJsonText.trim()) {
+          try {
+            const parsed = JSON.parse(drivingJsonText);
+            const arr = Array.isArray(parsed) ? parsed : [];
+            questionsToImport = arr.map((item: any) => ({
+              content: item.content || item.question || item.câu_hỏi || '',
+              option_a: 'Đúng (○)',
+              option_b: 'Sai (✕)',
+              option_c: null,
+              option_d: null,
+              correct_option: (item.correct_option || item.answer || item.đáp_án || 'A').toUpperCase() === 'A' || 
+                             (item.correct_option || item.answer || item.đáp_án || '') === 'O' || 
+                             (item.correct_option || '') === '○' ? 'A' : 'B',
+              explanation: item.explanation || item.giải_thích || null,
+              image_url: item.image_url || item.hình_ảnh || null,
+              option_count: 2,
+              question_type: 'standard',
+            }));
+          } catch {
+            toast.error('JSON không hợp lệ. Vui lòng kiểm tra lại định dạng.');
+            return;
+          }
+        } else {
+          toast.error('Chưa có dữ liệu. Vui lòng tải file hoặc dán JSON.');
           return;
         }
       } else {
@@ -427,6 +454,7 @@ const ImportQuestionsPage = () => {
             option_d: null,
             correct_option: q.correct_option,
             explanation: q.explanation || null,
+            image_url: q.image_url || null,
             option_count: 2,
             question_type: 'standard',
           }));
@@ -591,7 +619,7 @@ const ImportQuestionsPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedSectionId, parsedQuestions, tableQuestions, importMode, listeningData, usesLayers, selectedLeafCategory, isReadyToImport, allowDuplicates, drivingQuestions, drivingImportTab, drivingJsonText]);
+  }, [selectedSectionId, parsedQuestions, tableQuestions, importMode, listeningData, usesLayers, selectedLeafCategory, isReadyToImport, allowDuplicates, drivingQuestions, drivingImportTab, drivingJsonText, drivingExcelFile]);
 
   // Download sample template
   const downloadTemplate = useCallback(() => {
@@ -607,6 +635,80 @@ const ImportQuestionsPage = () => {
     link.download = 'mau_import_cau_hoi.csv';
     link.click();
     URL.revokeObjectURL(url);
+  }, []);
+
+  // Handle driving file upload (Excel/CSV)
+  const handleDrivingFileUpload = useCallback(async (file: File) => {
+    setDrivingExcelFile(file);
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    
+    try {
+      if (ext === 'csv') {
+        const text = await file.text();
+        const lines = text.trim().split('\n');
+        if (lines.length < 2) {
+          toast.error('File CSV không có dữ liệu');
+          return;
+        }
+        const dataLines = lines.slice(1);
+        const parsed: DrivingQuestion[] = dataLines.map(line => {
+          const values: string[] = [];
+          let current = '';
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') { inQuotes = !inQuotes; }
+            else if (char === ',' && !inQuotes) { values.push(current.trim()); current = ''; }
+            else { current += char; }
+          }
+          values.push(current.trim());
+          
+          const correctRaw = (values[2] || 'A').toUpperCase();
+          const correctOption: 'A' | 'B' = correctRaw === 'B' || correctRaw === 'X' || correctRaw === '✕' || correctRaw === 'SAI' ? 'B' : 'A';
+          
+          return {
+            content: values[0] || '',
+            image_url: values[1] || '',
+            correct_option: correctOption,
+            explanation: values[3] || '',
+          };
+        }).filter(q => q.content.trim().length > 0);
+        
+        setDrivingQuestions(parsed);
+        toast.success(`Đã đọc ${parsed.length} câu hỏi từ CSV`);
+      } else if (ext === 'xlsx') {
+        const { read, utils } = await import('xlsx');
+        const buffer = await file.arrayBuffer();
+        const wb = read(buffer);
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = utils.sheet_to_json<any>(ws, { header: 1 });
+        
+        if (rows.length < 2) {
+          toast.error('File Excel không có dữ liệu');
+          return;
+        }
+        
+        const dataRows = rows.slice(1);
+        const parsed: DrivingQuestion[] = dataRows.map((row: any[]) => {
+          const correctRaw = String(row[2] || 'A').toUpperCase();
+          const correctOption: 'A' | 'B' = correctRaw === 'B' || correctRaw === 'X' || correctRaw === '✕' || correctRaw === 'SAI' ? 'B' : 'A';
+          return {
+            content: String(row[0] || ''),
+            image_url: String(row[1] || ''),
+            correct_option: correctOption,
+            explanation: String(row[3] || ''),
+          };
+        }).filter(q => q.content.trim().length > 0);
+        
+        setDrivingQuestions(parsed);
+        toast.success(`Đã đọc ${parsed.length} câu hỏi từ Excel`);
+      } else {
+        toast.error('Chỉ hỗ trợ file .xlsx hoặc .csv');
+      }
+    } catch (err) {
+      console.error('Error parsing file:', err);
+      toast.error('Lỗi khi đọc file. Vui lòng kiểm tra định dạng.');
+    }
   }, []);
 
   // Loading state
@@ -820,15 +922,15 @@ const ImportQuestionsPage = () => {
               {/* Driving mode: special O/X input UI */}
               {selectedSubject?.slug === 'bang-lai-xe' ? (
                 <div className="space-y-4">
-                  <Tabs value={drivingImportTab} onValueChange={(v) => setDrivingImportTab(v as 'manual' | 'json')}>
+                  <Tabs value={drivingImportTab} onValueChange={(v) => setDrivingImportTab(v as 'manual' | 'excel')}>
                     <TabsList className="mb-4 grid w-full grid-cols-2">
                       <TabsTrigger value="manual" className="gap-2">
                         <Table2 className="h-4 w-4" />
                         Nhập trực tiếp
                       </TabsTrigger>
-                      <TabsTrigger value="json" className="gap-2">
-                        <FileText className="h-4 w-4" />
-                        Import JSON đề trọn vẹn
+                      <TabsTrigger value="excel" className="gap-2">
+                        <FileSpreadsheet className="h-4 w-4" />
+                        Import đề trọn vẹn (Excel / CSV / JSON)
                       </TabsTrigger>
                     </TabsList>
 
@@ -855,6 +957,12 @@ const ImportQuestionsPage = () => {
                             placeholder="Nhập nội dung câu hỏi..."
                             className="w-full min-h-[60px] rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
                             rows={2}
+                          />
+                          {/* Image upload */}
+                          <MediaUpload
+                            type="image"
+                            value={q.image_url || undefined}
+                            onChange={(url) => setDrivingQuestions(prev => prev.map((item, i) => i === idx ? { ...item, image_url: url || '' } : item))}
                           />
                           <div className="flex items-center gap-3">
                             <span className="text-xs text-muted-foreground">Đáp án:</span>
@@ -893,7 +1001,7 @@ const ImportQuestionsPage = () => {
                         variant="outline"
                         size="sm"
                         className="w-full gap-2"
-                        onClick={() => setDrivingQuestions(prev => [...prev, { content: '', correct_option: 'A', explanation: '' }])}
+                        onClick={() => setDrivingQuestions(prev => [...prev, { content: '', correct_option: 'A', explanation: '', image_url: '' }])}
                       >
                         <Plus className="h-4 w-4" />
                         Thêm câu hỏi
@@ -906,45 +1014,120 @@ const ImportQuestionsPage = () => {
                       )}
                     </TabsContent>
 
-                    <TabsContent value="json" className="mt-0 space-y-3">
-                      <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-xs text-yellow-800 space-y-1">
-                        <p className="font-semibold">Định dạng JSON mảng câu hỏi:</p>
-                        <pre className="font-mono text-[10px] overflow-x-auto">{`[
-  {
-    "content": "シートベルトは運転者のみ装着すれば良い。",
-    "correct_option": "B",
-    "explanation": "全員が着用する必要がある。"
-  },
-  ...
-]`}</pre>
-                        <p>Trường <code>correct_option</code>: <strong>A</strong> = Đúng (○), <strong>B</strong> = Sai (✕)</p>
-                        <p>Cũng chấp nhận: <code>"O"</code> hoặc <code>"○"</code> cho Đúng.</p>
+                    <TabsContent value="excel" className="mt-0 space-y-4">
+                      {/* Template download */}
+                      <div className="flex items-center gap-3">
+                        <Button variant="outline" size="sm" className="gap-2" onClick={() => {
+                          const headers = 'Nội dung câu hỏi,Link hình ảnh (nếu có),Đáp án (A=Đúng/B=Sai),Giải thích';
+                          const sample1 = '"シートベルトは運転者のみ装着すれば良い。","","B","全員が着用する必要がある。"';
+                          const sample2 = '"赤信号では必ず停止しなければならない。","https://example.com/image.jpg","A","赤信号は停止の意味。"';
+                          const csv = `${headers}\n${sample1}\n${sample2}`;
+                          const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = 'mau_de_thi_bang_lai_xe.csv';
+                          link.click();
+                          URL.revokeObjectURL(url);
+                        }}>
+                          <Download className="h-4 w-4" />
+                          Tải file mẫu
+                        </Button>
+                        <span className="text-xs text-muted-foreground">
+                          CSV/Excel: 4 cột (Nội dung | Link ảnh | Đáp án | Giải thích)
+                        </span>
                       </div>
-                      <textarea
-                        value={drivingJsonText}
-                        onChange={(e) => setDrivingJsonText(e.target.value)}
-                        placeholder='Dán JSON mảng câu hỏi vào đây...'
-                        className="w-full min-h-[200px] rounded-md border border-border bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-y"
-                        rows={10}
-                      />
-                      {drivingJsonText.trim() && (() => {
-                        try {
-                          const arr = JSON.parse(drivingJsonText);
-                          return (
-                            <p className="text-sm text-success flex items-center gap-1">
-                              <CheckCircle2 className="h-4 w-4" />
-                              JSON hợp lệ: {Array.isArray(arr) ? arr.length : 0} câu hỏi
-                            </p>
-                          );
-                        } catch {
-                          return (
-                            <p className="text-sm text-destructive flex items-center gap-1">
-                              <AlertCircle className="h-4 w-4" />
-                              JSON không hợp lệ
-                            </p>
-                          );
-                        }
-                      })()}
+
+                      {/* Drag & Drop file upload */}
+                      <label
+                        className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border p-8 transition-colors hover:border-primary/50 hover:bg-primary/5"
+                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onDrop={async (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const file = e.dataTransfer.files?.[0];
+                          if (!file) return;
+                          await handleDrivingFileUpload(file);
+                        }}
+                      >
+                        <FileSpreadsheet className="mb-3 h-12 w-12 text-muted-foreground" />
+                        <span className="mb-1 font-medium text-foreground">
+                          {drivingExcelFile ? drivingExcelFile.name : 'Kéo thả file Excel/CSV vào đây'}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          Hỗ trợ .xlsx, .csv — hoặc click để chọn file
+                        </span>
+                        <input
+                          type="file"
+                          accept=".xlsx,.csv"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) await handleDrivingFileUpload(file);
+                            e.target.value = '';
+                          }}
+                          className="hidden"
+                        />
+                      </label>
+
+                      {drivingExcelFile && validDrivingCount > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-sm text-success flex items-center gap-1">
+                            <CheckCircle2 className="h-4 w-4" />
+                            Đã đọc {validDrivingCount} câu hỏi từ file
+                          </p>
+                          <div className="rounded-lg border border-border bg-muted/20 p-3 max-h-48 overflow-y-auto">
+                            {drivingQuestions.slice(0, 5).map((q, i) => (
+                              <div key={i} className="text-xs py-1 border-b border-border/50 last:border-0">
+                                <span className="font-medium">{i + 1}.</span> {q.content.slice(0, 80)}{q.content.length > 80 ? '...' : ''} 
+                                <span className="ml-2 font-bold" style={{ color: q.correct_option === 'A' ? '#2563eb' : '#dc2626' }}>
+                                  {q.correct_option === 'A' ? '○' : '✕'}
+                                </span>
+                              </div>
+                            ))}
+                            {drivingQuestions.length > 5 && (
+                              <p className="text-xs text-muted-foreground pt-1">...và {drivingQuestions.length - 5} câu khác</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* JSON fallback */}
+                      <details className="group">
+                        <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                          Hoặc dán JSON trực tiếp ▾
+                        </summary>
+                        <div className="mt-2 space-y-2">
+                          <div className="rounded-lg border border-border bg-muted/20 p-3 text-xs text-muted-foreground space-y-1">
+                            <p className="font-semibold">Định dạng JSON:</p>
+                            <pre className="font-mono text-[10px] overflow-x-auto">{`[{"content":"...","correct_option":"A","explanation":"..."}]`}</pre>
+                          </div>
+                          <textarea
+                            value={drivingJsonText}
+                            onChange={(e) => setDrivingJsonText(e.target.value)}
+                            placeholder='Dán JSON mảng câu hỏi vào đây...'
+                            className="w-full min-h-[120px] rounded-md border border-border bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-y"
+                            rows={6}
+                          />
+                          {drivingJsonText.trim() && (() => {
+                            try {
+                              const arr = JSON.parse(drivingJsonText);
+                              return (
+                                <p className="text-sm text-success flex items-center gap-1">
+                                  <CheckCircle2 className="h-4 w-4" />
+                                  JSON hợp lệ: {Array.isArray(arr) ? arr.length : 0} câu hỏi
+                                </p>
+                              );
+                            } catch {
+                              return (
+                                <p className="text-sm text-destructive flex items-center gap-1">
+                                  <AlertCircle className="h-4 w-4" />
+                                  JSON không hợp lệ
+                                </p>
+                              );
+                            }
+                          })()}
+                        </div>
+                      </details>
                     </TabsContent>
                   </Tabs>
                 </div>
@@ -1060,8 +1243,8 @@ const ImportQuestionsPage = () => {
               disabled={
                 isLoading ||
                 (selectedSubject?.slug === 'bang-lai-xe'
-                  ? drivingImportTab === 'json'
-                    ? !drivingJsonText.trim()
+                  ? drivingImportTab === 'excel'
+                    ? (!drivingExcelFile && !drivingJsonText.trim()) || validDrivingCount === 0
                     : validDrivingCount === 0
                   : importMode === 'table'
                   ? validTableQuestionsCount === 0
@@ -1077,9 +1260,7 @@ const ImportQuestionsPage = () => {
                 ? 'Đang import...'
                 : `Import ${
                     selectedSubject?.slug === 'bang-lai-xe'
-                      ? drivingImportTab === 'json'
-                        ? (() => { try { const a = JSON.parse(drivingJsonText); return Array.isArray(a) ? a.length : 0; } catch { return 0; } })()
-                        : validDrivingCount
+                      ? validDrivingCount
                       : importMode === 'table'
                       ? validTableQuestionsCount
                       : importMode === 'listening'
