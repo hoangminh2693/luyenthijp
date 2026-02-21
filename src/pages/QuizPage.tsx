@@ -14,6 +14,7 @@ import { useLeafCategory } from '@/hooks/useCategoryPath';
 import { useRandomQuestions, useRandomListeningExam, type Question } from '@/hooks/useQuestions';
 import { type QuizResult } from '@/data/quizData';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 
@@ -27,6 +28,7 @@ import { useQuery } from '@tanstack/react-query';
  */
 const QuizPage = () => {
   useRobotsMeta('noindex, nofollow');
+  const { user } = useAuth();
   const { subjectSlug, '*': wildcardPath } = useParams<{ 
     subjectSlug?: string;
     '*': string;
@@ -198,7 +200,9 @@ const QuizPage = () => {
         }
       }
 
-      const { data, error } = await supabase.rpc('submit_quiz_answers', {
+      // Use different RPC based on auth status
+      const rpcName = user ? 'submit_quiz_answers' : 'check_quiz_answers';
+      const { data, error } = await supabase.rpc(rpcName, {
         p_answers: answersToSubmit,
       });
 

@@ -624,6 +624,7 @@ export type Database = {
       }
     }
     Functions: {
+      check_quiz_answers: { Args: { p_answers: Json }; Returns: Json }
       get_enhanced_leaderboard: {
         Args: {
           p_leaderboard_type?: string

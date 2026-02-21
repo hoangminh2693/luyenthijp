@@ -223,21 +223,23 @@ const LeaderboardPage = () => {
           return;
         }
 
-        const stats: UserStats[] = (data || []).map((row: any) => ({
-          user_id: row.user_id,
-          display_name: row.display_name || 'Người dùng ẩn danh',
-          avatar_url: row.avatar_url,
-          total_attempts: Number(row.total_attempts),
-          correct_count: Number(row.correct_count),
-          distinct_correct: Number(row.distinct_correct),
-          total_questions_in_level: Number(row.total_questions_in_level),
-          accuracy_percent: Number(row.accuracy_percent),
-          ranking_score: Number(row.ranking_score),
-          streak_days: Number(row.streak_days),
-          improvement_percent: Number(row.improvement_percent),
-          level_id: row.level_id,
-          level_name: row.level_name,
-        }));
+        const stats: UserStats[] = (data || [])
+          .map((row: any) => ({
+            user_id: row.user_id,
+            display_name: row.display_name || 'Người dùng ẩn danh',
+            avatar_url: row.avatar_url,
+            total_attempts: Number(row.total_attempts),
+            correct_count: Number(row.correct_count),
+            distinct_correct: Number(row.distinct_correct),
+            total_questions_in_level: Number(row.total_questions_in_level),
+            accuracy_percent: Number(row.accuracy_percent),
+            ranking_score: Number(row.ranking_score),
+            streak_days: Number(row.streak_days),
+            improvement_percent: Number(row.improvement_percent),
+            level_id: row.level_id,
+            level_name: row.level_name,
+          }))
+          .filter((u: UserStats) => u.display_name !== 'Người dùng ẩn danh');
 
         setLeaderboardData(stats);
 
@@ -589,7 +591,32 @@ const LeaderboardPage = () => {
           </Card>
         )}
 
-        {/* Motivation for users not on leaderboard */}
+        {/* Prompt for guest users */}
+        {!user && hasSelectedFilter && !isLoading && (
+          <Card className="mb-6 border-0 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent shadow-md">
+            <CardContent className="flex flex-col items-center gap-4 p-6 text-center sm:flex-row sm:text-left">
+              <div className="rounded-full bg-gradient-to-br from-primary to-primary/80 p-4 shadow-lg">
+                <Trophy className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-foreground">
+                  Đăng nhập để lưu điểm số và tranh tài cùng cộng đồng
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Kết quả bài làm của bạn sẽ được ghi nhận và hiển thị trên bảng xếp hạng khi bạn đăng nhập.
+                </p>
+              </div>
+              <Button asChild className="bg-gradient-to-r from-primary to-primary/80">
+                <Link to="/auth">
+                  Đăng nhập ngay
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Motivation for logged-in users not on leaderboard */}
         {hasSelectedFilter && !currentUserStats && user && !isLoading && leaderboardData.length > 0 && (
           <Card className="mb-6 border-0 bg-gradient-to-r from-orange-500/10 to-amber-500/5 shadow-md">
             <CardContent className="flex flex-col items-center gap-4 p-6 text-center sm:flex-row sm:text-left">
