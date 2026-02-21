@@ -36,6 +36,7 @@ const QuizPage = () => {
   const [searchParams] = useSearchParams();
   const mode = searchParams.get('mode');
   const isListeningMode = mode === 'listening';
+  const isDrivingMode = mode === 'driving';
   const questionCount = parseInt(searchParams.get('count') || '10', 10);
   
   // Parse category path
@@ -117,10 +118,10 @@ const QuizPage = () => {
   
   // Fetch câu hỏi dựa theo mode
   const { data: randomQuestions = [], isLoading: loadingRandomQuestions } = useRandomQuestions(
-    !isListeningMode ? sectionId : undefined, 
+    !isListeningMode && !isDrivingMode ? sectionId : undefined, 
     questionCount,
     sessionId,
-    !isListeningMode ? categoryIdForQuiz : undefined,
+    !isListeningMode && !isDrivingMode ? categoryIdForQuiz : undefined,
     shouldShuffle
   );
   const { data: listeningExam, isLoading: loadingListeningExam } = useRandomListeningExam(
@@ -129,14 +130,24 @@ const QuizPage = () => {
     sessionId,
     isListeningMode ? categoryIdForQuiz : undefined
   );
+  // Driving mode: fetch a random complete exam (same as listening)
+  const { data: drivingExam, isLoading: loadingDrivingExam } = useRandomListeningExam(
+    isDrivingMode ? sectionId : undefined,
+    isDrivingMode,
+    sessionId,
+    isDrivingMode ? categoryIdForQuiz : undefined
+  );
   
   // Chọn questions dựa theo mode
   const questions = useMemo(() => {
     if (isListeningMode && listeningExam) {
       return listeningExam.questions;
     }
+    if (isDrivingMode && drivingExam) {
+      return drivingExam.questions;
+    }
     return randomQuestions;
-  }, [isListeningMode, listeningExam, randomQuestions]);
+  }, [isListeningMode, isDrivingMode, listeningExam, drivingExam, randomQuestions]);
 
   // Scroll to top khi component mount
   useEffect(() => {
@@ -144,7 +155,7 @@ const QuizPage = () => {
   }, [categoryPath]);
 
   const isLoading = loadingPath || 
-    (isListeningMode ? loadingListeningExam : loadingRandomQuestions);
+    (isDrivingMode ? loadingDrivingExam : isListeningMode ? loadingListeningExam : loadingRandomQuestions);
 
   // Loading state
   if (isLoading) {
@@ -322,7 +333,7 @@ const QuizPage = () => {
   const mappedQuestions = questions;
 
   // ======= DRIVING MODE: Use DrivingExamView for 'bang-lai-xe' subject =======
-  if (subjectSlug === 'bang-lai-xe' && questions.length > 0) {
+  if ((subjectSlug === 'bang-lai-xe' || isDrivingMode) && questions.length > 0) {
     return (
       <div className="min-h-screen bg-background pb-8">
         <div className="container py-8">
