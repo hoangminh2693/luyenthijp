@@ -1,9 +1,11 @@
 import { useState, useRef } from 'react';
-import { Check, X, Lightbulb, Play, Pause, Volume2 } from 'lucide-react';
+import { Check, X, Lightbulb, Play, Pause, Volume2, Lock } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import type { Question } from '@/hooks/useQuestions';
 import { cn } from '@/lib/utils';
 import { QuestionHistoryBadge } from './QuestionHistoryBadge';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Ký hiệu số thứ tự kiểu Nhật
 const OPTION_SYMBOLS: Record<string, string> = {
@@ -313,11 +315,83 @@ export function QuestionCard({
   subAnswers = {},
   onSelectSubAnswer,
 }: QuestionCardProps) {
+  const { user } = useAuth();
   const questionType = question.questionType || 'standard';
   const hasSubQuestions = question.subQuestions && question.subQuestions.length > 0;
   
   // Với audio_only, không hiển thị nội dung câu hỏi (chỉ số thứ tự)
   const showQuestionContent = questionType !== 'audio_only' || question.content.trim() !== '';
+
+  // Render explanation with blur for guests
+  const renderExplanation = (explanation: string | undefined, isMain: boolean = true) => {
+    if (!showResult || !explanation) return null;
+    
+    if (!user) {
+      // Guest: blur explanation + login prompt
+      return (
+        <div className={cn("relative rounded-lg border border-primary/20 bg-primary/5", isMain ? "mt-4 p-4" : "mt-3 p-3")}>
+          <div className="flex items-start gap-2">
+            <Lightbulb className={cn("shrink-0 text-primary mt-0.5", isMain ? "h-5 w-5" : "h-4 w-4")} />
+            <div className="flex-1">
+              {isMain && <p className="font-medium text-primary mb-1">Giải thích</p>}
+              <div 
+                className={cn("text-foreground/80 leading-relaxed select-none filter blur-sm", isMain ? "text-sm" : "text-xs")}
+                dangerouslySetInnerHTML={{ __html: explanation }}
+                aria-hidden="true"
+              />
+            </div>
+          </div>
+          {/* Overlay with login prompt */}
+          <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/60 backdrop-blur-[1px]">
+            <Link to="/auth" className="flex flex-col items-center gap-2 text-center px-4">
+              <div className="rounded-full bg-primary/10 p-2">
+                <Lock className="h-5 w-5 text-primary" />
+              </div>
+              <p className="text-sm font-medium text-foreground">
+                Đăng nhập hoặc Đăng ký miễn phí
+              </p>
+              <p className="text-xs text-muted-foreground">
+                để xem giải thích chi tiết
+              </p>
+              <Button size="sm" className="mt-1 gap-1.5">
+                <Lock className="h-3.5 w-3.5" />
+                Đăng nhập ngay
+              </Button>
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
+    // Authenticated: show normally
+    if (isMain) {
+      return (
+        <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-4">
+          <div className="flex items-start gap-2">
+            <Lightbulb className="h-5 w-5 shrink-0 text-primary mt-0.5" />
+            <div>
+              <p className="font-medium text-primary mb-1">Giải thích</p>
+              <div 
+                className="text-sm text-foreground/80 leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: explanation }}
+              />
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+        <div className="flex items-start gap-2">
+          <Lightbulb className="h-4 w-4 shrink-0 text-primary mt-0.5" />
+          <div 
+            className="text-xs text-foreground/80"
+            dangerouslySetInnerHTML={{ __html: explanation }}
+          />
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div 
@@ -419,37 +493,14 @@ export function QuestionCard({
                 />
 
                 {/* Sub-question explanation */}
-                {showResult && subQ.explanation && (
-                  <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
-                    <div className="flex items-start gap-2">
-                      <Lightbulb className="h-4 w-4 shrink-0 text-primary mt-0.5" />
-                      <div 
-                        className="text-xs text-foreground/80"
-                        dangerouslySetInnerHTML={{ __html: subQ.explanation }}
-                      />
-                    </div>
-                  </div>
-                )}
+                {renderExplanation(subQ.explanation, false)}
               </div>
             ))}
           </div>
         )}
 
         {/* Main question explanation */}
-        {showResult && question.explanation && !hasSubQuestions && (
-          <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-4">
-            <div className="flex items-start gap-2">
-              <Lightbulb className="h-5 w-5 shrink-0 text-primary mt-0.5" />
-              <div>
-                <p className="font-medium text-primary mb-1">Giải thích</p>
-                <div 
-                  className="text-sm text-foreground/80 leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: question.explanation }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
+        {!hasSubQuestions && renderExplanation(question.explanation, true)}
       </div>
     </div>
   );

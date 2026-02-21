@@ -274,36 +274,7 @@ const StartQuizPage = () => {
     return <Navigate to="/subjects" replace />;
   }
 
-  // Yêu cầu đăng nhập trước khi làm bài
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="container py-8">
-          <div className="mx-auto max-w-md text-center">
-            <LogIn className="mx-auto mb-4 h-12 w-12 text-primary" />
-            <h1 className="mb-2 text-2xl font-bold text-foreground">Đăng nhập để làm bài</h1>
-            <p className="mb-6 text-muted-foreground">
-              Bạn cần đăng nhập để làm bài và lưu kết quả vào lịch sử học tập.
-            </p>
-            <div className="space-y-3">
-              <Link to="/auth" state={{ from: `/start/${subjectSlug}/${categoryPath}` }}>
-                <Button className="w-full gap-2">
-                  <LogIn className="h-4 w-4" />
-                  Đăng nhập ngay
-                </Button>
-              </Link>
-              <p className="text-sm text-muted-foreground">
-                Chưa có tài khoản?{' '}
-                <Link to="/auth" className="text-primary hover:underline">
-                  Đăng ký miễn phí
-                </Link>
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Guest users can now access quizzes freely (no login gate)
 
   const isDrivingSubject = subjectSlug === 'bang-lai-xe';
 
