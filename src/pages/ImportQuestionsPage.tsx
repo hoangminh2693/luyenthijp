@@ -394,10 +394,13 @@ const ImportQuestionsPage = () => {
     let questionsToImport: any[];
     let listeningQuestions: ReturnType<typeof flattenListeningExam> = [];
     
-    if (importMode === 'listening') {
+    // Determine effective import mode (driving is determined by subject slug, not importMode state)
+    const effectiveMode = selectedSubject?.slug === 'bang-lai-xe' ? 'driving' : importMode;
+    
+    if (effectiveMode === 'listening') {
       listeningQuestions = flattenListeningExam(listeningData);
       questionsToImport = listeningQuestions;
-    } else if (importMode === 'driving') {
+    } else if (effectiveMode === 'driving') {
       // Generate a unique exam group key for this batch
       const drivingExamKey = `driving-exam-${Date.now()}`;
       
@@ -465,7 +468,7 @@ const ImportQuestionsPage = () => {
             question_type: 'standard',
           }));
       }
-    } else if (importMode === 'table') {
+    } else if (effectiveMode === 'table') {
       questionsToImport = tableQuestions.filter(isValidTableQuestion);
     } else {
       questionsToImport = parsedQuestions;
@@ -553,7 +556,7 @@ const ImportQuestionsPage = () => {
         }
 
         // Add mondai fields for listening mode
-        if (importMode === 'listening' && q.mondai_index != null) {
+        if (effectiveMode === 'listening' && q.mondai_index != null) {
           insertData.mondai_index = q.mondai_index;
           insertData.mondai_title = q.mondai_title || null;
         }
@@ -582,7 +585,7 @@ const ImportQuestionsPage = () => {
             };
             if (targetSectionId) subInsert.section_id = targetSectionId;
             if (targetCategoryId) subInsert.category_id = targetCategoryId;
-            if (importMode === 'listening' && q.mondai_index != null) {
+            if (effectiveMode === 'listening' && q.mondai_index != null) {
               subInsert.mondai_index = q.mondai_index;
               subInsert.mondai_title = q.mondai_title || null;
             }
@@ -625,7 +628,7 @@ const ImportQuestionsPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedSectionId, parsedQuestions, tableQuestions, importMode, listeningData, usesLayers, selectedLeafCategory, isReadyToImport, allowDuplicates, drivingQuestions, drivingImportTab, drivingJsonText, drivingExcelFile]);
+  }, [selectedSectionId, parsedQuestions, tableQuestions, importMode, listeningData, usesLayers, selectedLeafCategory, isReadyToImport, allowDuplicates, drivingQuestions, drivingImportTab, drivingJsonText, drivingExcelFile, selectedSubject]);
 
   // Download sample template
   const downloadTemplate = useCallback(() => {
@@ -1253,6 +1256,7 @@ const ImportQuestionsPage = () => {
             <Button
               onClick={handleImport}
               disabled={
+                !isReadyToImport ||
                 isLoading ||
                 (selectedSubject?.slug === 'bang-lai-xe'
                   ? drivingImportTab === 'excel'
