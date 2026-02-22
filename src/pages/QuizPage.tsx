@@ -300,6 +300,8 @@ const QuizPage = () => {
   const backUrl = `/subjects/${subjectSlug}/${categoryPath}`;
   const pageTitle = isListeningMode 
     ? `${leafCategory.name} - Đề nghe` 
+    : isDrivingMode
+    ? `${leafCategory.name} - ${totalQuestionCount} câu`
     : `${leafCategory.name} - ${questionCount} câu`;
 
   // Audio toggle
