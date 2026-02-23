@@ -6,7 +6,7 @@
  * - 2 nút O (Đúng) và X (Sai)
  * - Auto-next sau khi chọn đáp án
  */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -53,8 +53,22 @@ export function DrivingExamView({ questions, examName, onRetry }: DrivingExamVie
   const autoNextTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentQuestion = questions[currentIndex];
-  const answeredCount = Object.keys(answers).length;
-  const totalQuestions = questions.length;
+  
+  // Flatten for counting: questions with sub-questions count each sub as a unit
+  const flatQuestionIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const q of questions) {
+      if (q.subQuestions && q.subQuestions.length > 0) {
+        for (const sq of q.subQuestions) ids.push(sq.id);
+      } else {
+        ids.push(q.id);
+      }
+    }
+    return ids;
+  }, [questions]);
+  
+  const answeredCount = flatQuestionIds.filter(id => !!answers[id]).length;
+  const totalQuestions = flatQuestionIds.length;
 
   // Clean up timer on unmount
   useEffect(() => {
@@ -68,13 +82,16 @@ export function DrivingExamView({ questions, examName, onRetry }: DrivingExamVie
     
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
     
-    // Auto-next after short delay
-    if (autoNextTimer.current) clearTimeout(autoNextTimer.current);
-    autoNextTimer.current = setTimeout(() => {
-      if (currentIndex < totalQuestions - 1) {
-        setCurrentIndex(prev => prev + 1);
-      }
-    }, 400);
+    // Auto-next: only for questions without sub-questions
+    const hasSubQ = currentQuestion?.subQuestions && currentQuestion.subQuestions.length > 0;
+    if (!hasSubQ) {
+      if (autoNextTimer.current) clearTimeout(autoNextTimer.current);
+      autoNextTimer.current = setTimeout(() => {
+        if (currentIndex < questions.length - 1) {
+          setCurrentIndex(prev => prev + 1);
+        }
+      }, 400);
+    }
   };
 
   const handleSubmit = async () => {
@@ -82,9 +99,9 @@ export function DrivingExamView({ questions, examName, onRetry }: DrivingExamVie
 
     setIsSubmitting(true);
     try {
-      const answersToSubmit = questions.map(q => ({
-        question_id: q.id,
-        selected_answer: answers[q.id] || 'A',
+      const answersToSubmit = flatQuestionIds.map(qId => ({
+        question_id: qId,
+        selected_answer: answers[qId] || 'A',
       }));
 
       // Use different RPC based on auth status
@@ -187,77 +204,96 @@ export function DrivingExamView({ questions, examName, onRetry }: DrivingExamVie
         <h3 className="text-xl font-bold text-foreground">Xem lại đáp án</h3>
         <div className="space-y-3">
           {questions.map((q, idx) => {
-            const detail = result.details.find(d => d.questionId === q.id);
-            const userAnswer = answers[q.id];
-            const isCorrect = detail?.isCorrect ?? false;
-            const correctOption = detail?.correctOption || 'A';
+            const hasSubQ = q.subQuestions && q.subQuestions.length > 0;
+            const itemsToReview = hasSubQ ? q.subQuestions! : [q];
             
             return (
-              <div
-                key={q.id}
-                className="rounded-xl border-2 p-4"
-                style={{
-                  borderColor: isCorrect ? '#86efac' : '#fda4af',
-                  backgroundColor: isCorrect ? '#f0fdf4' : '#fff1f2',
-                }}
-              >
-                <div className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                    style={{ backgroundColor: isCorrect ? '#22c55e' : '#ef4444' }}>
-                    {idx + 1}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground mb-2"
-                      dangerouslySetInnerHTML={{ __html: q.content }} />
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="flex items-center gap-1">
-                        <span className="text-muted-foreground">Bạn chọn:</span>
-                        <span
-                          className="font-bold text-base"
-                          style={{ color: userAnswer === 'A' ? '#2563eb' : '#dc2626' }}
-                        >
-                          {userAnswer === 'A' ? '○' : userAnswer === 'B' ? '✕' : '—'}
-                        </span>
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="text-muted-foreground">Đáp án:</span>
-                        <span
-                          className="font-bold text-base"
-                          style={{ color: correctOption === 'A' ? '#2563eb' : '#dc2626' }}
-                        >
-                          {correctOption === 'A' ? '○' : '✕'}
-                        </span>
-                      </span>
-                      {isCorrect
-                        ? <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
-                        : <XCircle className="h-4 w-4 text-red-500 ml-auto" />
-                      }
-                    </div>
-                    {detail?.explanation && (
-                      user ? (
-                        <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 p-2">
-                          <div className="flex items-start gap-1.5">
-                            <Lightbulb className="h-3.5 w-3.5 shrink-0 text-primary mt-0.5" />
-                            <p className="text-xs text-foreground/80"
-                              dangerouslySetInnerHTML={{ __html: detail.explanation }} />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="relative mt-2 rounded-lg border border-primary/20 bg-primary/5 p-2">
-                          <p className="text-xs text-foreground/80 select-none filter blur-sm"
-                            dangerouslySetInnerHTML={{ __html: detail.explanation }}
-                            aria-hidden="true" />
-                          <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/60 backdrop-blur-[1px]">
-                            <Link to="/auth" className="flex items-center gap-1.5 text-xs font-medium text-primary hover:underline">
-                              <Lock className="h-3 w-3" />
-                              Đăng nhập để xem giải thích
-                            </Link>
-                          </div>
-                        </div>
-                      )
+              <div key={q.id} className="space-y-2">
+                {/* Parent question content (shown as context for sub-questions) */}
+                {hasSubQ && (
+                  <div className="rounded-xl border border-border bg-card p-3">
+                    <p className="text-sm font-medium text-foreground" dangerouslySetInnerHTML={{ __html: q.content }} />
+                    {q.image_url && (
+                      <img src={q.image_url} alt="" className="mt-2 max-h-40 object-contain rounded-lg" />
                     )}
                   </div>
-                </div>
+                )}
+                {itemsToReview.map((item, subIdx) => {
+                  const detail = result.details.find(d => d.questionId === item.id);
+                  const userAnswer = answers[item.id];
+                  const isCorrect = detail?.isCorrect ?? false;
+                  const correctOption = detail?.correctOption || 'A';
+                  const displayNum = hasSubQ ? `${idx + 1}-${subIdx + 1}` : `${idx + 1}`;
+                  
+                  return (
+                    <div
+                      key={item.id}
+                      className="rounded-xl border-2 p-4"
+                      style={{
+                        borderColor: isCorrect ? '#86efac' : '#fda4af',
+                        backgroundColor: isCorrect ? '#f0fdf4' : '#fff1f2',
+                      }}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white"
+                          style={{ backgroundColor: isCorrect ? '#22c55e' : '#ef4444' }}>
+                          {displayNum}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground mb-2"
+                            dangerouslySetInnerHTML={{ __html: item.content }} />
+                          <div className="flex items-center gap-4 text-sm">
+                            <span className="flex items-center gap-1">
+                              <span className="text-muted-foreground">Bạn chọn:</span>
+                              <span
+                                className="font-bold text-base"
+                                style={{ color: userAnswer === 'A' ? '#2563eb' : '#dc2626' }}
+                              >
+                                {userAnswer === 'A' ? '○' : userAnswer === 'B' ? '✕' : '—'}
+                              </span>
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <span className="text-muted-foreground">Đáp án:</span>
+                              <span
+                                className="font-bold text-base"
+                                style={{ color: correctOption === 'A' ? '#2563eb' : '#dc2626' }}
+                              >
+                                {correctOption === 'A' ? '○' : '✕'}
+                              </span>
+                            </span>
+                            {isCorrect
+                              ? <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
+                              : <XCircle className="h-4 w-4 text-red-500 ml-auto" />
+                            }
+                          </div>
+                          {detail?.explanation && (
+                            user ? (
+                              <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 p-2">
+                                <div className="flex items-start gap-1.5">
+                                  <Lightbulb className="h-3.5 w-3.5 shrink-0 text-primary mt-0.5" />
+                                  <p className="text-xs text-foreground/80"
+                                    dangerouslySetInnerHTML={{ __html: detail.explanation }} />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="relative mt-2 rounded-lg border border-primary/20 bg-primary/5 p-2">
+                                <p className="text-xs text-foreground/80 select-none filter blur-sm"
+                                  dangerouslySetInnerHTML={{ __html: detail.explanation }}
+                                  aria-hidden="true" />
+                                <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/60 backdrop-blur-[1px]">
+                                  <Link to="/auth" className="flex items-center gap-1.5 text-xs font-medium text-primary hover:underline">
+                                    <Lock className="h-3 w-3" />
+                                    Đăng nhập để xem giải thích
+                                  </Link>
+                                </div>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
@@ -275,8 +311,7 @@ export function DrivingExamView({ questions, examName, onRetry }: DrivingExamVie
     );
   }
 
-  const currentAnswer = answers[currentQuestion.id];
-  const isAnswered = !!currentAnswer;
+  const hasSubQ = currentQuestion.subQuestions && currentQuestion.subQuestions.length > 0;
 
   return (
     <div
@@ -286,7 +321,7 @@ export function DrivingExamView({ questions, examName, onRetry }: DrivingExamVie
       {/* Progress header */}
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-muted-foreground">
-          Câu <span className="text-foreground font-bold">{currentIndex + 1}</span> / {totalQuestions}
+          Câu <span className="text-foreground font-bold">{currentIndex + 1}</span> / {questions.length}
         </span>
         <Badge variant="outline" className="text-xs">
           {answeredCount}/{totalQuestions} đã trả lời
@@ -302,7 +337,13 @@ export function DrivingExamView({ questions, examName, onRetry }: DrivingExamVie
         <div className="flex flex-wrap gap-1.5">
           {questions.map((q, idx) => {
             const isActive = idx === currentIndex;
-            const answered = !!answers[q.id];
+            const qHasSub = q.subQuestions && q.subQuestions.length > 0;
+            const answered = qHasSub
+              ? q.subQuestions!.every(sq => !!answers[sq.id])
+              : !!answers[q.id];
+            const partialAnswered = qHasSub
+              ? q.subQuestions!.some(sq => !!answers[sq.id]) && !answered
+              : false;
             return (
               <button
                 key={q.id}
@@ -313,12 +354,16 @@ export function DrivingExamView({ questions, examName, onRetry }: DrivingExamVie
                     ? '#1d4ed8'
                     : answered
                     ? '#22c55e'
+                    : partialAnswered
+                    ? '#facc15'
                     : '#ffffff',
-                  color: isActive || answered ? '#ffffff' : '#374151',
+                  color: isActive || answered ? '#ffffff' : partialAnswered ? '#713f12' : '#374151',
                   border: isActive
                     ? '2px solid #1d4ed8'
                     : answered
                     ? '2px solid #22c55e'
+                    : partialAnswered
+                    ? '2px solid #facc15'
                     : '1px solid #d1d5db',
                   boxShadow: isActive ? '0 0 0 2px rgba(29,78,216,0.3)' : undefined,
                 }}
@@ -351,52 +396,94 @@ export function DrivingExamView({ questions, examName, onRetry }: DrivingExamVie
         )}
       </div>
 
-      {/* O/X Buttons */}
-      <div className="grid grid-cols-2 gap-4">
-        {/* O Button - Đúng */}
-        <button
-          onClick={() => handleSelectAnswer(currentQuestion.id, 'A')}
-          disabled={isSubmitted}
-          className="group relative h-20 md:h-24 rounded-2xl border-2 font-black text-4xl md:text-5xl transition-all duration-150 disabled:opacity-50"
-          style={{
-            backgroundColor: currentAnswer === 'A' ? '#dbeafe' : '#f3f4f6',
-            borderColor: currentAnswer === 'A' ? '#2563eb' : '#d1d5db',
-            color: currentAnswer === 'A' ? '#1d4ed8' : '#6b7280',
-            transform: currentAnswer === 'A' ? 'scale(1.02)' : undefined,
-            boxShadow: currentAnswer === 'A' ? '0 4px 12px rgba(37,99,235,0.3)' : undefined,
-          }}
-        >
-          <span className="select-none">○</span>
-          <span
-            className="absolute bottom-2 left-0 right-0 text-xs font-medium text-center"
-            style={{ color: currentAnswer === 'A' ? '#1d4ed8' : '#9ca3af' }}
+      {/* O/X Buttons - different rendering for sub-questions */}
+      {hasSubQ ? (
+        <div className="space-y-3">
+          {currentQuestion.subQuestions!.map((sq, sqIdx) => {
+            const sqAnswer = answers[sq.id];
+            return (
+              <div key={sq.id} className="rounded-xl border border-border bg-white p-4 space-y-2">
+                <p className="text-xs text-muted-foreground font-medium">Câu con {sqIdx + 1}</p>
+                <div className="text-sm font-medium text-foreground" dangerouslySetInnerHTML={{ __html: sq.content }} />
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => handleSelectAnswer(sq.id, 'A')}
+                    disabled={isSubmitted}
+                    className="relative h-14 rounded-xl border-2 font-black text-2xl transition-all duration-150 disabled:opacity-50"
+                    style={{
+                      backgroundColor: sqAnswer === 'A' ? '#dbeafe' : '#f3f4f6',
+                      borderColor: sqAnswer === 'A' ? '#2563eb' : '#d1d5db',
+                      color: sqAnswer === 'A' ? '#1d4ed8' : '#6b7280',
+                      transform: sqAnswer === 'A' ? 'scale(1.02)' : undefined,
+                    }}
+                  >
+                    ○
+                  </button>
+                  <button
+                    onClick={() => handleSelectAnswer(sq.id, 'B')}
+                    disabled={isSubmitted}
+                    className="relative h-14 rounded-xl border-2 font-black text-2xl transition-all duration-150 disabled:opacity-50"
+                    style={{
+                      backgroundColor: sqAnswer === 'B' ? '#fee2e2' : '#f3f4f6',
+                      borderColor: sqAnswer === 'B' ? '#dc2626' : '#d1d5db',
+                      color: sqAnswer === 'B' ? '#dc2626' : '#6b7280',
+                      transform: sqAnswer === 'B' ? 'scale(1.02)' : undefined,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4">
+          {/* O Button - Đúng */}
+          <button
+            onClick={() => handleSelectAnswer(currentQuestion.id, 'A')}
+            disabled={isSubmitted}
+            className="group relative h-20 md:h-24 rounded-2xl border-2 font-black text-4xl md:text-5xl transition-all duration-150 disabled:opacity-50"
+            style={{
+              backgroundColor: answers[currentQuestion.id] === 'A' ? '#dbeafe' : '#f3f4f6',
+              borderColor: answers[currentQuestion.id] === 'A' ? '#2563eb' : '#d1d5db',
+              color: answers[currentQuestion.id] === 'A' ? '#1d4ed8' : '#6b7280',
+              transform: answers[currentQuestion.id] === 'A' ? 'scale(1.02)' : undefined,
+              boxShadow: answers[currentQuestion.id] === 'A' ? '0 4px 12px rgba(37,99,235,0.3)' : undefined,
+            }}
           >
-            Đúng (O)
-          </span>
-        </button>
+            <span className="select-none">○</span>
+            <span
+              className="absolute bottom-2 left-0 right-0 text-xs font-medium text-center"
+              style={{ color: answers[currentQuestion.id] === 'A' ? '#1d4ed8' : '#9ca3af' }}
+            >
+              Đúng (O)
+            </span>
+          </button>
 
-        {/* X Button - Sai */}
-        <button
-          onClick={() => handleSelectAnswer(currentQuestion.id, 'B')}
-          disabled={isSubmitted}
-          className="group relative h-20 md:h-24 rounded-2xl border-2 font-black text-4xl md:text-5xl transition-all duration-150 disabled:opacity-50"
-          style={{
-            backgroundColor: currentAnswer === 'B' ? '#fee2e2' : '#f3f4f6',
-            borderColor: currentAnswer === 'B' ? '#dc2626' : '#d1d5db',
-            color: currentAnswer === 'B' ? '#dc2626' : '#6b7280',
-            transform: currentAnswer === 'B' ? 'scale(1.02)' : undefined,
-            boxShadow: currentAnswer === 'B' ? '0 4px 12px rgba(220,38,38,0.3)' : undefined,
-          }}
-        >
-          <span className="select-none">✕</span>
-          <span
-            className="absolute bottom-2 left-0 right-0 text-xs font-medium text-center"
-            style={{ color: currentAnswer === 'B' ? '#dc2626' : '#9ca3af' }}
+          {/* X Button - Sai */}
+          <button
+            onClick={() => handleSelectAnswer(currentQuestion.id, 'B')}
+            disabled={isSubmitted}
+            className="group relative h-20 md:h-24 rounded-2xl border-2 font-black text-4xl md:text-5xl transition-all duration-150 disabled:opacity-50"
+            style={{
+              backgroundColor: answers[currentQuestion.id] === 'B' ? '#fee2e2' : '#f3f4f6',
+              borderColor: answers[currentQuestion.id] === 'B' ? '#dc2626' : '#d1d5db',
+              color: answers[currentQuestion.id] === 'B' ? '#dc2626' : '#6b7280',
+              transform: answers[currentQuestion.id] === 'B' ? 'scale(1.02)' : undefined,
+              boxShadow: answers[currentQuestion.id] === 'B' ? '0 4px 12px rgba(220,38,38,0.3)' : undefined,
+            }}
           >
-            Sai (X)
-          </span>
-        </button>
-      </div>
+            <span className="select-none">✕</span>
+            <span
+              className="absolute bottom-2 left-0 right-0 text-xs font-medium text-center"
+              style={{ color: answers[currentQuestion.id] === 'B' ? '#dc2626' : '#9ca3af' }}
+            >
+              Sai (X)
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* Navigation + Submit */}
       <div className="flex items-center gap-3 pt-2">
@@ -411,11 +498,11 @@ export function DrivingExamView({ questions, examName, onRetry }: DrivingExamVie
           Trước
         </Button>
 
-        {currentIndex < totalQuestions - 1 ? (
+        {currentIndex < questions.length - 1 ? (
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentIndex(prev => Math.min(totalQuestions - 1, prev + 1))}
+            onClick={() => setCurrentIndex(prev => Math.min(questions.length - 1, prev + 1))}
             className="gap-1 ml-auto"
           >
             Tiếp
