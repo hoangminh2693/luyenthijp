@@ -1112,6 +1112,7 @@ const ManageQuestionsPage = () => {
           <div className="space-y-4 py-4">
             {(() => {
               const hasSubQuestions = (editForm.subQuestions?.length ?? 0) > 0;
+              const isDrivingQuestion = !!(editingQuestion?.audio_url?.startsWith('driving-exam-'));
 
               return (
                 <>
@@ -1127,53 +1128,218 @@ const ManageQuestionsPage = () => {
                     />
                   </div>
 
-                  {/* Question type settings */}
-                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-4">
-                    <h4 className="font-medium text-sm text-foreground flex items-center gap-2">
-                      🎧 Cài đặt loại câu hỏi (cho phần nghe)
-                    </h4>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <label className="mb-1 block text-xs text-muted-foreground">Loại câu hỏi</label>
-                        <Select
-                          value={editForm.question_type || 'standard'}
-                          onValueChange={(v) => setEditForm((prev) => ({ ...prev, question_type: v as ListeningQuestionType }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="standard">Standard (đầy đủ text)</SelectItem>
-                            <SelectItem value="audio_only">Audio Only (chỉ ①②③④)</SelectItem>
-                            <SelectItem value="image_based">Image Based (chọn theo hình)</SelectItem>
-                          </SelectContent>
-                        </Select>
+                  {/* Question type settings - hide for driving exam */}
+                  {!isDrivingQuestion && (
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-4">
+                      <h4 className="font-medium text-sm text-foreground flex items-center gap-2">
+                        🎧 Cài đặt loại câu hỏi (cho phần nghe)
+                      </h4>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-xs text-muted-foreground">Loại câu hỏi</label>
+                          <Select
+                            value={editForm.question_type || 'standard'}
+                            onValueChange={(v) => setEditForm((prev) => ({ ...prev, question_type: v as ListeningQuestionType }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="standard">Standard (đầy đủ text)</SelectItem>
+                              <SelectItem value="audio_only">Audio Only (chỉ ①②③④)</SelectItem>
+                              <SelectItem value="image_based">Image Based (chọn theo hình)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs text-muted-foreground">Số lượng đáp án</label>
+                          <Select
+                            value={String(editForm.option_count || 4)}
+                            onValueChange={(v) => setEditForm((prev) => ({ ...prev, option_count: parseInt(v, 10) }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="2">2 đáp án</SelectItem>
+                              <SelectItem value="3">3 đáp án</SelectItem>
+                              <SelectItem value="4">4 đáp án</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                      <div>
-                        <label className="mb-1 block text-xs text-muted-foreground">Số lượng đáp án</label>
-                        <Select
-                          value={String(editForm.option_count || 4)}
-                          onValueChange={(v) => setEditForm((prev) => ({ ...prev, option_count: parseInt(v, 10) }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="2">2 đáp án</SelectItem>
-                            <SelectItem value="3">3 đáp án</SelectItem>
-                            <SelectItem value="4">4 đáp án</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        <strong>Standard:</strong> Hiển thị câu hỏi + đáp án text •{' '}
+                        <strong>Audio Only:</strong> Câu hỏi/đáp án trong audio, chỉ hiển thị ①②③④ •{' '}
+                        <strong>Image Based:</strong> Chọn đáp án theo hình
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      <strong>Standard:</strong> Hiển thị câu hỏi + đáp án text •{' '}
-                      <strong>Audio Only:</strong> Câu hỏi/đáp án trong audio, chỉ hiển thị ①②③④ •{' '}
-                      <strong>Image Based:</strong> Chọn đáp án theo hình
-                    </p>
-                  </div>
+                  )}
 
-                  {hasSubQuestions ? (
+                  {/* Driving exam: O/X sub-questions + single question editor */}
+                  {isDrivingQuestion ? (
+                    <div className="space-y-3">
+                      {!hasSubQuestions && (
+                        <>
+                          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+                            <label className="block text-sm font-medium">Đáp án</label>
+                            <div className="flex gap-3">
+                              <button
+                                type="button"
+                                onClick={() => setEditForm((prev) => ({ ...prev, correct_option: 'A' }))}
+                                className="flex-1 h-12 rounded-xl border-2 font-black text-xl transition-all"
+                                style={{
+                                  backgroundColor: editForm.correct_option === 'A' ? '#dbeafe' : '#f3f4f6',
+                                  borderColor: editForm.correct_option === 'A' ? '#2563eb' : '#d1d5db',
+                                  color: editForm.correct_option === 'A' ? '#1d4ed8' : '#6b7280',
+                                }}
+                              >
+                                ○ Đúng
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditForm((prev) => ({ ...prev, correct_option: 'B' }))}
+                                className="flex-1 h-12 rounded-xl border-2 font-black text-xl transition-all"
+                                style={{
+                                  backgroundColor: editForm.correct_option === 'B' ? '#fee2e2' : '#f3f4f6',
+                                  borderColor: editForm.correct_option === 'B' ? '#dc2626' : '#d1d5db',
+                                  color: editForm.correct_option === 'B' ? '#dc2626' : '#6b7280',
+                                }}
+                              >
+                                ✕ Sai
+                              </button>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-sm font-medium">Giải thích (tùy chọn)</label>
+                            <RichTextEditable
+                              value={editForm.explanation || ''}
+                              onChange={(v) => setEditForm((prev) => ({ ...prev, explanation: v }))}
+                              placeholder="Giải thích đáp án..."
+                              className="min-h-[60px]"
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {hasSubQuestions && (
+                        <div className="space-y-3">
+                          <label className="block text-sm font-medium">Câu hỏi con ({editForm.subQuestions!.length} câu)</label>
+                          {editForm.subQuestions!.map((sq, sqIdx) => (
+                            <div key={sq.id || `new-${sqIdx}`} className="rounded-xl border border-border bg-card p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-bold text-primary">Câu con {sqIdx + 1}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive h-7 px-2"
+                                  onClick={() => {
+                                    const next = [...(editForm.subQuestions || [])];
+                                    next.splice(sqIdx, 1);
+                                    setEditForm((prev) => ({ ...prev, subQuestions: next }));
+                                  }}
+                                  disabled={saving}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                              <RichTextEditable
+                                value={sq.content}
+                                onChange={(v) => {
+                                  const next = [...(editForm.subQuestions || [])];
+                                  next[sqIdx] = { ...next[sqIdx], content: v };
+                                  setEditForm((prev) => ({ ...prev, subQuestions: next }));
+                                }}
+                                placeholder="Nội dung câu hỏi con..."
+                                className="min-h-[50px]"
+                              />
+                              <div className="flex gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = [...(editForm.subQuestions || [])];
+                                    next[sqIdx] = { ...next[sqIdx], correct_option: 'A' };
+                                    setEditForm((prev) => ({ ...prev, subQuestions: next }));
+                                  }}
+                                  className="flex-1 h-10 rounded-lg border-2 font-bold text-base transition-all"
+                                  style={{
+                                    backgroundColor: sq.correct_option === 'A' ? '#dbeafe' : '#f3f4f6',
+                                    borderColor: sq.correct_option === 'A' ? '#2563eb' : '#d1d5db',
+                                    color: sq.correct_option === 'A' ? '#1d4ed8' : '#6b7280',
+                                  }}
+                                >
+                                  ○ Đúng
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = [...(editForm.subQuestions || [])];
+                                    next[sqIdx] = { ...next[sqIdx], correct_option: 'B' };
+                                    setEditForm((prev) => ({ ...prev, subQuestions: next }));
+                                  }}
+                                  className="flex-1 h-10 rounded-lg border-2 font-bold text-base transition-all"
+                                  style={{
+                                    backgroundColor: sq.correct_option === 'B' ? '#fee2e2' : '#f3f4f6',
+                                    borderColor: sq.correct_option === 'B' ? '#dc2626' : '#d1d5db',
+                                    color: sq.correct_option === 'B' ? '#dc2626' : '#6b7280',
+                                  }}
+                                >
+                                  ✕ Sai
+                                </button>
+                              </div>
+                              <RichTextEditable
+                                value={sq.explanation}
+                                onChange={(v) => {
+                                  const next = [...(editForm.subQuestions || [])];
+                                  next[sqIdx] = { ...next[sqIdx], explanation: v };
+                                  setEditForm((prev) => ({ ...prev, subQuestions: next }));
+                                }}
+                                placeholder="Giải thích (tùy chọn)..."
+                                className="min-h-[40px]"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-2"
+                        onClick={() => {
+                          const newSq: SubQuestion = {
+                            content: '',
+                            option_a: 'Đúng',
+                            option_b: 'Sai',
+                            option_c: '',
+                            option_d: '',
+                            correct_option: 'A',
+                            explanation: '',
+                            option_count: 2,
+                          };
+                          setEditForm((prev) => ({
+                            ...prev,
+                            subQuestions: [...(prev.subQuestions || []), newSq],
+                          }));
+                        }}
+                        disabled={saving}
+                      >
+                        + Thêm câu hỏi con
+                      </Button>
+
+                      {hasSubQuestions && (
+                        <div>
+                          <label className="mb-1 block text-sm font-medium">Giải thích/ghi chú đề bài (tùy chọn)</label>
+                          <RichTextEditable
+                            value={editForm.explanation || ''}
+                            onChange={(v) => setEditForm((prev) => ({ ...prev, explanation: v }))}
+                            placeholder="Ghi chú cho đề bài..."
+                            className="min-h-[60px]"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : hasSubQuestions ? (
                     <SubQuestionInput
                       subQuestions={editForm.subQuestions || []}
                       onChange={(sqs) => setEditForm((prev) => ({ ...prev, subQuestions: sqs }))}
@@ -1241,6 +1407,16 @@ const ManageQuestionsPage = () => {
                           </SelectContent>
                         </Select>
                       </div>
+
+                      <div>
+                        <label className="mb-1 block text-sm font-medium">Giải thích (tùy chọn)</label>
+                        <RichTextEditable
+                          value={editForm.explanation || ''}
+                          onChange={(v) => setEditForm((prev) => ({ ...prev, explanation: v }))}
+                          placeholder="Giải thích đáp án..."
+                          className="min-h-[60px]"
+                        />
+                      </div>
                     </>
                   )}
 
@@ -1255,15 +1431,17 @@ const ManageQuestionsPage = () => {
                         disabled={saving}
                       />
                     </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium">Âm thanh</label>
-                      <MediaUpload
-                        type="audio"
-                        value={editForm.audio_url || undefined}
-                        onChange={(url) => setEditForm((prev) => ({ ...prev, audio_url: url ?? null }))}
-                        disabled={saving}
-                      />
-                    </div>
+                    {!isDrivingQuestion && (
+                      <div>
+                        <label className="mb-1 block text-sm font-medium">Âm thanh</label>
+                        <MediaUpload
+                          type="audio"
+                          value={editForm.audio_url || undefined}
+                          onChange={(url) => setEditForm((prev) => ({ ...prev, audio_url: url ?? null }))}
+                          disabled={saving}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Move to different target */}
@@ -1299,18 +1477,6 @@ const ManageQuestionsPage = () => {
                         ⚠️ Câu hỏi sẽ được chuyển sang mục khác sau khi lưu
                       </p>
                     )}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium">
-                      {hasSubQuestions ? 'Giải thích/ghi chú đề bài (tùy chọn)' : 'Giải thích (tùy chọn)'}
-                    </label>
-                    <RichTextEditable
-                      value={editForm.explanation || ''}
-                      onChange={(v) => setEditForm((prev) => ({ ...prev, explanation: v }))}
-                      placeholder={hasSubQuestions ? 'Ghi chú cho đề bài...' : 'Giải thích đáp án...'}
-                      className="min-h-[60px]"
-                    />
                   </div>
                 </>
               );
