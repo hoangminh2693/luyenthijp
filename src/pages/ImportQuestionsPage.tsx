@@ -36,11 +36,18 @@ interface ParsedQuestion {
   explanation?: string;
 }
 
+interface DrivingSubQuestion {
+  content: string;
+  correct_option: 'A' | 'B';
+  explanation?: string;
+}
+
 interface DrivingQuestion {
   content: string;
   correct_option: 'A' | 'B'; // A = O (Đúng), B = X (Sai)
   explanation?: string;
   image_url?: string;
+  subQuestions?: DrivingSubQuestion[];
 }
 
 interface ImportResult {
@@ -158,6 +165,10 @@ const ImportQuestionsPage = () => {
   const [drivingExcelFile, setDrivingExcelFile] = useState<File | null>(null);
   const validDrivingCount = useMemo(
     () => drivingQuestions.filter(q => q.content.trim().length > 0).length,
+    [drivingQuestions]
+  );
+  const totalDrivingSubQuestions = useMemo(
+    () => drivingQuestions.reduce((sum, q) => sum + (q.subQuestions?.filter(sq => sq.content.trim().length > 0).length || 0), 0),
     [drivingQuestions]
   );
 
@@ -466,6 +477,17 @@ const ImportQuestionsPage = () => {
             audio_url: drivingExamKey,
             option_count: 2,
             question_type: 'standard',
+            subQuestions: q.subQuestions?.filter(sq => sq.content.trim().length > 0).map(sq => ({
+              content: sq.content.trim(),
+              option_a: 'Đúng (○)',
+              option_b: 'Sai (✕)',
+              option_c: null,
+              option_d: null,
+              correct_option: sq.correct_option,
+              explanation: sq.explanation || null,
+              option_count: 2,
+              question_type: 'standard',
+            })),
           }));
       }
     } else if (effectiveMode === 'table') {
@@ -1010,6 +1032,103 @@ const ImportQuestionsPage = () => {
                             placeholder="Giải thích (tùy chọn)..."
                             className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                           />
+                          {/* Sub-questions */}
+                          {q.subQuestions && q.subQuestions.length > 0 && (
+                            <div className="ml-4 space-y-2 border-l-2 border-primary/20 pl-3">
+                              <p className="text-xs font-medium text-muted-foreground">Câu hỏi con:</p>
+                              {q.subQuestions.map((sq, sqIdx) => (
+                                <div key={sqIdx} className="rounded-md border border-border/50 bg-background p-2 space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-medium text-muted-foreground">Câu con {sqIdx + 1}</span>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-5 w-5 p-0 text-destructive hover:text-destructive"
+                                      onClick={() => setDrivingQuestions(prev => prev.map((item, i) => {
+                                        if (i !== idx) return item;
+                                        const newSubs = [...(item.subQuestions || [])];
+                                        newSubs.splice(sqIdx, 1);
+                                        return { ...item, subQuestions: newSubs.length > 0 ? newSubs : undefined };
+                                      }))}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                  <textarea
+                                    value={sq.content}
+                                    onChange={(e) => setDrivingQuestions(prev => prev.map((item, i) => {
+                                      if (i !== idx) return item;
+                                      const newSubs = [...(item.subQuestions || [])];
+                                      newSubs[sqIdx] = { ...newSubs[sqIdx], content: e.target.value };
+                                      return { ...item, subQuestions: newSubs };
+                                    }))}
+                                    placeholder="Nội dung câu hỏi con..."
+                                    className="w-full min-h-[40px] rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                                    rows={1}
+                                  />
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] text-muted-foreground">Đáp án:</span>
+                                    <button
+                                      onClick={() => setDrivingQuestions(prev => prev.map((item, i) => {
+                                        if (i !== idx) return item;
+                                        const newSubs = [...(item.subQuestions || [])];
+                                        newSubs[sqIdx] = { ...newSubs[sqIdx], correct_option: 'A' };
+                                        return { ...item, subQuestions: newSubs };
+                                      }))}
+                                      className="px-2 py-0.5 rounded text-xs font-bold border transition-all"
+                                      style={{
+                                        backgroundColor: sq.correct_option === 'A' ? '#dbeafe' : '#f3f4f6',
+                                        borderColor: sq.correct_option === 'A' ? '#2563eb' : '#d1d5db',
+                                        color: sq.correct_option === 'A' ? '#1d4ed8' : '#6b7280',
+                                      }}
+                                    >
+                                      ○
+                                    </button>
+                                    <button
+                                      onClick={() => setDrivingQuestions(prev => prev.map((item, i) => {
+                                        if (i !== idx) return item;
+                                        const newSubs = [...(item.subQuestions || [])];
+                                        newSubs[sqIdx] = { ...newSubs[sqIdx], correct_option: 'B' };
+                                        return { ...item, subQuestions: newSubs };
+                                      }))}
+                                      className="px-2 py-0.5 rounded text-xs font-bold border transition-all"
+                                      style={{
+                                        backgroundColor: sq.correct_option === 'B' ? '#fee2e2' : '#f3f4f6',
+                                        borderColor: sq.correct_option === 'B' ? '#dc2626' : '#d1d5db',
+                                        color: sq.correct_option === 'B' ? '#dc2626' : '#6b7280',
+                                      }}
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                  <input
+                                    value={sq.explanation || ''}
+                                    onChange={(e) => setDrivingQuestions(prev => prev.map((item, i) => {
+                                      if (i !== idx) return item;
+                                      const newSubs = [...(item.subQuestions || [])];
+                                      newSubs[sqIdx] = { ...newSubs[sqIdx], explanation: e.target.value };
+                                      return { ...item, subQuestions: newSubs };
+                                    }))}
+                                    placeholder="Giải thích câu con (tùy chọn)..."
+                                    className="w-full rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-1 text-xs text-muted-foreground hover:text-foreground"
+                            onClick={() => setDrivingQuestions(prev => prev.map((item, i) => {
+                              if (i !== idx) return item;
+                              const newSubs = [...(item.subQuestions || []), { content: '', correct_option: 'A' as const, explanation: '' }];
+                              return { ...item, subQuestions: newSubs };
+                            }))}
+                          >
+                            <Plus className="h-3 w-3" />
+                            Thêm câu hỏi con
+                          </Button>
                         </div>
                       ))}
                       <Button
