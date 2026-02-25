@@ -1,12 +1,21 @@
 import { Link } from 'react-router-dom';
 import { FileText, CheckSquare, AlertTriangle, Scale, Ban, RefreshCw } from 'lucide-react';
 import { Breadcrumb } from '@/components/layout/Header';
+import { useSEO, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
 
 /**
  * TermsPage - Trang điều khoản sử dụng
  * Cần thiết cho Google AdSense
  */
 const TermsPage = () => {
+  useSEO({
+    title: 'Điều khoản sử dụng | Luyện Đề Thi',
+    description: 'Điều khoản sử dụng của Luyện Đề Thi. Vui lòng đọc kỹ trước khi sử dụng dịch vụ luyện thi trắc nghiệm.',
+    jsonLd: buildBreadcrumbSchema([
+      { name: 'Trang chủ', url: SITE_URL },
+      { name: 'Điều khoản sử dụng' },
+    ]),
+  });
   const lastUpdated = '17/01/2025';
 
   const sections = [

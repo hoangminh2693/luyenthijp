@@ -1,12 +1,21 @@
 import { Link } from 'react-router-dom';
 import { Shield, Eye, Lock, Database, Bell, UserCheck } from 'lucide-react';
 import { Breadcrumb } from '@/components/layout/Header';
+import { useSEO, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
 
 /**
  * PrivacyPage - Trang chính sách bảo mật
  * Cần thiết cho Google AdSense
  */
 const PrivacyPage = () => {
+  useSEO({
+    title: 'Chính sách bảo mật | Luyện Đề Thi',
+    description: 'Chính sách bảo mật của Luyện Đề Thi. Tìm hiểu cách chúng tôi thu thập, sử dụng và bảo vệ thông tin cá nhân của bạn.',
+    jsonLd: buildBreadcrumbSchema([
+      { name: 'Trang chủ', url: SITE_URL },
+      { name: 'Chính sách bảo mật' },
+    ]),
+  });
   const lastUpdated = '17/01/2025';
 
   const sections = [
