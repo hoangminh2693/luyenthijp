@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Breadcrumb } from '@/components/layout/Header';
 import { toast } from 'sonner';
 import { useSEO, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * ContactPage - Trang liên hệ
@@ -31,15 +32,19 @@ const ContactPage = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    toast.success('Cảm ơn bạn đã liên hệ! Chúng tôi sẽ phản hồi sớm nhất có thể.');
-    setFormData({
-      name: '',
-      email: '',
-      subject: '',
-      message: ''
+    const { error } = await supabase.from('contact_messages').insert({
+      name: formData.name.trim(),
+      email: formData.email.trim(),
+      subject: formData.subject.trim(),
+      message: formData.message.trim(),
     });
+
+    if (error) {
+      toast.error('Gửi tin nhắn thất bại. Vui lòng thử lại sau.');
+    } else {
+      toast.success('Cảm ơn bạn đã liên hệ! Chúng tôi sẽ phản hồi sớm nhất có thể.');
+      setFormData({ name: '', email: '', subject: '', message: '' });
+    }
     setIsSubmitting(false);
   };
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
