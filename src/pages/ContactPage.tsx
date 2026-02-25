@@ -5,12 +5,21 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Breadcrumb } from '@/components/layout/Header';
 import { toast } from 'sonner';
+import { useSEO, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
 
 /**
  * ContactPage - Trang liên hệ
  * Chuẩn SEO, form đơn giản
  */
 const ContactPage = () => {
+  useSEO({
+    title: 'Liên hệ | Luyện Đề Thi',
+    description: 'Liên hệ với đội ngũ Luyện Đề Thi. Gửi câu hỏi, góp ý hoặc yêu cầu hỗ trợ về luyện thi trắc nghiệm tại Nhật.',
+    jsonLd: buildBreadcrumbSchema([
+      { name: 'Trang chủ', url: SITE_URL },
+      { name: 'Liên hệ' },
+    ]),
+  });
   const [formData, setFormData] = useState({
     name: '',
     email: '',

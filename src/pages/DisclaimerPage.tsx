@@ -1,11 +1,20 @@
 import { Breadcrumb } from '@/components/layout/Header';
 import { AlertTriangle } from 'lucide-react';
+import { useSEO, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
 
 /**
  * DisclaimerPage - Trang miễn trừ trách nhiệm
  * Cần thiết cho site giáo dục để tăng E-E-A-T và hỗ trợ AdSense
  */
 const DisclaimerPage = () => {
+  useSEO({
+    title: 'Miễn trừ trách nhiệm | Luyện Đề Thi',
+    description: 'Miễn trừ trách nhiệm của Luyện Đề Thi. Nội dung trên website được cung cấp với mục đích tham khảo và luyện tập.',
+    jsonLd: buildBreadcrumbSchema([
+      { name: 'Trang chủ', url: SITE_URL },
+      { name: 'Miễn trừ trách nhiệm' },
+    ]),
+  });
   return (
     <div className="min-h-screen bg-background">
       <div className="container py-8">

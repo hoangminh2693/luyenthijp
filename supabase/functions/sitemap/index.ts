@@ -205,6 +205,21 @@ Deno.serve(async (req) => {
     <lastmod>${today}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>${SITE_URL}/privacy</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>${SITE_URL}/terms</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>${SITE_URL}/disclaimer</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
   </url>`;
 
     // Subject pages
