@@ -26,6 +26,7 @@ import TermsPage from "./pages/TermsPage";
 import BlogPage from "./pages/BlogPage";
 import BlogPostPage from "./pages/BlogPostPage";
 import ManageBlogPage from "./pages/ManageBlogPage";
+import ManageContactPage from "./pages/ManageContactPage";
 import DisclaimerPage from "./pages/DisclaimerPage";
 import NotFound from "./pages/NotFound";
 
@@ -101,6 +102,7 @@ const App = () => (
                 <Route path="/blog" element={<BlogPage />} />
                 <Route path="/blog/:slug" element={<BlogPostPage />} />
                 <Route path="/manage-blog" element={<ManageBlogPage />} />
+                <Route path="/manage-contact" element={<ManageContactPage />} />
                 
                 {/* Trang 404 */}
                 <Route path="*" element={<NotFound />} />
