@@ -111,6 +111,26 @@ function mapDbQuestion(dbQuestion: DbQuestion): Question {
   };
 }
 
+// Normalize content for deduplication: strip HTML tags, whitespace, punctuation variants
+function normalizeContent(content: string): string {
+  return content
+    .replace(/<[^>]*>/g, '') // strip HTML
+    .replace(/[\s\u3000\u00A0]+/g, '') // strip all whitespace (including fullwidth)
+    .replace(/[。、．，！？!?,.\-\u200B]/g, '') // strip punctuation
+    .toLowerCase();
+}
+
+// Filter out questions with near-duplicate content (keep first occurrence)
+function deduplicateByContent(questions: Question[]): Question[] {
+  const seen = new Set<string>();
+  return questions.filter(q => {
+    const key = normalizeContent(q.content);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 // Nhóm câu hỏi cha với câu hỏi con (safe version)
 function groupQuestionsWithChildrenSafe(questions: DbQuestionSafe[]): Question[] {
   // Sort by created_at to preserve import order
@@ -197,8 +217,8 @@ export function useRandomQuestions(sectionId: string | undefined, count: number,
         }
       }
       
-      // Nhóm câu hỏi cha với câu con
-      const grouped = groupQuestionsWithChildrenSafe(allData);
+      // Nhóm câu hỏi cha với câu con, loại bỏ trùng nội dung
+      const grouped = deduplicateByContent(groupQuestionsWithChildrenSafe(allData));
       
       if (shuffle) {
         // Shuffle và lấy số lượng câu cha cần thiết
