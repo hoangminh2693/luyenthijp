@@ -278,7 +278,7 @@ export function ListeningQuestionCard({
         <div className="flex-1">
           {showQuestionContent && question.content.trim() !== '' ? (
             <p 
-              className="text-base font-medium text-foreground leading-relaxed"
+               className="text-base font-medium text-foreground leading-relaxed whitespace-pre-line"
               dangerouslySetInnerHTML={{ __html: question.content }}
             />
           ) : (
@@ -329,8 +329,8 @@ export function ListeningQuestionCard({
                 {/* Sub-question header */}
                 {subQ.questionType !== 'audio_only' && subQ.content.trim() !== '' ? (
                   <p 
-                    className="mb-3 text-sm font-medium text-foreground"
-                    dangerouslySetInnerHTML={{ __html: `${questionNumber}.${idx + 1}. ${subQ.content}` }}
+                     className="mb-3 text-sm font-medium text-foreground whitespace-pre-line"
+                     dangerouslySetInnerHTML={{ __html: `${questionNumber}.${idx + 1}. ${subQ.content}` }}
                   />
                 ) : (
                   <p className="mb-3 text-sm font-medium text-muted-foreground italic">

@@ -212,7 +212,7 @@ export function DrivingExamView({ questions, examName, onRetry }: DrivingExamVie
                 {/* Parent question content (shown as context for sub-questions) */}
                 {hasSubQ && (
                   <div className="rounded-xl border border-border bg-card p-3">
-                    <p className="text-sm font-medium text-foreground" dangerouslySetInnerHTML={{ __html: q.content }} />
+                    <p className="text-sm font-medium text-foreground whitespace-pre-line" dangerouslySetInnerHTML={{ __html: q.content }} />
                     {q.image_url && (
                       <img src={q.image_url} alt="" className="mt-2 max-h-40 object-contain rounded-lg" />
                     )}
@@ -240,7 +240,7 @@ export function DrivingExamView({ questions, examName, onRetry }: DrivingExamVie
                           {displayNum}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground mb-2"
+                <p className="text-sm font-medium text-foreground mb-2 whitespace-pre-line"
                             dangerouslySetInnerHTML={{ __html: item.content }} />
                           <div className="flex items-center gap-4 text-sm">
                             <span className="flex items-center gap-1">
@@ -384,7 +384,7 @@ export function DrivingExamView({ questions, examName, onRetry }: DrivingExamVie
           Câu hỏi {currentIndex + 1}
         </p>
         <div
-          className="text-base md:text-lg font-medium text-foreground leading-relaxed"
+          className="text-base md:text-lg font-medium text-foreground leading-relaxed whitespace-pre-line"
           dangerouslySetInnerHTML={{ __html: currentQuestion.content }}
         />
         {currentQuestion.image_url && (
@@ -404,7 +404,7 @@ export function DrivingExamView({ questions, examName, onRetry }: DrivingExamVie
             return (
               <div key={sq.id} className="rounded-xl border border-border bg-white p-4 space-y-2">
                 <p className="text-xs text-muted-foreground font-medium">Câu con {sqIdx + 1}</p>
-                <div className="text-sm font-medium text-foreground" dangerouslySetInnerHTML={{ __html: sq.content }} />
+                <div className="text-sm font-medium text-foreground whitespace-pre-line" dangerouslySetInnerHTML={{ __html: sq.content }} />
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={() => handleSelectAnswer(sq.id, 'A')}
