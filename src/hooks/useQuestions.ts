@@ -208,7 +208,7 @@ export function useQuestionsBySection(sectionId: string | undefined) {
 // shuffle: true = xáo trộn ngẫu nhiên, false = giữ nguyên thứ tự (fixed_exam_mode)
 export function useRandomQuestions(sectionId: string | undefined, count: number, sessionId?: string, categoryId?: string, shuffle: boolean = true, answeredIds?: Set<string>) {
   return useQuery({
-    queryKey: ['questions', 'random', sectionId, categoryId, count, sessionId, shuffle],
+    queryKey: ['questions', 'random', sectionId, categoryId, count, sessionId, shuffle, answeredIds?.size ?? 0],
     queryFn: async () => {
       if (!sectionId && !categoryId) return [];
       
