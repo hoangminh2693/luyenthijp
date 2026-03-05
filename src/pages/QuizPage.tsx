@@ -58,8 +58,8 @@ const QuizPage = () => {
   // Question history hook
   const { getQuestionStats } = useQuestionHistory();
   
-  // Unique session ID - changes on each mount to ensure fresh questions
-  const [sessionId] = useState(() => crypto.randomUUID());
+  // Unique session ID - regenerate để luôn lấy bộ câu mới khi làm lại
+  const [sessionId, setSessionId] = useState(() => crypto.randomUUID());
 
   // Fetch category data
   const { 
@@ -276,6 +276,8 @@ const QuizPage = () => {
     setSubAnswers({});
     setIsSubmitted(false);
     setResult(null);
+    setRevealedAnswers({});
+    setSessionId(crypto.randomUUID());
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
