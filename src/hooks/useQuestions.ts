@@ -111,20 +111,39 @@ function mapDbQuestion(dbQuestion: DbQuestion): Question {
   };
 }
 
-// Normalize content for deduplication: strip HTML tags, whitespace, punctuation variants
-function normalizeContent(content: string): string {
-  return content
+// Normalize text to compare duplicate questions safely
+function normalizeText(value: string | undefined): string {
+  return (value || '')
     .replace(/<[^>]*>/g, '') // strip HTML
-    .replace(/[\s\u3000\u00A0]+/g, '') // strip all whitespace (including fullwidth)
+    .replace(/[\s\u3000\u00A0]+/g, ' ') // collapse whitespace
     .replace(/[。、．，！？!?,.\-\u200B]/g, '') // strip punctuation
+    .trim()
     .toLowerCase();
 }
 
-// Filter out questions with near-duplicate content (keep first occurrence)
-function deduplicateByContent(questions: Question[]): Question[] {
+function buildQuestionSignature(question: Question): string {
+  const options = ['A', 'B', 'C', 'D']
+    .map((key) => `${key}:${normalizeText(question.options[key as 'A' | 'B' | 'C' | 'D'])}`)
+    .join('|');
+
+  const subSignature = question.subQuestions?.length
+    ? `|subs:${question.subQuestions.map(buildQuestionSignature).join('||')}`
+    : '';
+
+  return [
+    normalizeText(question.content),
+    options,
+    `type:${question.questionType || 'standard'}`,
+    `count:${question.optionCount ?? 4}`,
+    subSignature,
+  ].join('|');
+}
+
+// Filter true duplicates only (same stem + options + children), avoid dropping valid similar stems
+function deduplicateQuestions(questions: Question[]): Question[] {
   const seen = new Set<string>();
-  return questions.filter(q => {
-    const key = normalizeContent(q.content);
+  return questions.filter((q) => {
+    const key = buildQuestionSignature(q);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -217,12 +236,16 @@ export function useRandomQuestions(sectionId: string | undefined, count: number,
         }
       }
       
-      // Nhóm câu hỏi cha với câu con, loại bỏ trùng nội dung
-      const grouped = deduplicateByContent(groupQuestionsWithChildrenSafe(allData));
+      // Nhóm câu hỏi cha với câu con, sau đó chỉ loại trùng thực sự
+      const grouped = deduplicateQuestions(groupQuestionsWithChildrenSafe(allData));
       
       if (shuffle) {
-        // Shuffle và lấy số lượng câu cha cần thiết
-        const shuffled = [...grouped].sort(() => Math.random() - 0.5);
+        // Shuffle đều hơn với Fisher-Yates rồi lấy số lượng cần thiết
+        const shuffled = [...grouped];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
         return shuffled.slice(0, Math.min(count, shuffled.length));
       } else {
         // Fixed exam mode: giữ nguyên thứ tự, lấy đúng số lượng
