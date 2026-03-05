@@ -206,7 +206,7 @@ export function useQuestionsBySection(sectionId: string | undefined) {
 
 // Hook lấy câu hỏi từ section/category (SECURE - không có đáp án)
 // shuffle: true = xáo trộn ngẫu nhiên, false = giữ nguyên thứ tự (fixed_exam_mode)
-export function useRandomQuestions(sectionId: string | undefined, count: number, sessionId?: string, categoryId?: string, shuffle: boolean = true) {
+export function useRandomQuestions(sectionId: string | undefined, count: number, sessionId?: string, categoryId?: string, shuffle: boolean = true, answeredIds?: Set<string>) {
   return useQuery({
     queryKey: ['questions', 'random', sectionId, categoryId, count, sessionId, shuffle],
     queryFn: async () => {
@@ -240,13 +240,29 @@ export function useRandomQuestions(sectionId: string | undefined, count: number,
       const grouped = deduplicateQuestions(groupQuestionsWithChildrenSafe(allData));
       
       if (shuffle) {
-        // Shuffle đều hơn với Fisher-Yates rồi lấy số lượng cần thiết
-        const shuffled = [...grouped];
-        for (let i = shuffled.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        // Ưu tiên câu chưa làm: chia thành 2 nhóm rồi shuffle từng nhóm
+        const unanswered: Question[] = [];
+        const answered: Question[] = [];
+        for (const q of grouped) {
+          // Kiểm tra cả câu cha và câu con
+          const qIds = q.subQuestions?.length
+            ? q.subQuestions.map(s => s.id)
+            : [q.id];
+          const wasAnswered = answeredIds && qIds.some(id => answeredIds.has(id));
+          (wasAnswered ? answered : unanswered).push(q);
         }
-        return shuffled.slice(0, Math.min(count, shuffled.length));
+        
+        // Fisher-Yates shuffle từng nhóm
+        for (const arr of [unanswered, answered]) {
+          for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+          }
+        }
+        
+        // Ghép: câu chưa làm trước, câu đã làm sau
+        const combined = [...unanswered, ...answered];
+        return combined.slice(0, Math.min(count, combined.length));
       } else {
         // Fixed exam mode: giữ nguyên thứ tự, lấy đúng số lượng
         return grouped.slice(0, Math.min(count, grouped.length));

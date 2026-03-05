@@ -56,7 +56,14 @@ const QuizPage = () => {
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   
   // Question history hook
-  const { getQuestionStats } = useQuestionHistory();
+  const { getQuestionStats, history } = useQuestionHistory();
+  
+  // Build set of answered question IDs for prioritization
+  const answeredQuestionIds = useMemo(() => {
+    const ids = new Set<string>();
+    history.forEach((_, qId) => ids.add(qId));
+    return ids;
+  }, [history]);
   
   // Unique session ID - regenerate để luôn lấy bộ câu mới khi làm lại
   const [sessionId, setSessionId] = useState(() => crypto.randomUUID());
@@ -122,7 +129,8 @@ const QuizPage = () => {
     questionCount,
     sessionId,
     !isListeningMode && !isDrivingMode ? categoryIdForQuiz : undefined,
-    shouldShuffle
+    shouldShuffle,
+    answeredQuestionIds.size > 0 ? answeredQuestionIds : undefined
   );
   const { data: listeningExam, isLoading: loadingListeningExam } = useRandomListeningExam(
     isListeningMode ? sectionId : undefined,
