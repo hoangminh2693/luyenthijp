@@ -2,6 +2,7 @@ import { Award, CheckCircle, XCircle, RotateCcw, Home } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ActivityWidget } from '@/components/ui/ActivityWidget';
+import { ShareableResultCard } from '@/components/quiz/ShareableResultCard';
 import type { QuizResult } from '@/data/quizData';
 import { cn } from '@/lib/utils';
 
@@ -84,8 +85,9 @@ export function ResultSummary({ result, examName, onRetry }: ResultSummaryProps)
         </Button>
       </div>
 
-      {/* Activity Widget - hiển thị ở trang kết quả */}
-      <div className="mt-6 flex justify-center">
+      {/* Share + Activity */}
+      <div className="mt-6 flex flex-col items-center gap-4">
+        <ShareableResultCard result={result} examName={examName} />
         <ActivityWidget variant="compact" />
       </div>
     </div>
