@@ -2,6 +2,7 @@ import { Award, CheckCircle, XCircle, RotateCcw, Home } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ActivityWidget } from '@/components/ui/ActivityWidget';
+import { ShareableResultCard } from '@/components/quiz/ShareableResultCard';
 import type { QuizResult } from '@/data/quizData';
 import { cn } from '@/lib/utils';
 
