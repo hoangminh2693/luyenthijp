@@ -6,6 +6,7 @@ import { Breadcrumb } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { useSubjectBySlug, useLevelBySlug, useSectionBySlug } from '@/hooks/useSections';
 import { useQuestionCount, useListeningExams } from '@/hooks/useQuestions';
+import { useSEO, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
 
 /**
  * ExamsPage - Trang danh sách đề thi theo phần
