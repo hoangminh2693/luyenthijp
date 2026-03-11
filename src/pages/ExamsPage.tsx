@@ -6,6 +6,7 @@ import { Breadcrumb } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { useSubjectBySlug, useLevelBySlug, useSectionBySlug } from '@/hooks/useSections';
 import { useQuestionCount, useListeningExams } from '@/hooks/useQuestions';
+import { useSEO, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
 
 /**
  * ExamsPage - Trang danh sách đề thi theo phần
@@ -30,6 +31,18 @@ const ExamsPage = () => {
   );
   
   const isLoading = loadingSubject || loadingLevel || loadingSection;
+
+  useSEO({
+    title: subject && level && section ? `${section.name} - ${subject.name} ${level.name} | Luyện Đề Thi` : 'Đề thi | Luyện Đề Thi',
+    description: subject && level && section ? `Danh sách đề thi ${section.name} - ${subject.name} ${level.name}. Luyện thi trắc nghiệm miễn phí.` : 'Danh sách đề thi trắc nghiệm.',
+    jsonLd: buildBreadcrumbSchema([
+      { name: 'Trang chủ', url: SITE_URL },
+      { name: 'Chọn môn học', url: `${SITE_URL}/subjects` },
+      ...(subject ? [{ name: subject.name, url: `${SITE_URL}/subjects/${subject.slug}` }] : []),
+      ...(level ? [{ name: level.name, url: `${SITE_URL}/subjects/${subject?.slug}/${level.slug}` }] : []),
+      ...(section ? [{ name: section.name }] : []),
+    ]),
+  });
 
   // Loading state
   if (isLoading) {

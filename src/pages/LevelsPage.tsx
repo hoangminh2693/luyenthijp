@@ -2,6 +2,7 @@ import { useParams, Navigate } from 'react-router-dom';
 import { getSubjectBySlug, getLevelsBySubject } from '@/data/quizData';
 import { LevelCard } from '@/components/ui/LevelCard';
 import { Breadcrumb } from '@/components/layout/Header';
+import { useSEO, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
 
 /**
  * LevelsPage - Trang danh sách cấp độ theo môn học
@@ -11,6 +12,16 @@ const LevelsPage = () => {
   
   // Lấy thông tin môn học
   const subject = subjectSlug ? getSubjectBySlug(subjectSlug) : undefined;
+
+  useSEO({
+    title: subject ? `${subject.name} - Chọn cấp độ luyện thi | Luyện Đề Thi` : 'Chọn cấp độ | Luyện Đề Thi',
+    description: subject ? `Chọn cấp độ luyện thi ${subject.name}. Luyện đề thi trắc nghiệm miễn phí tại Nhật Bản.` : 'Chọn cấp độ luyện thi trắc nghiệm.',
+    jsonLd: buildBreadcrumbSchema([
+      { name: 'Trang chủ', url: SITE_URL },
+      { name: 'Chọn môn học', url: `${SITE_URL}/subjects` },
+      ...(subject ? [{ name: subject.name }] : []),
+    ]),
+  });
   
   // Nếu không tìm thấy môn học, chuyển về trang danh sách môn
   if (!subject) {

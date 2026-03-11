@@ -10,7 +10,7 @@
  */
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Navigate, useNavigate, Link } from 'react-router-dom';
-import { useRobotsMeta } from '@/hooks/useRobotsMeta';
+import { useSEO } from '@/hooks/useSEO';
 import { 
   Play, 
   Clock, 
@@ -123,7 +123,10 @@ const getExamIntroduction = (
 };
 
 const StartQuizPage = () => {
-  useRobotsMeta('noindex, nofollow');
+  useSEO({
+    title: 'Chuẩn bị làm bài | Luyện Đề Thi',
+    description: 'Chọn số lượng câu hỏi và bắt đầu luyện thi trắc nghiệm miễn phí.',
+  });
   const { subjectSlug, '*': wildcardPath } = useParams<{
     subjectSlug: string;
     '*': string;

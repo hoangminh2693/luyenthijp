@@ -5,6 +5,7 @@ import { Breadcrumb } from '@/components/layout/Header';
 import { useSubjectBySlug, useLevelBySlug } from '@/hooks/useSections';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useSEO, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
 
 /**
  * SectionsPage - Trang danh sách phần theo cấp độ
@@ -15,6 +16,17 @@ const SectionsPage = () => {
   // Fetch dữ liệu từ Supabase
   const { data: subject, isLoading: loadingSubject } = useSubjectBySlug(subjectSlug);
   const { data: level, isLoading: loadingLevel } = useLevelBySlug(subject?.id, levelSlug);
+
+  useSEO({
+    title: subject && level ? `${subject.name} ${level.name} - Chọn phần luyện thi | Luyện Đề Thi` : 'Chọn phần luyện thi | Luyện Đề Thi',
+    description: subject && level ? `Chọn phần luyện thi ${subject.name} ${level.name}. Đề thi trắc nghiệm miễn phí.` : 'Chọn phần luyện thi trắc nghiệm.',
+    jsonLd: buildBreadcrumbSchema([
+      { name: 'Trang chủ', url: SITE_URL },
+      { name: 'Chọn môn học', url: `${SITE_URL}/subjects` },
+      ...(subject ? [{ name: subject.name, url: `${SITE_URL}/subjects/${subject.slug}` }] : []),
+      ...(level ? [{ name: level.name }] : []),
+    ]),
+  });
   
   // Fetch sections từ database
   const { data: sections = [], isLoading: loadingSections } = useQuery({
