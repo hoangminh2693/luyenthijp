@@ -10,7 +10,7 @@
  */
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Navigate, useNavigate, Link } from 'react-router-dom';
-import { useRobotsMeta } from '@/hooks/useRobotsMeta';
+import { useSEO } from '@/hooks/useSEO';
 import { 
   Play, 
   Clock, 
