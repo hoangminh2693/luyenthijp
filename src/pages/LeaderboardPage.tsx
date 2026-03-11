@@ -82,6 +82,15 @@ type TimeRange = 'week' | 'month' | 'all';
 type LeaderboardType = 'overall' | 'accuracy' | 'diligent' | 'progress';
 
 const LeaderboardPage = () => {
+  useSEO({
+    title: 'Bảng xếp hạng luyện thi | Luyện Đề Thi',
+    description: 'Xem bảng xếp hạng người luyện thi hàng đầu. So sánh thành tích và theo dõi tiến bộ của bạn.',
+    jsonLd: buildBreadcrumbSchema([
+      { name: 'Trang chủ', url: SITE_URL },
+      { name: 'Bảng xếp hạng' },
+    ]),
+  });
+
   const { user } = useAuth();
   
   // Filter states

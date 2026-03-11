@@ -123,7 +123,10 @@ const getExamIntroduction = (
 };
 
 const StartQuizPage = () => {
-  useRobotsMeta('noindex, nofollow');
+  useSEO({
+    title: 'Chuẩn bị làm bài | Luyện Đề Thi',
+    description: 'Chọn số lượng câu hỏi và bắt đầu luyện thi trắc nghiệm miễn phí.',
+  });
   const { subjectSlug, '*': wildcardPath } = useParams<{
     subjectSlug: string;
     '*': string;
