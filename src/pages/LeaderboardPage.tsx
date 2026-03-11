@@ -39,6 +39,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useSEO, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
 import { 
   AchievementBadges, 
   calculateAchievements, 
