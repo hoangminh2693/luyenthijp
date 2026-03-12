@@ -171,6 +171,68 @@ export function ListeningExamManager({
     }
   }, [deletingExam, onQuestionsChanged]);
 
+  // Bulk selection helpers
+  const toggleQuestion = useCallback((id: string) => {
+    setSelectedQuestions(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleExamQuestions = useCallback((exam: ListeningExamGroup) => {
+    const parentIds = exam.questions.filter(q => !q.parent_id).map(q => q.id);
+    setSelectedQuestions(prev => {
+      const next = new Set(prev);
+      const allSelected = parentIds.every(id => next.has(id));
+      if (allSelected) {
+        parentIds.forEach(id => next.delete(id));
+      } else {
+        parentIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedQuestions(new Set());
+  }, []);
+
+  const handleDeleteSelected = useCallback(async () => {
+    if (selectedQuestions.size === 0) return;
+    setDeletingSelected(true);
+    try {
+      // Find all child question IDs for selected parents
+      const childIds = questions
+        .filter(q => q.parent_id && selectedQuestions.has(q.parent_id))
+        .map(q => q.id);
+
+      // Delete children first
+      if (childIds.length > 0) {
+        const { error } = await supabase.from('questions').delete().in('id', childIds);
+        if (error) throw error;
+      }
+
+      // Delete selected parents
+      const parentIds = Array.from(selectedQuestions);
+      if (parentIds.length > 0) {
+        const { error } = await supabase.from('questions').delete().in('id', parentIds);
+        if (error) throw error;
+      }
+
+      toast.success(`Đã xóa ${parentIds.length} câu hỏi`);
+      setSelectedQuestions(new Set());
+      setShowDeleteSelectedDialog(false);
+      onQuestionsChanged();
+    } catch (err) {
+      console.error('Error deleting selected questions:', err);
+      toast.error('Lỗi khi xóa câu hỏi');
+    } finally {
+      setDeletingSelected(false);
+    }
+  }, [selectedQuestions, questions, onQuestionsChanged]);
+
   // Group parent questions with children, then organize by mondai
   const getParentQuestions = (examQuestions: QuestionRow[]) => {
     const parents = examQuestions.filter(q => !q.parent_id)
