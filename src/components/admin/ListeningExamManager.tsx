@@ -337,11 +337,26 @@ export function ListeningExamManager({
             <div className="rounded-xl border border-border overflow-hidden">
               {/* Exam header */}
               <div className="flex items-center gap-3 bg-muted/50 px-4 py-3">
-                <CollapsibleTrigger asChild>
+               <CollapsibleTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
                     {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </Button>
                 </CollapsibleTrigger>
+
+                {/* Select all in exam */}
+                {(() => {
+                  const parentIds = exam.questions.filter(q => !q.parent_id).map(q => q.id);
+                  const allSelected = parentIds.length > 0 && parentIds.every(id => selectedQuestions.has(id));
+                  const someSelected = parentIds.some(id => selectedQuestions.has(id));
+                  return (
+                    <Checkbox
+                      checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                      onCheckedChange={() => toggleExamQuestions(exam)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="shrink-0"
+                    />
+                  );
+                })()}
 
                 <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDriving ? 'bg-yellow-100' : 'bg-primary/10'}`}>
                   {isDriving ? (
