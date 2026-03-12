@@ -6,8 +6,9 @@
 import { useState, useMemo, useCallback } from 'react';
 import { 
   Headphones, ChevronDown, ChevronUp, Trash2, Pencil, Clock, 
-  FileText, Loader2, Volume2
+  FileText, Loader2, Volume2, CheckSquare, Square, XCircle
 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -111,6 +112,11 @@ export function ListeningExamManager({
   const [expandedExams, setExpandedExams] = useState<Set<string>>(new Set());
   const [deletingExam, setDeletingExam] = useState<ListeningExamGroup | null>(null);
   const [deleting, setDeleting] = useState(false);
+  
+  // Bulk selection state
+  const [selectedQuestions, setSelectedQuestions] = useState<Set<string>>(new Set());
+  const [deletingSelected, setDeletingSelected] = useState(false);
+  const [showDeleteSelectedDialog, setShowDeleteSelectedDialog] = useState(false);
 
   const exams = useMemo(() => groupByExam(questions), [questions]);
 
@@ -165,6 +171,68 @@ export function ListeningExamManager({
     }
   }, [deletingExam, onQuestionsChanged]);
 
+  // Bulk selection helpers
+  const toggleQuestion = useCallback((id: string) => {
+    setSelectedQuestions(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleExamQuestions = useCallback((exam: ListeningExamGroup) => {
+    const parentIds = exam.questions.filter(q => !q.parent_id).map(q => q.id);
+    setSelectedQuestions(prev => {
+      const next = new Set(prev);
+      const allSelected = parentIds.every(id => next.has(id));
+      if (allSelected) {
+        parentIds.forEach(id => next.delete(id));
+      } else {
+        parentIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedQuestions(new Set());
+  }, []);
+
+  const handleDeleteSelected = useCallback(async () => {
+    if (selectedQuestions.size === 0) return;
+    setDeletingSelected(true);
+    try {
+      // Find all child question IDs for selected parents
+      const childIds = questions
+        .filter(q => q.parent_id && selectedQuestions.has(q.parent_id))
+        .map(q => q.id);
+
+      // Delete children first
+      if (childIds.length > 0) {
+        const { error } = await supabase.from('questions').delete().in('id', childIds);
+        if (error) throw error;
+      }
+
+      // Delete selected parents
+      const parentIds = Array.from(selectedQuestions);
+      if (parentIds.length > 0) {
+        const { error } = await supabase.from('questions').delete().in('id', parentIds);
+        if (error) throw error;
+      }
+
+      toast.success(`Đã xóa ${parentIds.length} câu hỏi`);
+      setSelectedQuestions(new Set());
+      setShowDeleteSelectedDialog(false);
+      onQuestionsChanged();
+    } catch (err) {
+      console.error('Error deleting selected questions:', err);
+      toast.error('Lỗi khi xóa câu hỏi');
+    } finally {
+      setDeletingSelected(false);
+    }
+  }, [selectedQuestions, questions, onQuestionsChanged]);
+
   // Group parent questions with children, then organize by mondai
   const getParentQuestions = (examQuestions: QuestionRow[]) => {
     const parents = examQuestions.filter(q => !q.parent_id)
@@ -218,6 +286,35 @@ export function ListeningExamManager({
 
   return (
     <div className="space-y-3">
+      {/* Bulk action bar */}
+      {selectedQuestions.size > 0 && (
+        <div className="sticky top-0 z-10 flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-2.5">
+          <CheckSquare className="h-4 w-4 text-destructive" />
+          <span className="text-sm font-medium text-foreground">
+            Đã chọn {selectedQuestions.size} câu hỏi
+          </span>
+          <div className="flex-1" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={clearSelection}
+          >
+            <XCircle className="mr-1 h-3.5 w-3.5" />
+            Bỏ chọn
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => setShowDeleteSelectedDialog(true)}
+          >
+            <Trash2 className="mr-1 h-3.5 w-3.5" />
+            Xóa đã chọn
+          </Button>
+        </div>
+      )}
+
       {/* Summary bar */}
       <div className="px-4 py-2 bg-muted/20 rounded-lg border border-border">
         <p className="text-sm text-muted-foreground">
@@ -240,11 +337,26 @@ export function ListeningExamManager({
             <div className="rounded-xl border border-border overflow-hidden">
               {/* Exam header */}
               <div className="flex items-center gap-3 bg-muted/50 px-4 py-3">
-                <CollapsibleTrigger asChild>
+               <CollapsibleTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
                     {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </Button>
                 </CollapsibleTrigger>
+
+                {/* Select all in exam */}
+                {(() => {
+                  const parentIds = exam.questions.filter(q => !q.parent_id).map(q => q.id);
+                  const allSelected = parentIds.length > 0 && parentIds.every(id => selectedQuestions.has(id));
+                  const someSelected = parentIds.some(id => selectedQuestions.has(id));
+                  return (
+                    <Checkbox
+                      checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                      onCheckedChange={() => toggleExamQuestions(exam)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="shrink-0"
+                    />
+                  );
+                })()}
 
                 <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isDriving ? 'bg-yellow-100' : 'bg-primary/10'}`}>
                   {isDriving ? (
@@ -312,8 +424,16 @@ export function ListeningExamManager({
                       {/* Questions in this mondai */}
                       <div className="divide-y divide-border">
                         {mondai.questions.map((q, qIdx) => (
-                          <div key={q.id} className="px-4 py-3 hover:bg-muted/30 transition-colors">
+                          <div key={q.id} className={cn(
+                            "px-4 py-3 hover:bg-muted/30 transition-colors",
+                            selectedQuestions.has(q.id) && "bg-primary/5"
+                          )}>
                             <div className="flex items-start gap-3">
+                              <Checkbox
+                                checked={selectedQuestions.has(q.id)}
+                                onCheckedChange={() => toggleQuestion(q.id)}
+                                className="mt-1.5 shrink-0"
+                              />
                               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-primary/10 text-xs font-bold text-primary mt-0.5">
                                 {qIdx + 1}
                               </span>
@@ -424,6 +544,29 @@ export function ListeningExamManager({
             >
               {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {isDriving ? 'Xóa đề' : 'Xóa đề'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete selected dialog */}
+      <AlertDialog open={showDeleteSelectedDialog} onOpenChange={setShowDeleteSelectedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xóa {selectedQuestions.size} câu hỏi đã chọn?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có chắc muốn xóa {selectedQuestions.size} câu hỏi đã chọn? Các câu hỏi con liên quan cũng sẽ bị xóa vĩnh viễn.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingSelected}>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSelected}
+              disabled={deletingSelected}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingSelected ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Xóa {selectedQuestions.size} câu
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
