@@ -286,6 +286,35 @@ export function ListeningExamManager({
 
   return (
     <div className="space-y-3">
+      {/* Bulk action bar */}
+      {selectedQuestions.size > 0 && (
+        <div className="sticky top-0 z-10 flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-2.5">
+          <CheckSquare className="h-4 w-4 text-destructive" />
+          <span className="text-sm font-medium text-foreground">
+            Đã chọn {selectedQuestions.size} câu hỏi
+          </span>
+          <div className="flex-1" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={clearSelection}
+          >
+            <XCircle className="mr-1 h-3.5 w-3.5" />
+            Bỏ chọn
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => setShowDeleteSelectedDialog(true)}
+          >
+            <Trash2 className="mr-1 h-3.5 w-3.5" />
+            Xóa đã chọn
+          </Button>
+        </div>
+      )}
+
       {/* Summary bar */}
       <div className="px-4 py-2 bg-muted/20 rounded-lg border border-border">
         <p className="text-sm text-muted-foreground">
