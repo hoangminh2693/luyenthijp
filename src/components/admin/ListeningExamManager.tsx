@@ -112,6 +112,11 @@ export function ListeningExamManager({
   const [expandedExams, setExpandedExams] = useState<Set<string>>(new Set());
   const [deletingExam, setDeletingExam] = useState<ListeningExamGroup | null>(null);
   const [deleting, setDeleting] = useState(false);
+  
+  // Bulk selection state
+  const [selectedQuestions, setSelectedQuestions] = useState<Set<string>>(new Set());
+  const [deletingSelected, setDeletingSelected] = useState(false);
+  const [showDeleteSelectedDialog, setShowDeleteSelectedDialog] = useState(false);
 
   const exams = useMemo(() => groupByExam(questions), [questions]);
 
