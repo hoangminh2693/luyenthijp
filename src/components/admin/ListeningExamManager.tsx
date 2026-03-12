@@ -6,8 +6,9 @@
 import { useState, useMemo, useCallback } from 'react';
 import { 
   Headphones, ChevronDown, ChevronUp, Trash2, Pencil, Clock, 
-  FileText, Loader2, Volume2
+  FileText, Loader2, Volume2, CheckSquare, Square, XCircle
 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
