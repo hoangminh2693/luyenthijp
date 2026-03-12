@@ -548,6 +548,29 @@ export function ListeningExamManager({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Delete selected dialog */}
+      <AlertDialog open={showDeleteSelectedDialog} onOpenChange={setShowDeleteSelectedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xóa {selectedQuestions.size} câu hỏi đã chọn?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có chắc muốn xóa {selectedQuestions.size} câu hỏi đã chọn? Các câu hỏi con liên quan cũng sẽ bị xóa vĩnh viễn.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingSelected}>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSelected}
+              disabled={deletingSelected}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingSelected ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Xóa {selectedQuestions.size} câu
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
