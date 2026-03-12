@@ -424,8 +424,16 @@ export function ListeningExamManager({
                       {/* Questions in this mondai */}
                       <div className="divide-y divide-border">
                         {mondai.questions.map((q, qIdx) => (
-                          <div key={q.id} className="px-4 py-3 hover:bg-muted/30 transition-colors">
+                          <div key={q.id} className={cn(
+                            "px-4 py-3 hover:bg-muted/30 transition-colors",
+                            selectedQuestions.has(q.id) && "bg-primary/5"
+                          )}>
                             <div className="flex items-start gap-3">
+                              <Checkbox
+                                checked={selectedQuestions.has(q.id)}
+                                onCheckedChange={() => toggleQuestion(q.id)}
+                                className="mt-1.5 shrink-0"
+                              />
                               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-primary/10 text-xs font-bold text-primary mt-0.5">
                                 {qIdx + 1}
                               </span>
