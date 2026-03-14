@@ -1,4 +1,5 @@
 import * as React from "react";
+import { DOMParser as PmDOMParser } from 'prosemirror-model';
 import { useEditor, EditorContent, type Editor, Extension } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
