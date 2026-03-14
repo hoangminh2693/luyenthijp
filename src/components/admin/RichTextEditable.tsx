@@ -1,4 +1,5 @@
 import * as React from "react";
+import { DOMParser as PmDOMParser } from 'prosemirror-model';
 import { useEditor, EditorContent, type Editor, Extension } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -226,15 +227,11 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
           const hasHtmlTags = /<(table|tr|td|th|br|div|span|ul|ol|li|img|a|b|strong|i|em|u|p|h[1-6]|sub|sup|blockquote|pre|code|mark|thead|tbody)\b/i.test(plain);
           
           if (hasHtmlTags) {
-            // Content contains raw HTML tags - insert as HTML to preserve structure
             event.preventDefault();
-            const editor = (view as any)?.editor || (view.state as any)?.editor;
-            if (editor?.commands) {
-              editor.commands.insertContent(plain, { parseOptions: { preserveWhitespace: false } });
-            } else {
-              // Fallback: insert as text
-              view.dispatch(view.state.tr.insertText(plain));
-            }
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = plain;
+            const parsedSlice = PmDOMParser.fromSchema(view.state.schema).parseSlice(wrapper);
+            view.dispatch(view.state.tr.replaceSelection(parsedSlice));
             return true;
           }
           
