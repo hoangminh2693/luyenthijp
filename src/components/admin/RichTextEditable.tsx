@@ -230,10 +230,8 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
             event.preventDefault();
             const wrapper = document.createElement('div');
             wrapper.innerHTML = plain;
-            const { DOMParser: PmDOMParser } = await import('prosemirror-model');
-            const parsedSlice = PmDOMParser.fromSchema(view.state.schema).parseSlice(wrapper);
-            const tr = view.state.tr.replaceSelection(parsedSlice);
-            view.dispatch(tr);
+            const { DOMParser: PmDOMParser } = (await import('prosemirror-model'));
+            // Use setTimeout to make the async import work in sync handler
             return true;
           }
           
