@@ -66,7 +66,7 @@ export function sanitizeRichText(input: string): string {
       'a', 'img', 'mark',
       'table', 'thead', 'tbody', 'tr', 'th', 'td',
     ],
-    ALLOWED_ATTR: ['style', 'colspan', 'rowspan', 'href', 'target', 'rel', 'src', 'alt', 'class', 'data-color'],
+    ALLOWED_ATTR: ['style', 'colspan', 'rowspan', 'href', 'target', 'rel', 'src', 'alt', 'class', 'data-color', 'align'],
   });
 
   // Lọc style để tránh nhúng CSS lạ
