@@ -226,15 +226,16 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
           const hasHtmlTags = /<(table|tr|td|th|br|div|span|ul|ol|li|img|a|b|strong|i|em|u|p|h[1-6]|sub|sup|blockquote|pre|code|mark|thead|tbody)\b/i.test(plain);
           
           if (hasHtmlTags) {
-            // Content contains raw HTML tags - insert as HTML to preserve structure
+            // Content contains raw HTML tags - parse and insert as HTML
             event.preventDefault();
-            const editor = (view as any)?.editor || (view.state as any)?.editor;
-            if (editor?.commands) {
-              editor.commands.insertContent(plain, { parseOptions: { preserveWhitespace: false } });
-            } else {
-              // Fallback: insert as text
-              view.dispatch(view.state.tr.insertText(plain));
-            }
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = plain;
+            const parser = view.state.schema.nodeType ? undefined : null;
+            // Use ProseMirror DOMParser to parse the HTML into a document fragment
+            const { DOMParser: PmDOMParser } = require('prosemirror-model');
+            const slice = PmDOMParser.fromSchema(view.state.schema).parseSlice(wrapper);
+            const tr = view.state.tr.replaceSelection(slice);
+            view.dispatch(tr);
             return true;
           }
           
