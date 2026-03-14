@@ -227,12 +227,11 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
           const hasHtmlTags = /<(table|tr|td|th|br|div|span|ul|ol|li|img|a|b|strong|i|em|u|p|h[1-6]|sub|sup|blockquote|pre|code|mark|thead|tbody)\b/i.test(plain);
           
           if (hasHtmlTags) {
-            // Content contains raw HTML tags - parse and insert as HTML via ProseMirror DOMParser
             event.preventDefault();
             const wrapper = document.createElement('div');
             wrapper.innerHTML = plain;
-            const { DOMParser: PmDOMParser } = (await import('prosemirror-model'));
-            // Use setTimeout to make the async import work in sync handler
+            const parsedSlice = PmDOMParser.fromSchema(view.state.schema).parseSlice(wrapper);
+            view.dispatch(view.state.tr.replaceSelection(parsedSlice));
             return true;
           }
           
