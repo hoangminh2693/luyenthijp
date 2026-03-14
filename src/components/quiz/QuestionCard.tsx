@@ -406,7 +406,7 @@ export function QuestionCard({
         <div className="flex-1">
           {showQuestionContent && question.content.trim() !== '' ? (
              <p 
-               className="text-base font-normal text-foreground leading-relaxed whitespace-pre-line [&_b]:font-bold [&_strong]:font-bold [&_b]:text-foreground [&_strong]:text-foreground"
+               className="text-base font-normal text-foreground leading-relaxed whitespace-pre-line [&_b]:font-bold [&_strong]:font-bold [&_b]:text-foreground [&_strong]:text-foreground [&_table]:w-full [&_table]:border-collapse [&_table]:my-2 [&_table]:text-sm [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted/50 [&_th]:font-semibold [&_div[align=right]]:text-right"
                dangerouslySetInnerHTML={{ __html: question.content }}
              />
           ) : (

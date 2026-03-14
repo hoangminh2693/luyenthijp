@@ -217,12 +217,31 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
             "[&_.selectedCell]:bg-primary/10 [&_.selectedCell]:outline [&_.selectedCell]:outline-2 [&_.selectedCell]:outline-primary",
           ),
         },
-        handlePaste: compact ? (view, event) => {
-          // In compact mode, strip all formatting and paste as plain text
+        handlePaste: compact ? (view, event, slice) => {
+          // In compact mode, check if pasted content contains HTML tags
+          const html = event.clipboardData?.getData('text/html') || '';
+          const plain = event.clipboardData?.getData('text/plain') || '';
+          
+          // Detect if the plain text itself contains HTML tags (e.g. <table>, <br>, <div>)
+          const hasHtmlTags = /<(table|tr|td|th|br|div|span|ul|ol|li|img|a|b|strong|i|em|u|p|h[1-6]|sub|sup|blockquote|pre|code|mark|thead|tbody)\b/i.test(plain);
+          
+          if (hasHtmlTags) {
+            // Content contains raw HTML tags - insert as HTML to preserve structure
+            event.preventDefault();
+            const editor = (view as any)?.editor || (view.state as any)?.editor;
+            if (editor?.commands) {
+              editor.commands.insertContent(plain, { parseOptions: { preserveWhitespace: false } });
+            } else {
+              // Fallback: insert as text
+              view.dispatch(view.state.tr.insertText(plain));
+            }
+            return true;
+          }
+          
+          // Otherwise strip formatting and paste as plain text
           event.preventDefault();
-          const text = event.clipboardData?.getData('text/plain') || '';
-          if (text) {
-            view.dispatch(view.state.tr.insertText(text));
+          if (plain) {
+            view.dispatch(view.state.tr.insertText(plain));
           }
           return true;
         } : undefined,
