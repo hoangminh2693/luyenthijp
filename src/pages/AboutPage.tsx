@@ -179,8 +179,8 @@ const AboutPage = () => {
               Cảm ơn bạn đã lựa chọn luyenthi.jp. Chúc bạn ôn tập thật tốt và đạt kết quả 
               cao trong các kỳ thi sắp tới!
             </p>
-            <p className="text-sm text-muted-foreground mb-6 flex items-center justify-center gap-1">
-              Được phát triển với <Heart className="h-4 w-4 text-destructive fill-destructive" /> tại Osaka, Nhật Bản
+            <p className="text-sm text-muted-foreground mb-6">
+              Được phát triển bởi Minhbaohiemjp!
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Button asChild size="lg" className="gap-2">
