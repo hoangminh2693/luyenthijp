@@ -11,7 +11,7 @@ import { DrivingExamView } from '@/components/quiz/DrivingExamView';
 import { Breadcrumb } from '@/components/layout/Header';
 import { useQuestionHistory } from '@/hooks/useQuestionHistory';
 import { useLeafCategory } from '@/hooks/useCategoryPath';
-import { useRandomQuestions, useRandomListeningExam, type Question } from '@/hooks/useQuestions';
+import { useRandomQuestions, useRandomListeningExam, useListeningExams, type Question } from '@/hooks/useQuestions';
 import { type QuizResult } from '@/data/quizData';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,6 +37,8 @@ const QuizPage = () => {
   const mode = searchParams.get('mode');
   const isListeningMode = mode === 'listening';
   const isDrivingMode = mode === 'driving';
+  const examIndexParam = searchParams.get('exam');
+  const examIndex = examIndexParam !== null ? parseInt(examIndexParam, 10) : null;
   const questionCount = parseInt(searchParams.get('count') || '10', 10);
   
   // Parse category path
@@ -132,12 +134,26 @@ const QuizPage = () => {
     shouldShuffle,
     answeredQuestionIds.size > 0 ? answeredQuestionIds : undefined
   );
-  const { data: listeningExam, isLoading: loadingListeningExam } = useRandomListeningExam(
-    isListeningMode ? sectionId : undefined,
-    isListeningMode,
-    sessionId,
-    isListeningMode ? categoryIdForQuiz : undefined
+  // Listening: if exam index specified, load all exams and pick by index; otherwise random
+  const hasSpecificExam = isListeningMode && examIndex !== null;
+  const { data: allListeningExams = [], isLoading: loadingAllListening } = useListeningExams(
+    hasSpecificExam ? sectionId : undefined,
+    hasSpecificExam ? categoryIdForQuiz : undefined
   );
+  const specificListeningExam = hasSpecificExam && allListeningExams.length > 0 && examIndex < allListeningExams.length
+    ? allListeningExams[examIndex]
+    : null;
+
+  const { data: randomListeningExam, isLoading: loadingRandomListening } = useRandomListeningExam(
+    isListeningMode && !hasSpecificExam ? sectionId : undefined,
+    isListeningMode && !hasSpecificExam,
+    sessionId,
+    isListeningMode && !hasSpecificExam ? categoryIdForQuiz : undefined
+  );
+  
+  const listeningExam = specificListeningExam || randomListeningExam;
+  const loadingListeningExam = hasSpecificExam ? loadingAllListening : loadingRandomListening;
+
   // Driving mode: fetch a random complete exam (same as listening)
   const { data: drivingExam, isLoading: loadingDrivingExam } = useRandomListeningExam(
     isDrivingMode ? sectionId : undefined,

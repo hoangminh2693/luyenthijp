@@ -8,7 +8,7 @@
  * - fixed_exam_mode = true: Không chọn số lượng, làm theo đề nghe hoàn chỉnh
  * - Các phần khác: Cho phép random và chọn số lượng như bình thường
  */
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Navigate, useNavigate, Link } from 'react-router-dom';
 import { useSEO } from '@/hooks/useSEO';
 import { 
@@ -269,6 +269,59 @@ const StartQuizPage = () => {
     }
   }, [effectiveQuestionCount, isListeningSection, isDrivingSubject]);
 
+  const handleSelectListeningExam = useCallback((examIndex: number) => {
+    navigate(`/quiz/${subjectSlug}/${categoryPath}?mode=listening&exam=${examIndex}`);
+  }, [navigate, subjectSlug, categoryPath]);
+
+  // Fetch completed exams from question_history for logged-in users
+  const { data: completedIndices = new Set<number>() } = useQuery({
+    queryKey: ['completed-listening-exams', leafCategory?.id, matchingSection?.id, user?.id],
+    queryFn: async () => {
+      if (!user || listeningExams.length === 0) return new Set<number>();
+      
+      const allQuestionIds: string[] = [];
+      for (const exam of listeningExams) {
+        for (const q of exam.questions) {
+          if (q.subQuestions && q.subQuestions.length > 0) {
+            q.subQuestions.forEach(sq => allQuestionIds.push(sq.id));
+          } else {
+            allQuestionIds.push(q.id);
+          }
+        }
+      }
+      
+      if (allQuestionIds.length === 0) return new Set<number>();
+      
+      const { data, error } = await supabase
+        .from('question_history')
+        .select('question_id')
+        .eq('user_id', user.id)
+        .in('question_id', allQuestionIds);
+      
+      if (error || !data) return new Set<number>();
+      
+      const answeredIds = new Set(data.map(d => d.question_id));
+      
+      const completed = new Set<number>();
+      listeningExams.forEach((exam, index) => {
+        const examQuestionIds: string[] = [];
+        for (const q of exam.questions) {
+          if (q.subQuestions && q.subQuestions.length > 0) {
+            q.subQuestions.forEach(sq => examQuestionIds.push(sq.id));
+          } else {
+            examQuestionIds.push(q.id);
+          }
+        }
+        if (examQuestionIds.some(id => answeredIds.has(id))) {
+          completed.add(index);
+        }
+      });
+      
+      return completed;
+    },
+    enabled: !!user && isListeningSection && listeningExams.length > 0,
+  });
+
   const isLoading = authLoading || loadingPath || loadingCount || (isListeningSection && loadingListening) || (isDrivingSubject && loadingDrivingExams);
 
   // Loading state
@@ -290,8 +343,6 @@ const StartQuizPage = () => {
   const handleStartQuiz = () => {
     if (isDrivingSubject) {
       navigate(`/quiz/${subjectSlug}/${categoryPath}?mode=driving`);
-    } else if (isListeningSection) {
-      navigate(`/quiz/${subjectSlug}/${categoryPath}?mode=listening`);
     } else {
       navigate(`/quiz/${subjectSlug}/${categoryPath}?count=${questionCount}`);
     }
@@ -385,8 +436,10 @@ const StartQuizPage = () => {
                   </div>
                 ) : isListeningSection ? (
                   <ListeningExamSelector
-                    totalExams={listeningExams.length}
-                    estimatedMinutes={avgAudioDuration > 0 ? Math.ceil(avgAudioDuration / 60) : 0}
+                    exams={listeningExams}
+                    completedExamIndices={completedIndices}
+                    isLoggedIn={!!user}
+                    onSelectExam={handleSelectListeningExam}
                   />
                 ) : (
                   <QuestionCountSelector
@@ -398,35 +451,31 @@ const StartQuizPage = () => {
                 )}
               </div>
 
-              {/* Start button */}
-              <Button
-                onClick={handleStartQuiz}
-                size="lg"
-                className="w-full gap-2"
-                disabled={
-                  isDrivingSubject
-                    ? drivingExams.length === 0
-                    : isListeningSection
-                    ? listeningExams.length === 0
-                    : effectiveQuestionCount === 0
-                }
-              >
-                {isDrivingSubject ? (
-                  <span className="text-lg">🚗</span>
-                ) : isListeningSection ? (
-                  <Headphones className="h-5 w-5" />
-                ) : (
-                  <Play className="h-5 w-5" />
-                )}
-                {isDrivingSubject
-                  ? `Bắt đầu thi (${drivingExams.length} đề)`
-                  : isListeningSection
-                  ? 'Bắt đầu làm đề nghe'
-                  : `Bắt đầu làm bài (${questionCount} câu)`
-                }
-              </Button>
+              {/* Start button - hidden for listening (user clicks exam directly) */}
+              {!isListeningSection && (
+                <Button
+                  onClick={handleStartQuiz}
+                  size="lg"
+                  className="w-full gap-2"
+                  disabled={
+                    isDrivingSubject
+                      ? drivingExams.length === 0
+                      : effectiveQuestionCount === 0
+                  }
+                >
+                  {isDrivingSubject ? (
+                    <span className="text-lg">🚗</span>
+                  ) : (
+                    <Play className="h-5 w-5" />
+                  )}
+                  {isDrivingSubject
+                    ? `Bắt đầu thi (${drivingExams.length} đề)`
+                    : `Bắt đầu làm bài (${questionCount} câu)`
+                  }
+                </Button>
+              )}
 
-              {effectiveQuestionCount === 0 && (
+              {!isListeningSection && effectiveQuestionCount === 0 && (
                 <p className="mt-4 text-center text-sm text-muted-foreground">
                   Chưa có câu hỏi nào cho phần này. Vui lòng quay lại sau.
                 </p>
