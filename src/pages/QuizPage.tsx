@@ -11,7 +11,7 @@ import { DrivingExamView } from '@/components/quiz/DrivingExamView';
 import { Breadcrumb } from '@/components/layout/Header';
 import { useQuestionHistory } from '@/hooks/useQuestionHistory';
 import { useLeafCategory } from '@/hooks/useCategoryPath';
-import { useRandomQuestions, useRandomListeningExam, type Question } from '@/hooks/useQuestions';
+import { useRandomQuestions, useRandomListeningExam, useListeningExams, type Question } from '@/hooks/useQuestions';
 import { type QuizResult } from '@/data/quizData';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
