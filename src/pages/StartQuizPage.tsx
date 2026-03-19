@@ -8,7 +8,7 @@
  * - fixed_exam_mode = true: Không chọn số lượng, làm theo đề nghe hoàn chỉnh
  * - Các phần khác: Cho phép random và chọn số lượng như bình thường
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Navigate, useNavigate, Link } from 'react-router-dom';
 import { useSEO } from '@/hooks/useSEO';
 import { 
