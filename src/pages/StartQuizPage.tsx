@@ -447,8 +447,10 @@ const StartQuizPage = () => {
                   </div>
                 ) : isListeningSection ? (
                   <ListeningExamSelector
-                    totalExams={listeningExams.length}
-                    estimatedMinutes={avgAudioDuration > 0 ? Math.ceil(avgAudioDuration / 60) : 0}
+                    exams={listeningExams}
+                    completedExamIndices={completedIndices}
+                    isLoggedIn={!!user}
+                    onSelectExam={handleSelectListeningExam}
                   />
                 ) : (
                   <QuestionCountSelector
@@ -460,35 +462,31 @@ const StartQuizPage = () => {
                 )}
               </div>
 
-              {/* Start button */}
-              <Button
-                onClick={handleStartQuiz}
-                size="lg"
-                className="w-full gap-2"
-                disabled={
-                  isDrivingSubject
-                    ? drivingExams.length === 0
-                    : isListeningSection
-                    ? listeningExams.length === 0
-                    : effectiveQuestionCount === 0
-                }
-              >
-                {isDrivingSubject ? (
-                  <span className="text-lg">🚗</span>
-                ) : isListeningSection ? (
-                  <Headphones className="h-5 w-5" />
-                ) : (
-                  <Play className="h-5 w-5" />
-                )}
-                {isDrivingSubject
-                  ? `Bắt đầu thi (${drivingExams.length} đề)`
-                  : isListeningSection
-                  ? 'Bắt đầu làm đề nghe'
-                  : `Bắt đầu làm bài (${questionCount} câu)`
-                }
-              </Button>
+              {/* Start button - hidden for listening (user clicks exam directly) */}
+              {!isListeningSection && (
+                <Button
+                  onClick={handleStartQuiz}
+                  size="lg"
+                  className="w-full gap-2"
+                  disabled={
+                    isDrivingSubject
+                      ? drivingExams.length === 0
+                      : effectiveQuestionCount === 0
+                  }
+                >
+                  {isDrivingSubject ? (
+                    <span className="text-lg">🚗</span>
+                  ) : (
+                    <Play className="h-5 w-5" />
+                  )}
+                  {isDrivingSubject
+                    ? `Bắt đầu thi (${drivingExams.length} đề)`
+                    : `Bắt đầu làm bài (${questionCount} câu)`
+                  }
+                </Button>
+              )}
 
-              {effectiveQuestionCount === 0 && (
+              {!isListeningSection && effectiveQuestionCount === 0 && (
                 <p className="mt-4 text-center text-sm text-muted-foreground">
                   Chưa có câu hỏi nào cho phần này. Vui lòng quay lại sau.
                 </p>
