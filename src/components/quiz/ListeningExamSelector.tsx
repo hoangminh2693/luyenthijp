@@ -1,76 +1,97 @@
 /**
- * Component hiển thị thông tin đề nghe cho phần 聴解
- * Thay thế QuestionCountSelector cho các section có fixed_exam_mode = true
+ * Component hiển thị danh sách đề nghe cho phần 聴解
+ * Cho phép người dùng chọn đề cụ thể thay vì random
  */
-import { Headphones, Clock, AlertCircle, FileText } from 'lucide-react';
+import { Headphones, CheckCircle2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import type { ListeningExam } from '@/hooks/useQuestions';
 
 interface ListeningExamSelectorProps {
-  totalExams: number;
-  estimatedMinutes: number;
+  exams: ListeningExam[];
+  completedExamIndices: Set<number>;
+  isLoggedIn: boolean;
+  onSelectExam: (examIndex: number) => void;
   className?: string;
 }
 
-function formatDuration(minutes: number): string {
-  if (minutes <= 0) return '—';
-  if (minutes < 1) return '< 1 phút';
-  return `~${Math.ceil(minutes)} phút`;
-}
-
 export function ListeningExamSelector({
-  totalExams,
-  estimatedMinutes,
+  exams,
+  completedExamIndices,
+  isLoggedIn,
+  onSelectExam,
   className,
 }: ListeningExamSelectorProps) {
+  if (exams.length === 0) {
+    return (
+      <div className={cn("text-center py-8", className)}>
+        <Headphones className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
+        <p className="text-muted-foreground">Chưa có đề nghe nào.</p>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("space-y-4", className)}>
       <h3 className="text-sm font-medium text-foreground">
-        Chế độ làm bài
+        Chọn đề nghe ({exams.length} đề)
       </h3>
-      
-      {/* Info card cho phần nghe */}
-      <div className="rounded-xl border-2 border-primary bg-primary/5 p-5">
-        <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Headphones className="h-6 w-6" />
-          </div>
-          <div className="flex-1 space-y-2">
-            <h4 className="font-semibold text-foreground">
-              Làm 1 đề nghe hoàn chỉnh
-            </h4>
-            <p className="text-sm text-muted-foreground">
-              Hệ thống sẽ chọn ngẫu nhiên 1 đề nghe từ kho {totalExams} đề. 
-              Bạn sẽ nghe audio và trả lời tất cả câu hỏi liên quan.
-            </p>
-          </div>
-        </div>
-      </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="flex items-center gap-2 rounded-lg bg-muted/30 p-3">
-          <FileText className="h-5 w-5 text-muted-foreground" />
-          <div>
-            <p className="text-xs text-muted-foreground">Số đề đang có</p>
-            <p className="font-semibold text-foreground">{totalExams} đề</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 rounded-lg bg-muted/30 p-3">
-          <Clock className="h-5 w-5 text-muted-foreground" />
-          <div>
-            <p className="text-xs text-muted-foreground">Thời gian ước tính</p>
-            <p className="font-semibold text-foreground">{formatDuration(estimatedMinutes)}</p>
-          </div>
-        </div>
-      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {exams.map((exam, index) => {
+          const isCompleted = completedExamIndices.has(index);
+          return (
+            <button
+              key={exam.audioUrl}
+              onClick={() => onSelectExam(index)}
+              className={cn(
+                "relative flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all",
+                "hover:shadow-md hover:border-primary hover:bg-primary/5",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                isCompleted
+                  ? "border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/30"
+                  : "border-border bg-card"
+              )}
+            >
+              {/* Status badge */}
+              {isLoggedIn && (
+                <div className="absolute top-2 right-2">
+                  {isCompleted ? (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-green-400 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/50">
+                      <CheckCircle2 className="h-3 w-3 mr-0.5" />
+                      Đã làm
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-blue-300 text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50">
+                      <Sparkles className="h-3 w-3 mr-0.5" />
+                      Mới
+                    </Badge>
+                  )}
+                </div>
+              )}
 
-      {/* Note */}
-      <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3">
-        <AlertCircle className="h-4 w-4 shrink-0 text-warning mt-0.5" />
-        <p className="text-xs text-foreground/80">
-          <strong>Lưu ý:</strong> Phần nghe sẽ làm theo đề hoàn chỉnh, không thể chọn số lượng câu hỏi 
-          vì các câu hỏi phụ thuộc vào cùng một đoạn audio.
-        </p>
+              {/* Icon */}
+              <div className={cn(
+                "flex h-10 w-10 items-center justify-center rounded-lg",
+                isCompleted
+                  ? "bg-green-100 text-green-600 dark:bg-green-900/50 dark:text-green-400"
+                  : "bg-primary/10 text-primary"
+              )}>
+                <Headphones className="h-5 w-5" />
+              </div>
+
+              {/* Label */}
+              <span className="text-sm font-semibold text-foreground">
+                Đề {index + 1}
+              </span>
+
+              {/* Question count */}
+              <span className="text-xs text-muted-foreground">
+                {exam.questionCount} câu
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
