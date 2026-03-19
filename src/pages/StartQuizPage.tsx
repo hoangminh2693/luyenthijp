@@ -290,12 +290,74 @@ const StartQuizPage = () => {
   const handleStartQuiz = () => {
     if (isDrivingSubject) {
       navigate(`/quiz/${subjectSlug}/${categoryPath}?mode=driving`);
-    } else if (isListeningSection) {
-      navigate(`/quiz/${subjectSlug}/${categoryPath}?mode=listening`);
     } else {
       navigate(`/quiz/${subjectSlug}/${categoryPath}?count=${questionCount}`);
     }
   };
+
+  const handleSelectListeningExam = useCallback((examIndex: number) => {
+    navigate(`/quiz/${subjectSlug}/${categoryPath}?mode=listening&exam=${examIndex}`);
+  }, [navigate, subjectSlug, categoryPath]);
+
+  // Compute completed exam indices for logged-in users
+  const completedExamIndices = useMemo(() => {
+    const completed = new Set<number>();
+    if (!user || !isListeningSection || listeningExams.length === 0) return completed;
+    // Will be populated by question history check below
+    return completed;
+  }, [user, isListeningSection, listeningExams]);
+
+  // Fetch completed exams from question_history for logged-in users
+  const { data: completedIndices = new Set<number>() } = useQuery({
+    queryKey: ['completed-listening-exams', leafCategory?.id, matchingSection?.id, user?.id],
+    queryFn: async () => {
+      if (!user || listeningExams.length === 0) return new Set<number>();
+      
+      // Get all question IDs across all exams
+      const allQuestionIds: string[] = [];
+      for (const exam of listeningExams) {
+        for (const q of exam.questions) {
+          if (q.subQuestions && q.subQuestions.length > 0) {
+            q.subQuestions.forEach(sq => allQuestionIds.push(sq.id));
+          } else {
+            allQuestionIds.push(q.id);
+          }
+        }
+      }
+      
+      if (allQuestionIds.length === 0) return new Set<number>();
+      
+      // Query which questions user has answered
+      const { data, error } = await supabase
+        .from('question_history')
+        .select('question_id')
+        .eq('user_id', user.id)
+        .in('question_id', allQuestionIds);
+      
+      if (error || !data) return new Set<number>();
+      
+      const answeredIds = new Set(data.map(d => d.question_id));
+      
+      // Check each exam - mark as completed if ANY question was answered
+      const completed = new Set<number>();
+      listeningExams.forEach((exam, index) => {
+        const examQuestionIds: string[] = [];
+        for (const q of exam.questions) {
+          if (q.subQuestions && q.subQuestions.length > 0) {
+            q.subQuestions.forEach(sq => examQuestionIds.push(sq.id));
+          } else {
+            examQuestionIds.push(q.id);
+          }
+        }
+        if (examQuestionIds.some(id => answeredIds.has(id))) {
+          completed.add(index);
+        }
+      });
+      
+      return completed;
+    },
+    enabled: !!user && isListeningSection && listeningExams.length > 0,
+  });
 
   // Tính thời gian ước tính
   const estimatedMinutes = isListeningSection 
