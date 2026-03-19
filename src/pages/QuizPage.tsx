@@ -275,12 +275,24 @@ const QuizPage = () => {
 
       setRevealedAnswers(revealed);
 
+      // Calculate total answerable questions from the actual quiz
+      const actualTotalQuestions = questions.reduce((total, q) => {
+        if (q.subQuestions && q.subQuestions.length > 0) {
+          return total + q.subQuestions.length;
+        }
+        return total + 1;
+      }, 0);
+
+      const correctCount = serverResult.correct_answers;
+      const wrongCount = actualTotalQuestions - correctCount;
+      const percentage = Math.round((correctCount / actualTotalQuestions) * 100);
+
       const quizResult: QuizResult = {
-        totalQuestions: serverResult.total_questions,
-        correctAnswers: serverResult.correct_answers,
-        wrongAnswers: serverResult.wrong_answers,
-        score: serverResult.correct_answers,
-        percentage: serverResult.percentage,
+        totalQuestions: actualTotalQuestions,
+        correctAnswers: correctCount,
+        wrongAnswers: wrongCount,
+        score: correctCount,
+        percentage,
         details,
       };
 
