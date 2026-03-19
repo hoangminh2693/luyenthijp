@@ -37,6 +37,8 @@ const QuizPage = () => {
   const mode = searchParams.get('mode');
   const isListeningMode = mode === 'listening';
   const isDrivingMode = mode === 'driving';
+  const examIndexParam = searchParams.get('exam');
+  const examIndex = examIndexParam !== null ? parseInt(examIndexParam, 10) : null;
   const questionCount = parseInt(searchParams.get('count') || '10', 10);
   
   // Parse category path
