@@ -16,7 +16,7 @@ const PrivacyPage = () => {
       { name: 'Chính sách bảo mật' },
     ]),
   });
-  const lastUpdated = '17/01/2025';
+  const lastUpdated = '22/03/2026';
 
   const sections = [
     {
