@@ -64,7 +64,9 @@ Tuy nhiên, không có phương thức truyền tải qua Internet nào an toàn
 • Duy trì phiên đăng nhập của bạn
 • Ghi nhớ tùy chọn cá nhân
 • Phân tích lưu lượng truy cập (Google Analytics)
-• Hiển thị quảng cáo phù hợp (trong tương lai)
+• Hiển thị quảng cáo phù hợp (Google AdSense)
+
+Chúng tôi sử dụng Google AdSense để hiển thị quảng cáo. Google và các đối tác quảng cáo có thể sử dụng cookies để phân phối quảng cáo dựa trên lịch sử truy cập của bạn trên website này và các website khác.
 
 Bạn có thể tắt cookies trong trình duyệt, nhưng điều này có thể ảnh hưởng đến một số tính năng của website.`,
     },
