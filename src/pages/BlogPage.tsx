@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, User, ArrowRight, Clock, BookOpen, Tag, Settings } from 'lucide-react';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from '@/components/ui/pagination';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Breadcrumb } from '@/components/layout/Header';
@@ -24,13 +25,45 @@ const BlogPage = () => {
   const { data: posts, isLoading } = usePublishedPosts();
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [showAllTags, setShowAllTags] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const POSTS_PER_PAGE = 10;
 
   // Collect all unique tags
   const allTags = Array.from(new Set((posts || []).flatMap(p => p.tags || [])));
 
-  const filteredPosts = activeTag
-    ? (posts || []).filter(p => p.tags?.includes(activeTag))
-    : (posts || []);
+  const filteredPosts = useMemo(() => {
+    return activeTag
+      ? (posts || []).filter(p => p.tags?.includes(activeTag))
+      : (posts || []);
+  }, [posts, activeTag]);
+
+  // Reset page when filter changes
+  const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
+  const paginatedPosts = useMemo(() => {
+    const start = (currentPage - 1) * POSTS_PER_PAGE;
+    return filteredPosts.slice(start, start + POSTS_PER_PAGE);
+  }, [filteredPosts, currentPage, POSTS_PER_PAGE]);
+
+  const handleTagChange = (tag: string | null) => {
+    setActiveTag(tag);
+    setCurrentPage(1);
+  };
+
+  const getPageNumbers = () => {
+    const pages: (number | 'ellipsis')[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push('ellipsis');
+      for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+        pages.push(i);
+      }
+      if (currentPage < totalPages - 2) pages.push('ellipsis');
+      pages.push(totalPages);
+    }
+    return pages;
+  };
 
   const estimateReadTime = (content: string) => {
     const words = content.replace(/<[^>]*>/g, '').split(/\s+/).length;
@@ -67,7 +100,7 @@ const BlogPage = () => {
             <Button
               variant={activeTag === null ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setActiveTag(null)}
+              onClick={() => handleTagChange(null)}
             >
               Tất cả
             </Button>
@@ -76,7 +109,7 @@ const BlogPage = () => {
                 key={tag}
                 variant={activeTag === tag ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setActiveTag(tag)}
+                onClick={() => handleTagChange(tag)}
               >
                 {tag}
               </Button>
@@ -103,63 +136,101 @@ const BlogPage = () => {
             <p className="text-muted-foreground">Chưa có bài viết nào.</p>
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {filteredPosts.map(post => (
-              <article
-                key={post.id}
-                className="group rounded-xl border border-border bg-card overflow-hidden transition-all duration-200 hover:border-primary/30 hover:shadow-md"
-              >
-                <Link to={`/blog/${post.slug}`} className="block overflow-hidden">
-                  {post.thumbnail_url ? (
-                    <img src={post.thumbnail_url} alt={`Ảnh bìa bài viết: ${post.title}`} loading="lazy" className="aspect-video w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                  ) : (
-                    <div className="aspect-video bg-muted flex items-center justify-center transition-colors duration-300 group-hover:bg-muted/70">
-                      <BookOpen className="h-12 w-12 text-muted-foreground/30" />
-                    </div>
-                  )}
-                </Link>
-
-                <div className="p-6">
-                  {post.tags?.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {post.tags.slice(0, 3).map(tag => (
-                        <span key={tag} className="inline-block text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  <Link to={`/blog/${post.slug}`}>
-                    <h2 className="text-lg font-semibold text-foreground mb-2 line-clamp-2 group-hover:text-primary transition-colors">
-                      {post.title}
-                    </h2>
-                  </Link>
-
-                  {post.excerpt && (
-                    <p className="text-sm text-muted-foreground line-clamp-3 mb-4">{post.excerpt}</p>
-                  )}
-
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
-                    {post.published_at && (
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {new Date(post.published_at).toLocaleDateString('vi-VN')}
-                      </span>
+          <>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {paginatedPosts.map(post => (
+                <article
+                  key={post.id}
+                  className="group rounded-xl border border-border bg-card overflow-hidden transition-all duration-200 hover:border-primary/30 hover:shadow-md"
+                >
+                  <Link to={`/blog/${post.slug}`} className="block overflow-hidden">
+                    {post.thumbnail_url ? (
+                      <img src={post.thumbnail_url} alt={`Ảnh bìa bài viết: ${post.title}`} loading="lazy" className="aspect-video w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                    ) : (
+                      <div className="aspect-video bg-muted flex items-center justify-center transition-colors duration-300 group-hover:bg-muted/70">
+                        <BookOpen className="h-12 w-12 text-muted-foreground/30" />
+                      </div>
                     )}
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {estimateReadTime(post.content)}
-                    </span>
-                  </div>
-
-                  <Link to={`/blog/${post.slug}`} className="flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-                    Đọc tiếp <ArrowRight className="h-4 w-4" />
                   </Link>
-                </div>
-              </article>
-            ))}
-          </div>
+
+                  <div className="p-6">
+                    {post.tags?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {post.tags.slice(0, 3).map(tag => (
+                          <span key={tag} className="inline-block text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <Link to={`/blog/${post.slug}`}>
+                      <h2 className="text-lg font-semibold text-foreground mb-2 line-clamp-2 group-hover:text-primary transition-colors">
+                        {post.title}
+                      </h2>
+                    </Link>
+
+                    {post.excerpt && (
+                      <p className="text-sm text-muted-foreground line-clamp-3 mb-4">{post.excerpt}</p>
+                    )}
+
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
+                      {post.published_at && (
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {new Date(post.published_at).toLocaleDateString('vi-VN')}
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {estimateReadTime(post.content)}
+                      </span>
+                    </div>
+
+                    <Link to={`/blog/${post.slug}`} className="flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+                      Đọc tiếp <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            {totalPages > 1 && (
+              <Pagination className="mt-8">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                  {getPageNumbers().map((page, i) =>
+                    page === 'ellipsis' ? (
+                      <PaginationItem key={`ellipsis-${i}`}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    ) : (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          isActive={currentPage === page}
+                          onClick={() => setCurrentPage(page as number)}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    )
+                  )}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
+          </>
         )}
       </div>
     </div>
