@@ -24,6 +24,8 @@ const BlogPage = () => {
   const { data: posts, isLoading } = usePublishedPosts();
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [showAllTags, setShowAllTags] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const POSTS_PER_PAGE = 10;
 
   // Collect all unique tags
   const allTags = Array.from(new Set((posts || []).flatMap(p => p.tags || [])));
