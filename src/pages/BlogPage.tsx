@@ -99,7 +99,7 @@ const BlogPage = () => {
             <Button
               variant={activeTag === null ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setActiveTag(null)}
+              onClick={() => handleTagChange(null)}
             >
               Tất cả
             </Button>
