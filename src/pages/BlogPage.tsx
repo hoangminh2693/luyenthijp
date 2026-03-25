@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, User, ArrowRight, Clock, BookOpen, Tag, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
