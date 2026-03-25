@@ -30,9 +30,39 @@ const BlogPage = () => {
   // Collect all unique tags
   const allTags = Array.from(new Set((posts || []).flatMap(p => p.tags || [])));
 
-  const filteredPosts = activeTag
-    ? (posts || []).filter(p => p.tags?.includes(activeTag))
-    : (posts || []);
+  const filteredPosts = useMemo(() => {
+    return activeTag
+      ? (posts || []).filter(p => p.tags?.includes(activeTag))
+      : (posts || []);
+  }, [posts, activeTag]);
+
+  // Reset page when filter changes
+  const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
+  const paginatedPosts = useMemo(() => {
+    const start = (currentPage - 1) * POSTS_PER_PAGE;
+    return filteredPosts.slice(start, start + POSTS_PER_PAGE);
+  }, [filteredPosts, currentPage, POSTS_PER_PAGE]);
+
+  const handleTagChange = (tag: string | null) => {
+    setActiveTag(tag);
+    setCurrentPage(1);
+  };
+
+  const getPageNumbers = () => {
+    const pages: (number | 'ellipsis')[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push('ellipsis');
+      for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+        pages.push(i);
+      }
+      if (currentPage < totalPages - 2) pages.push('ellipsis');
+      pages.push(totalPages);
+    }
+    return pages;
+  };
 
   const estimateReadTime = (content: string) => {
     const words = content.replace(/<[^>]*>/g, '').split(/\s+/).length;
