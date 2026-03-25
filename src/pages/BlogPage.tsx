@@ -108,7 +108,7 @@ const BlogPage = () => {
                 key={tag}
                 variant={activeTag === tag ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setActiveTag(tag)}
+                onClick={() => handleTagChange(tag)}
               >
                 {tag}
               </Button>
