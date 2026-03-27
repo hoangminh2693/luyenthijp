@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 const SITE_URL = 'https://luyenthi.jp';
-const SITE_NAME = 'Luyện Đề Thi - Luyện thi trắc nghiệm tại Nhật';
+const SITE_NAME = 'Luyenthi.jp';
 
 interface SEOConfig {
   title: string;
@@ -108,7 +108,8 @@ export function buildWebsiteSchema() {
   return {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
-    name: SITE_NAME,
+    name: 'Luyenthi.jp',
+    alternateName: 'Luyện Thi JLPT',
     url: SITE_URL,
     description: 'Nền tảng luyện thi trực tuyến miễn phí dành cho người Việt tại Nhật Bản',
     potentialAction: {
