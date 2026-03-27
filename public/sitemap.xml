@@ -2,19 +2,19 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://luyenthi.jp/</loc>
-    <lastmod>2026-03-26</lastmod>
+    <lastmod>2026-03-27</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://luyenthi.jp/subjects</loc>
-    <lastmod>2026-03-26</lastmod>
+    <lastmod>2026-03-27</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://luyenthi.jp/blog</loc>
-    <lastmod>2026-03-26</lastmod>
+    <lastmod>2026-03-27</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -30,7 +30,7 @@
   </url>
   <url>
     <loc>https://luyenthi.jp/leaderboard</loc>
-    <lastmod>2026-03-26</lastmod>
+    <lastmod>2026-03-27</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
@@ -246,6 +246,36 @@
     <lastmod>2026-02-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://luyenthi.jp/blog/tu-vung-tieng-nhat-khau-lenh-thi-thuc-hanh-lai-xe-oto-nhat-ban</loc>
+    <lastmod>2026-03-27</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://luyenthi.jp/blog/huong-dan-doi-bang-lai-xe-viet-nam-sang-nhat-ban-gaimen-kirikae</loc>
+    <lastmod>2026-03-27</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://luyenthi.jp/blog/meo-lam-bai-tinh-huong-hinh-anh-kiken-yosoku-honmen</loc>
+    <lastmod>2026-03-27</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://luyenthi.jp/blog/lo-trinh-chi-tiet-lay-bang-lai-xe-o-to-nhat-ban-chi-phi-thoi-gian</loc>
+    <lastmod>2026-03-27</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://luyenthi.jp/blog/top-5-bien-bao-giao-thong-nhat-ban-de-gay-lu-thi-ly-thuyet-karimen</loc>
+    <lastmod>2026-03-27</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
   </url>
   <url>
     <loc>https://luyenthi.jp/blog/phan-biet-thi-ly-thuyet-bang-lai-xe-karimen-honmen-nhat-ban</loc>
