@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 const SITE_URL = 'https://luyenthi.jp';
-const SITE_NAME = 'Luyện Đề Thi - Luyện thi trắc nghiệm tại Nhật';
+const SITE_NAME = 'Luyenthi.jp';
 
 interface SEOConfig {
   title: string;
