@@ -108,7 +108,8 @@ export function buildWebsiteSchema() {
   return {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
-    name: SITE_NAME,
+    name: 'Luyenthi.jp',
+    alternateName: 'Luyện Thi JLPT',
     url: SITE_URL,
     description: 'Nền tảng luyện thi trực tuyến miễn phí dành cho người Việt tại Nhật Bản',
     potentialAction: {

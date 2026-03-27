@@ -25,7 +25,7 @@ import { useSEO, buildWebsiteSchema, buildFAQSchema, SITE_URL } from "@/hooks/us
  */
 const Index = () => {
   useSEO({
-    title: 'Luyện đề thi trắc nghiệm các kỳ thi tại Nhật | Luyện Đề Thi',
+    title: 'Luyện đề thi trắc nghiệm các kỳ thi tại Nhật - Luyenthi.jp',
     description: 'Nền tảng luyện thi trực tuyến miễn phí dành cho người Việt tại Nhật Bản. Luyện tập JLPT, BJT, 宅建 với hàng nghìn câu hỏi chất lượng.',
     canonical: SITE_URL,
     jsonLd: [
