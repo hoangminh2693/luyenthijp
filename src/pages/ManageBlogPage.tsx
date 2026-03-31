@@ -178,8 +178,9 @@ const ManageBlogPage = () => {
         ) : filteredPosts.length === 0 ? (
           <p className="text-muted-foreground text-center py-8">Chưa có bài viết nào.</p>
         ) : (
+          <>
           <div className="space-y-4">
-            {filteredPosts.map(post => (
+            {paginatedPosts.map(post => (
               <Card key={post.id}>
                 <CardContent className="flex items-start gap-4 p-4">
                   {post.thumbnail_url && (
