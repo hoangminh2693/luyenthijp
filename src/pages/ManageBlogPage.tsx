@@ -130,10 +130,22 @@ const ManageBlogPage = () => {
     });
   };
 
-  const filteredPosts = (posts || []).filter(p =>
+  const filteredPosts = useMemo(() => (posts || []).filter(p =>
     p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (p.tags || []).some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  ), [posts, searchQuery]);
+
+  const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
+  const paginatedPosts = useMemo(() => {
+    const start = (currentPage - 1) * POSTS_PER_PAGE;
+    return filteredPosts.slice(start, start + POSTS_PER_PAGE);
+  }, [filteredPosts, currentPage]);
+
+  // Reset page when search changes
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  };
 
   return (
     <div className="min-h-screen bg-background">
