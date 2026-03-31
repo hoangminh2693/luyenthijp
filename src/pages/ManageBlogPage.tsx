@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRobotsMeta } from '@/hooks/useRobotsMeta';
 import { useAllPosts, useCreatePost, useUpdatePost, useDeletePost, BlogPost } from '@/hooks/useBlogPosts';
@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { MediaUpload } from '@/components/admin/MediaUpload';
 import { RichTextEditable } from '@/components/admin/RichTextEditable';
-import { Plus, Edit, Trash2, Eye, EyeOff, Calendar, Tag, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, EyeOff, Calendar, Tag, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 function slugify(text: string): string {
@@ -36,6 +36,8 @@ const ManageBlogPage = () => {
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const POSTS_PER_PAGE = 10;
 
   // Form state
   const [title, setTitle] = useState('');
@@ -47,6 +49,17 @@ const ManageBlogPage = () => {
   const [metaTitle, setMetaTitle] = useState('');
   const [metaDescription, setMetaDescription] = useState('');
   const [status, setStatus] = useState<'draft' | 'published'>('draft');
+
+  const filteredPosts = useMemo(() => (posts || []).filter(p =>
+    p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (p.tags || []).some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
+  ), [posts, searchQuery]);
+
+  const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
+  const paginatedPosts = useMemo(() => {
+    const start = (currentPage - 1) * POSTS_PER_PAGE;
+    return filteredPosts.slice(start, start + POSTS_PER_PAGE);
+  }, [filteredPosts, currentPage]);
 
   if (!isAdmin) {
     return (
@@ -128,10 +141,11 @@ const ManageBlogPage = () => {
     });
   };
 
-  const filteredPosts = (posts || []).filter(p =>
-    p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.tags || []).some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  // Reset page when search changes
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -153,7 +167,7 @@ const ManageBlogPage = () => {
           <Input
             placeholder="Tìm bài viết..."
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
+            onChange={e => handleSearchChange(e.target.value)}
             className="pl-10"
           />
         </div>
@@ -164,8 +178,9 @@ const ManageBlogPage = () => {
         ) : filteredPosts.length === 0 ? (
           <p className="text-muted-foreground text-center py-8">Chưa có bài viết nào.</p>
         ) : (
+          <>
           <div className="space-y-4">
-            {filteredPosts.map(post => (
+            {paginatedPosts.map(post => (
               <Card key={post.id}>
                 <CardContent className="flex items-start gap-4 p-4">
                   {post.thumbnail_url && (
@@ -223,6 +238,45 @@ const ManageBlogPage = () => {
               </Card>
             ))}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6">
+              <p className="text-sm text-muted-foreground">
+                Trang {currentPage}/{totalPages} ({filteredPosts.length} bài viết)
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? 'default' : 'outline'}
+                    size="sm"
+                    className="w-8 h-8 p-0"
+                    onClick={() => setCurrentPage(page)}
+                  >
+                    {page}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+          </>
         )}
 
         {/* Create/Edit Dialog */}
