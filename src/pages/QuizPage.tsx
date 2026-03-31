@@ -69,6 +69,7 @@ const QuizPage = () => {
   
   // Unique session ID - regenerate để luôn lấy bộ câu mới khi làm lại
   const [sessionId, setSessionId] = useState(() => crypto.randomUUID());
+  const [lastDrivingAudioUrl, setLastDrivingAudioUrl] = useState<string | undefined>();
 
   // Fetch category data
   const { 
