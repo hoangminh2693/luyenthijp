@@ -310,6 +310,10 @@ const QuizPage = () => {
   };
 
   const handleRetry = () => {
+    // Lưu lại đề driving vừa làm để tránh lặp lại
+    if (isDrivingMode && drivingExam?.audioUrl) {
+      setLastDrivingAudioUrl(drivingExam.audioUrl);
+    }
     setAnswers({});
     setSubAnswers({});
     setIsSubmitted(false);
