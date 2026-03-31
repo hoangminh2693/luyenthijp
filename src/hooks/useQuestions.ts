@@ -382,10 +382,11 @@ export function useRandomListeningExam(
   sectionId: string | undefined, 
   enabled: boolean = true, 
   sessionId?: string,
-  categoryId?: string
+  categoryId?: string,
+  excludeAudioUrl?: string
 ) {
   return useQuery({
-    queryKey: ['listening-exam', 'random', sectionId, categoryId, sessionId],
+    queryKey: ['listening-exam', 'random', sectionId, categoryId, sessionId, excludeAudioUrl],
     queryFn: async () => {
       if (!sectionId && !categoryId) return null;
       
