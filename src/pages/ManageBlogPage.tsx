@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { MediaUpload } from '@/components/admin/MediaUpload';
 import { RichTextEditable } from '@/components/admin/RichTextEditable';
-import { Plus, Edit, Trash2, Eye, EyeOff, Calendar, Tag, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, EyeOff, Calendar, Tag, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 function slugify(text: string): string {
