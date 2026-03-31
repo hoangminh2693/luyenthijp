@@ -167,7 +167,7 @@ const ManageBlogPage = () => {
           <Input
             placeholder="Tìm bài viết..."
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
+            onChange={e => handleSearchChange(e.target.value)}
             className="pl-10"
           />
         </div>
