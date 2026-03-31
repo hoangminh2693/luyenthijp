@@ -155,12 +155,13 @@ const QuizPage = () => {
   const listeningExam = specificListeningExam || randomListeningExam;
   const loadingListeningExam = hasSpecificExam ? loadingAllListening : loadingRandomListening;
 
-  // Driving mode: fetch a random complete exam (same as listening)
+  // Driving mode: fetch a random complete exam (same as listening), avoid repeating last exam
   const { data: drivingExam, isLoading: loadingDrivingExam } = useRandomListeningExam(
     isDrivingMode ? sectionId : undefined,
     isDrivingMode,
     sessionId,
-    isDrivingMode ? categoryIdForQuiz : undefined
+    isDrivingMode ? categoryIdForQuiz : undefined,
+    isDrivingMode ? lastDrivingAudioUrl : undefined
   );
   
   // Chọn questions dựa theo mode
