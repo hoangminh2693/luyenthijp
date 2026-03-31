@@ -382,10 +382,11 @@ export function useRandomListeningExam(
   sectionId: string | undefined, 
   enabled: boolean = true, 
   sessionId?: string,
-  categoryId?: string
+  categoryId?: string,
+  excludeAudioUrl?: string
 ) {
   return useQuery({
-    queryKey: ['listening-exam', 'random', sectionId, categoryId, sessionId],
+    queryKey: ['listening-exam', 'random', sectionId, categoryId, sessionId, excludeAudioUrl],
     queryFn: async () => {
       if (!sectionId && !categoryId) return null;
       
@@ -428,11 +429,16 @@ export function useRandomListeningExam(
         examsByAudio.get(q.audio_url)!.push(q);
       }
       
-      // Random chọn 1 audio
+      // Random chọn 1 audio, ưu tiên tránh đề vừa làm
       const audioUrls = Array.from(examsByAudio.keys());
       if (audioUrls.length === 0) return null;
       
-      const randomAudioUrl = audioUrls[Math.floor(Math.random() * audioUrls.length)];
+      // Loại bỏ đề vừa làm xong (nếu còn đề khác)
+      const candidates = audioUrls.length > 1 && excludeAudioUrl
+        ? audioUrls.filter(url => url !== excludeAudioUrl)
+        : audioUrls;
+      
+      const randomAudioUrl = candidates[Math.floor(Math.random() * candidates.length)];
       const examParents = examsByAudio.get(randomAudioUrl)!;
       
       // Step 2: Fetch children (sub-questions) for these parents

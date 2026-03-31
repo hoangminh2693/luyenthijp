@@ -69,6 +69,7 @@ const QuizPage = () => {
   
   // Unique session ID - regenerate để luôn lấy bộ câu mới khi làm lại
   const [sessionId, setSessionId] = useState(() => crypto.randomUUID());
+  const [lastDrivingAudioUrl, setLastDrivingAudioUrl] = useState<string | undefined>();
 
   // Fetch category data
   const { 
@@ -154,12 +155,13 @@ const QuizPage = () => {
   const listeningExam = specificListeningExam || randomListeningExam;
   const loadingListeningExam = hasSpecificExam ? loadingAllListening : loadingRandomListening;
 
-  // Driving mode: fetch a random complete exam (same as listening)
+  // Driving mode: fetch a random complete exam (same as listening), avoid repeating last exam
   const { data: drivingExam, isLoading: loadingDrivingExam } = useRandomListeningExam(
     isDrivingMode ? sectionId : undefined,
     isDrivingMode,
     sessionId,
-    isDrivingMode ? categoryIdForQuiz : undefined
+    isDrivingMode ? categoryIdForQuiz : undefined,
+    isDrivingMode ? lastDrivingAudioUrl : undefined
   );
   
   // Chọn questions dựa theo mode
@@ -308,6 +310,10 @@ const QuizPage = () => {
   };
 
   const handleRetry = () => {
+    // Lưu lại đề driving vừa làm để tránh lặp lại
+    if (isDrivingMode && drivingExam?.audioUrl) {
+      setLastDrivingAudioUrl(drivingExam.audioUrl);
+    }
     setAnswers({});
     setSubAnswers({});
     setIsSubmitted(false);
