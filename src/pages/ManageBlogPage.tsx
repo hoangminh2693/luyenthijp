@@ -50,6 +50,17 @@ const ManageBlogPage = () => {
   const [metaDescription, setMetaDescription] = useState('');
   const [status, setStatus] = useState<'draft' | 'published'>('draft');
 
+  const filteredPosts = useMemo(() => (posts || []).filter(p =>
+    p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (p.tags || []).some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
+  ), [posts, searchQuery]);
+
+  const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
+  const paginatedPosts = useMemo(() => {
+    const start = (currentPage - 1) * POSTS_PER_PAGE;
+    return filteredPosts.slice(start, start + POSTS_PER_PAGE);
+  }, [filteredPosts, currentPage]);
+
   if (!isAdmin) {
     return (
       <div className="container py-12 text-center">
