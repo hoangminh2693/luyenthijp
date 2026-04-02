@@ -58,7 +58,7 @@ const nicknameSchema = z.string()
   }, 'Nickname chứa từ ngữ không phù hợp');
 
 const AuthPage = () => {
-  useRobotsMeta('noindex, nofollow');
+  useSEO({ title: 'Đăng nhập | Luyện Đề Thi', description: 'Đăng nhập hoặc đăng ký tài khoản.', noindex: true });
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

@@ -110,7 +110,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 const StatisticsPage = () => {
-  useRobotsMeta('noindex, nofollow');
+  useSEO({ title: 'Thống kê học tập | Luyện Đề Thi', description: 'Thống kê tiến trình học tập cá nhân.', noindex: true });
   const { user } = useAuth();
   
   // Filter states

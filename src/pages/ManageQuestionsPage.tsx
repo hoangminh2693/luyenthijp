@@ -216,7 +216,7 @@ function groupQuestionsWithChildren(rows: QuestionRow[]): ParentQuestionRow[] {
 }
 
 const ManageQuestionsPage = () => {
-  useRobotsMeta('noindex, nofollow');
+  useSEO({ title: 'Quản lý câu hỏi | Admin', description: 'Quản lý câu hỏi thi.', noindex: true });
   const { user, isAdmin, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
 

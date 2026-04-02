@@ -145,7 +145,7 @@ function isValidTableQuestion(q: TableQuestion): boolean {
 }
 
 const ImportQuestionsPage = () => {
-  useRobotsMeta('noindex, nofollow');
+  useSEO({ title: 'Import câu hỏi | Admin', description: 'Import câu hỏi từ file.', noindex: true });
   const { user, isAdmin, isLoading: authLoading } = useAuth();
 
   const [file, setFile] = useState<File | null>(null);

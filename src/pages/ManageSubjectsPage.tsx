@@ -29,7 +29,7 @@ import { CategoryTreeView } from '@/components/admin/CategoryTreeView';
 import type { Subject, SubjectLayer, Category } from '@/hooks/useSubjectLayers';
 
 const ManageSubjectsPage = () => {
-  useRobotsMeta('noindex, nofollow');
+  useSEO({ title: 'Quản lý môn học | Admin', description: 'Quản lý môn học và danh mục.', noindex: true });
   const { user, isAdmin, isLoading: authLoading } = useAuth();
 
   const [subjects, setSubjects] = useState<Subject[]>([]);

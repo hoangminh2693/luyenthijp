@@ -27,7 +27,7 @@ import { useQuery } from '@tanstack/react-query';
  * SECURE: Correct answers are only revealed after server-side submission
  */
 const QuizPage = () => {
-  useRobotsMeta('noindex, nofollow');
+  useSEO({ title: 'Làm bài thi | Luyện Đề Thi', description: 'Trang làm bài thi trắc nghiệm.', noindex: true });
   const { user } = useAuth();
   const { subjectSlug, '*': wildcardPath } = useParams<{ 
     subjectSlug?: string;

@@ -26,7 +26,7 @@ function slugify(text: string): string {
 }
 
 const ManageBlogPage = () => {
-  useRobotsMeta('noindex, nofollow');
+  useSEO({ title: 'Quản lý bài viết | Admin', description: 'Quản lý bài viết blog.', noindex: true });
   const { user, isAdmin } = useAuth();
   const { data: posts, isLoading } = useAllPosts();
   const createPost = useCreatePost();
