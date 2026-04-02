@@ -3,7 +3,7 @@
  * Hiển thị biểu đồ chi tiết theo thời gian
  */
 import { useState, useEffect, useMemo } from 'react';
-import { useRobotsMeta } from '@/hooks/useRobotsMeta';
+import { useSEO } from '@/hooks/useSEO';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -110,7 +110,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 const StatisticsPage = () => {
-  useRobotsMeta('noindex, nofollow');
+  useSEO({ title: 'Thống kê học tập | Luyện Đề Thi', description: 'Thống kê tiến trình học tập cá nhân.', noindex: true });
   const { user } = useAuth();
   
   // Filter states

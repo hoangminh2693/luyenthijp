@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, LogIn, Shield, Pencil, Trash2, Search, ChevronDown, Save, X, Image, Volume2, ArrowRightLeft, CheckSquare, Square, MoveRight, Headphones } from 'lucide-react';
-import { useRobotsMeta } from '@/hooks/useRobotsMeta';
+import { useSEO } from '@/hooks/useSEO';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -216,7 +216,7 @@ function groupQuestionsWithChildren(rows: QuestionRow[]): ParentQuestionRow[] {
 }
 
 const ManageQuestionsPage = () => {
-  useRobotsMeta('noindex, nofollow');
+  useSEO({ title: 'Quản lý câu hỏi | Admin', description: 'Quản lý câu hỏi thi.', noindex: true });
   const { user, isAdmin, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useRobotsMeta } from '@/hooks/useRobotsMeta';
+import { useSEO } from '@/hooks/useSEO';
 import { Mail, Lock, User, Eye, EyeOff, Loader2, Calendar, Globe, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -58,7 +58,7 @@ const nicknameSchema = z.string()
   }, 'Nickname chứa từ ngữ không phù hợp');
 
 const AuthPage = () => {
-  useRobotsMeta('noindex, nofollow');
+  useSEO({ title: 'Đăng nhập | Luyện Đề Thi', description: 'Đăng nhập hoặc đăng ký tài khoản.', noindex: true });
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

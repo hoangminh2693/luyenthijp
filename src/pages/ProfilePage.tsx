@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useRobotsMeta } from '@/hooks/useRobotsMeta';
+import { useSEO } from '@/hooks/useSEO';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,7 @@ const INAPPROPRIATE_WORDS = [
 ];
 
 export default function ProfilePage() {
-  useRobotsMeta('noindex, nofollow');
+  useSEO({ title: 'Hồ sơ cá nhân | Luyện Đề Thi', description: 'Quản lý hồ sơ cá nhân.', noindex: true });
   const { user, profile, profilePrivate, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);

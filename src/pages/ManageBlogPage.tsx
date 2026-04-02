@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRobotsMeta } from '@/hooks/useRobotsMeta';
+import { useSEO } from '@/hooks/useSEO';
 import { useAllPosts, useCreatePost, useUpdatePost, useDeletePost, BlogPost } from '@/hooks/useBlogPosts';
 import { Breadcrumb } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,7 @@ function slugify(text: string): string {
 }
 
 const ManageBlogPage = () => {
-  useRobotsMeta('noindex, nofollow');
+  useSEO({ title: 'Quản lý bài viết | Admin', description: 'Quản lý bài viết blog.', noindex: true });
   const { user, isAdmin } = useAuth();
   const { data: posts, isLoading } = useAllPosts();
   const createPost = useCreatePost();
