@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useParams, Navigate, Link, useSearchParams } from 'react-router-dom';
-import { useRobotsMeta } from '@/hooks/useRobotsMeta';
+import { useSEO } from '@/hooks/useSEO';
 import { ArrowLeft, Send, Loader2, Headphones, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuestionCard } from '@/components/quiz/QuestionCard';
