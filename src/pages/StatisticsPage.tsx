@@ -3,7 +3,7 @@
  * Hiển thị biểu đồ chi tiết theo thời gian
  */
 import { useState, useEffect, useMemo } from 'react';
-import { useRobotsMeta } from '@/hooks/useRobotsMeta';
+import { useSEO } from '@/hooks/useSEO';
 import { 
   BarChart3, 
   TrendingUp, 
