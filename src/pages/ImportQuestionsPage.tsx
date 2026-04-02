@@ -6,7 +6,7 @@
  * - Import đề thi 聴解 (Listening) với cấu trúc Mondai
  */
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { useRobotsMeta } from '@/hooks/useRobotsMeta';
+import { useSEO } from '@/hooks/useSEO';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Download, LogIn, Shield, Table2, FileText, Headphones, CopyCheck, Car, Plus, Trash2, Image } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
