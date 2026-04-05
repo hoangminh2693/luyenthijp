@@ -235,10 +235,23 @@ export const RichTextEditable = React.forwardRef<HTMLDivElement, RichTextEditabl
             return true;
           }
           
-          // Otherwise strip formatting and paste as plain text
+          // Strip formatting but preserve line breaks as separate paragraphs
           event.preventDefault();
           if (plain) {
-            view.dispatch(view.state.tr.insertText(plain));
+            const lines = plain.split(/\r?\n/);
+            if (lines.length <= 1) {
+              view.dispatch(view.state.tr.insertText(plain));
+            } else {
+              // Build HTML with separate <p> tags so alignment works per-line
+              const wrapper = document.createElement('div');
+              lines.forEach((line) => {
+                const p = document.createElement('p');
+                p.textContent = line || '';
+                wrapper.appendChild(p);
+              });
+              const parsedSlice = PmDOMParser.fromSchema(view.state.schema).parseSlice(wrapper);
+              view.dispatch(view.state.tr.replaceSelection(parsedSlice));
+            }
           }
           return true;
         } : undefined,
