@@ -14,12 +14,19 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Breadcrumb } from '@/components/layout/Header';
-import { useSEO } from '@/hooks/useSEO';
+import { useSEO, buildOrganizationSchema, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
 
 const AboutPage = () => {
   useSEO({
     title: 'Giới thiệu | Luyện Đề Thi - Luyện thi trắc nghiệm tại Nhật',
     description: 'Tìm hiểu về Luyện Đề Thi - nền tảng luyện thi trực tuyến miễn phí cho người Việt tại Nhật Bản. Câu chuyện, sứ mệnh và tính năng.',
+    jsonLd: [
+      buildOrganizationSchema(),
+      buildBreadcrumbSchema([
+        { name: 'Trang chủ', url: SITE_URL },
+        { name: 'Giới thiệu' },
+      ]),
+    ],
   });
 
   return (

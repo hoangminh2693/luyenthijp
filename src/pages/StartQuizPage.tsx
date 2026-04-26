@@ -10,7 +10,7 @@
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Navigate, useNavigate, Link } from 'react-router-dom';
-import { useSEO } from '@/hooks/useSEO';
+import { useSEO, buildPracticeTestSchema, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
 import { 
   Play, 
   Clock, 
@@ -123,10 +123,7 @@ const getExamIntroduction = (
 };
 
 const StartQuizPage = () => {
-  useSEO({
-    title: 'Chuẩn bị làm bài | Luyện Đề Thi',
-    description: 'Chọn số lượng câu hỏi và bắt đầu luyện thi trắc nghiệm miễn phí.',
-  });
+  // useSEO sẽ được gọi sau khi có dữ liệu (xem dưới)
   const { subjectSlug, '*': wildcardPath } = useParams<{
     subjectSlug: string;
     '*': string;
@@ -323,6 +320,45 @@ const StartQuizPage = () => {
   });
 
   const isLoading = authLoading || loadingPath || loadingCount || (isListeningSection && loadingListening) || (isDrivingSubject && loadingDrivingExams);
+
+  // Dynamic SEO based on loaded data
+  const seoTitle = subject && leafCategory
+    ? `Luyện ${leafCategory.name} - ${subject.name} | Luyenthi.jp`
+    : 'Chuẩn bị làm bài | Luyện Đề Thi';
+  const seoDesc = subject && leafCategory
+    ? `Luyện thi trắc nghiệm ${subject.name} - ${categories.map(c => c.name).join(' / ')}. Miễn phí, có giải thích chi tiết.`
+    : 'Chọn số lượng câu hỏi và bắt đầu luyện thi trắc nghiệm miễn phí.';
+  const canonicalPath = subject && categoryPath
+    ? `${SITE_URL}/start/${subject.slug}/${categoryPath}`
+    : undefined;
+  const seoJsonLd = subject && leafCategory ? [
+    buildPracticeTestSchema({
+      name: `${subject.name} - ${leafCategory.name}`,
+      description: `Bài luyện thi trắc nghiệm ${leafCategory.name} thuộc ${subject.name}.`,
+      url: canonicalPath || `${SITE_URL}/start/${subject?.slug}/${categoryPath}`,
+      educationalLevel: categories[0]?.name,
+      about: subject.name,
+    }),
+    buildBreadcrumbSchema([
+      { name: 'Trang chủ', url: SITE_URL },
+      { name: 'Chọn môn học', url: `${SITE_URL}/subjects` },
+      { name: subject.name, url: `${SITE_URL}/subjects/${subject.slug}` },
+      ...categories.map((c, i) => ({
+        name: c.name,
+        url: i < categories.length - 1
+          ? `${SITE_URL}/subjects/${subject.slug}/${categories.slice(0, i + 1).map(x => x.slug).join('/')}`
+          : undefined,
+      })),
+    ]),
+  ] : undefined;
+
+  useSEO({
+    title: seoTitle,
+    description: seoDesc,
+    canonical: canonicalPath,
+    jsonLd: seoJsonLd,
+  });
+
 
   // Loading state
   if (isLoading) {
