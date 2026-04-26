@@ -163,6 +163,26 @@ export function buildFAQSchema(faqs: { question: string; answer: string }[]) {
   };
 }
 
+export function buildOrganizationSchema() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'EducationalOrganization',
+    name: 'Luyenthi.jp',
+    alternateName: 'Luyện Đề Thi',
+    url: SITE_URL,
+    logo: `${SITE_URL}/favicon.png`,
+    description: 'Nền tảng luyện thi trắc nghiệm trực tuyến miễn phí dành cho người Việt tại Nhật Bản: JLPT, BJT, 宅建 và nhiều kỳ thi khác.',
+    sameAs: [
+      'https://www.facebook.com/luyenthi.jp',
+    ],
+    areaServed: {
+      '@type': 'Country',
+      name: 'Japan',
+    },
+    knowsLanguage: ['vi', 'ja'],
+  };
+}
+
 export function buildBreadcrumbSchema(items: { name: string; url?: string }[]) {
   return {
     '@context': 'https://schema.org',
