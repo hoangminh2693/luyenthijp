@@ -10,7 +10,7 @@
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Navigate, useNavigate, Link } from 'react-router-dom';
-import { useSEO } from '@/hooks/useSEO';
+import { useSEO, buildPracticeTestSchema, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
 import { 
   Play, 
   Clock, 
