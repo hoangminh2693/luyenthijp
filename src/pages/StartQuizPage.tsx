@@ -123,10 +123,7 @@ const getExamIntroduction = (
 };
 
 const StartQuizPage = () => {
-  useSEO({
-    title: 'Chuẩn bị làm bài | Luyện Đề Thi',
-    description: 'Chọn số lượng câu hỏi và bắt đầu luyện thi trắc nghiệm miễn phí.',
-  });
+  // useSEO sẽ được gọi sau khi có dữ liệu (xem dưới)
   const { subjectSlug, '*': wildcardPath } = useParams<{
     subjectSlug: string;
     '*': string;
