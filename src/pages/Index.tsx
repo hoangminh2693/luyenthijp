@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { useSubjects, useLayersBySubject, useCategoriesByLayer } from "@/hooks/useSubjectLayers";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ActivityWidget } from "@/components/ui/ActivityWidget";
-import { useSEO, buildWebsiteSchema, buildFAQSchema, SITE_URL } from "@/hooks/useSEO";
+import { useSEO, buildWebsiteSchema, buildFAQSchema, buildOrganizationSchema, SITE_URL } from "@/hooks/useSEO";
 
 /**
  * Index Page - Trang chủ của ứng dụng luyện đề thi
@@ -30,6 +30,7 @@ const Index = () => {
     canonical: SITE_URL,
     jsonLd: [
       buildWebsiteSchema(),
+      buildOrganizationSchema(),
       buildFAQSchema([
         { question: 'Luyện Đề Thi có miễn phí không?', answer: 'Có, Luyện Đề Thi hoàn toàn miễn phí cho tất cả người dùng.' },
         { question: 'Luyện Đề Thi hỗ trợ những kỳ thi nào?', answer: 'Hiện tại hỗ trợ JLPT (N5-N1), BJT và đang mở rộng thêm các kỳ thi khác tại Nhật Bản.' },
