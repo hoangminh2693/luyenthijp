@@ -2,19 +2,19 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://luyenthi.jp/</loc>
-    <lastmod>2026-04-16</lastmod>
+    <lastmod>2026-04-30</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://luyenthi.jp/subjects</loc>
-    <lastmod>2026-04-16</lastmod>
+    <lastmod>2026-04-30</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://luyenthi.jp/blog</loc>
-    <lastmod>2026-04-16</lastmod>
+    <lastmod>2026-04-30</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -30,7 +30,7 @@
   </url>
   <url>
     <loc>https://luyenthi.jp/leaderboard</loc>
-    <lastmod>2026-04-16</lastmod>
+    <lastmod>2026-04-30</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
@@ -246,6 +246,48 @@
     <lastmod>2026-02-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://luyenthi.jp/blog/bay-kinh-ngu-keigo-trong-de-thi-bjt-cach-an-diem-khong-can-hoc-vet</loc>
+    <lastmod>2026-04-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://luyenthi.jp/blog/top-3-cuon-sach-on-thi-bjt-chan-ai-giup-ky-su-vuot-ai-400-diem</loc>
+    <lastmod>2026-04-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://luyenthi.jp/blog/lo-trinh-tu-hoc-bjt-400-diem-trong-2-thang-cho-ky-su-it-ban-ron</loc>
+    <lastmod>2026-04-30</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://luyenthi.jp/blog/su-khac-biet-tu-huyet-giua-nghe-hieu-jlpt-va-nghe-hieu-bjt-choukai</loc>
+    <lastmod>2026-04-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://luyenthi.jp/blog/lich-thi-bjt-huong-dan-dang-ky-thi-cbt-tren-may-tinh-lay-bang-nhanh</loc>
+    <lastmod>2026-04-23</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://luyenthi.jp/blog/gia-han-visa-ky-su-bi-tu-choi-tieng-nhat-kem-loi-thoat-bjt</loc>
+    <lastmod>2026-04-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://luyenthi.jp/blog/bjt-400-diem-muc-j2-co-kho-khong-giai-ma-thang-diem-cho-ky-su</loc>
+    <lastmod>2026-04-19</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
   </url>
   <url>
     <loc>https://luyenthi.jp/blog/so-sanh-jlpt-n2-va-bjt-ky-su-nen-thi-chung-chi-nao-de-xin-visa</loc>
