@@ -14,6 +14,8 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSEO, buildPracticeTestSchema, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
+import { SeoDescriptionBlock } from '@/components/ui/SeoDescriptionBlock';
+import { SmartAdSense } from '@/components/ads/SmartAdSense';
 
 /**
  * DynamicCategoryPage - Trang hiển thị categories động theo cấu hình layers
@@ -266,6 +268,13 @@ const DynamicCategoryPage = () => {
           </div>
         </div>
 
+        {/* SEO Description Block - tăng lượng text hữu ích đầu trang */}
+        <SeoDescriptionBlock
+          title={`Giới thiệu ${displayTitle}`}
+          content={displayDescription}
+          fallback={`Khám phá nội dung luyện thi ${displayTitle}. Chọn ${currentLayer?.name?.toLowerCase() || 'mục'} phù hợp để bắt đầu luyện tập. Tất cả nội dung được biên soạn nhằm giúp bạn ôn luyện hiệu quả, làm quen với cấu trúc đề thi và nâng cao kỹ năng làm bài.`}
+        />
+
         {/* Section title */}
         <div className="mb-6">
           <h2 className="text-xl font-semibold text-foreground">
@@ -286,11 +295,14 @@ const DynamicCategoryPage = () => {
           ))}
         </div>
 
+        {/* Quảng cáo - chỉ hiển thị khi có nội dung */}
+        <SmartAdSense slot="auto" hasContent={categories.length > 0} />
+
         {/* Empty state */}
         {categories.length === 0 && (
           <div className="rounded-xl border border-border bg-card p-12 text-center">
             <p className="text-muted-foreground">
-              Chưa có nội dung. Vui lòng quay lại sau.
+              Nội dung đang được cập nhật. Vui lòng quay lại sau.
             </p>
           </div>
         )}

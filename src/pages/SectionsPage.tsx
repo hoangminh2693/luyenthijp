@@ -6,6 +6,8 @@ import { useSubjectBySlug, useLevelBySlug } from '@/hooks/useSections';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSEO, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
+import { SeoDescriptionBlock } from '@/components/ui/SeoDescriptionBlock';
+import { SmartAdSense } from '@/components/ads/SmartAdSense';
 
 /**
  * SectionsPage - Trang danh sách phần theo cấp độ
@@ -93,6 +95,13 @@ const SectionsPage = () => {
           </div>
         </div>
 
+        {/* SEO Description Block */}
+        <SeoDescriptionBlock
+          title={`Giới thiệu ${subject.name} ${level.name}`}
+          content={level.description}
+          fallback={`${subject.name} ${level.name} là cấp độ luyện thi quan trọng. Lựa chọn phần bạn muốn luyện tập bên dưới để bắt đầu. Mỗi phần đều có nhiều câu hỏi trắc nghiệm chất lượng giúp bạn rèn luyện kỹ năng và làm quen với đề thi thật.`}
+        />
+
         {/* Section title */}
         <div className="mb-6">
           <h2 className="text-xl font-semibold text-foreground">
@@ -113,11 +122,14 @@ const SectionsPage = () => {
           ))}
         </div>
 
+        {/* Quảng cáo - chỉ khi có nội dung */}
+        <SmartAdSense slot="auto" hasContent={sections.length > 0} />
+
         {/* Empty state */}
         {sections.length === 0 && (
           <div className="rounded-xl border border-border bg-card p-12 text-center">
             <p className="text-muted-foreground">
-              Chưa có phần nào cho cấp độ {level.name}. Vui lòng quay lại sau.
+              Nội dung đang được cập nhật. Vui lòng quay lại sau.
             </p>
           </div>
         )}
