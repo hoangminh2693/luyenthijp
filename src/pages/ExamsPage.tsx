@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { useSubjectBySlug, useLevelBySlug, useSectionBySlug } from '@/hooks/useSections';
 import { useQuestionCount, useListeningExams } from '@/hooks/useQuestions';
 import { useSEO, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
+import { SeoDescriptionBlock } from '@/components/ui/SeoDescriptionBlock';
+import { SmartAdSense } from '@/components/ads/SmartAdSense';
 
 /**
  * ExamsPage - Trang danh sách đề thi theo phần
@@ -123,6 +125,13 @@ const ExamsPage = () => {
           </Link>
         </div>
 
+        {/* SEO Description Block */}
+        <SeoDescriptionBlock
+          title={`Giới thiệu ${section.name}`}
+          content={(section as any).description}
+          fallback={`Phần ${section.name} thuộc ${subject.name} ${level.name}. Tại đây bạn có thể luyện tập với ${isListeningSection ? `${listeningExams.length} đề nghe` : `${totalQuestions} câu hỏi`} được biên soạn bám sát đề thi thật. Hãy luyện đều đặn mỗi ngày để cải thiện kỹ năng làm bài và tăng tốc độ phản xạ.`}
+        />
+
         {/* Section title */}
         <div className="mb-6">
           <h2 className="text-xl font-semibold text-foreground">
@@ -140,11 +149,17 @@ const ExamsPage = () => {
           ))}
         </div>
 
+        {/* Quảng cáo chỉ hiển thị khi có nội dung */}
+        <SmartAdSense
+          slot="auto"
+          hasContent={exams.length > 0 || (isListeningSection ? listeningExams.length > 0 : totalQuestions > 0)}
+        />
+
         {/* Empty state */}
         {exams.length === 0 && (
           <div className="rounded-xl border border-border bg-card p-12 text-center">
             <p className="text-muted-foreground">
-              Chưa có đề thi nào cho phần {section.name}. Vui lòng quay lại sau.
+              Nội dung đang được cập nhật. Vui lòng quay lại sau.
             </p>
           </div>
         )}
