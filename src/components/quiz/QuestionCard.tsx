@@ -370,7 +370,7 @@ export function QuestionCard({
           <div className="flex items-start gap-2">
             <Lightbulb className="h-5 w-5 shrink-0 text-primary mt-0.5" />
             <div>
-              <p className="font-medium text-primary mb-1">Giải thích</p>
+              <p className="font-medium text-primary mb-1">Giải thích chi tiết</p>
               <div 
                 className="text-sm text-foreground/80 leading-relaxed"
                 dangerouslySetInnerHTML={{ __html: explanation }}
