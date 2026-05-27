@@ -1,0 +1,29 @@
+# Luyenthi.jp
+
+> Nền tảng luyện thi trắc nghiệm trực tuyến miễn phí dành cho người Việt
+> tại Nhật Bản: JLPT, BJT (Business Japanese Test), thi bằng lái xe Nhật
+> và các kỳ thi khác. Chấm điểm tự động, có giải thích chi tiết.
+
+Luyenthi.jp cung cấp ngân hàng câu hỏi lớn, tổ chức theo nhiều cấp độ
+(N5 → N1 cho JLPT, J5 → J1 cho BJT), nhiều kỹ năng (文字・語彙, 文法,
+読解, 聴解) và nhiều dạng đề (luyện theo phần, đề thi mẫu, đề nghe có
+audio thật). Toàn bộ nội dung viết bằng tiếng Việt giúp người học dễ
+tiếp cận.
+
+## Pages
+
+- [Trang chủ](/): Giới thiệu nền tảng và lối tắt đến các môn học.
+- [Chọn môn học](/subjects): Danh sách tất cả môn học và kỳ thi đang hỗ trợ.
+- [JLPT](/subjects/jlpt): Luyện thi Năng lực Nhật ngữ JLPT từ N5 đến N1.
+- [BJT](/subjects/bjt): Luyện thi Business Japanese Test (BJT) - tiếng Nhật thương mại.
+- [Thi bằng lái xe Nhật](/subjects/bang-lai-xe): Câu hỏi lý thuyết thi bằng lái xe tại Nhật Bản, bản dịch tiếng Việt.
+- [Bảng xếp hạng](/leaderboard): Bảng xếp hạng người học theo điểm số, độ chính xác, số đề đã làm.
+- [Blog](/blog): Bài viết chia sẻ kinh nghiệm học tiếng Nhật, mẹo làm bài JLPT/BJT, hướng dẫn ôn luyện.
+- [Giới thiệu](/about): Giới thiệu về Luyenthi.jp và sứ mệnh hỗ trợ cộng đồng người Việt tại Nhật.
+- [Liên hệ](/contact): Form liên hệ, góp ý, báo lỗi câu hỏi.
+
+## Optional
+
+- [Chính sách bảo mật](/privacy): Cam kết bảo vệ dữ liệu người dùng.
+- [Điều khoản sử dụng](/terms): Điều khoản và quy định sử dụng dịch vụ.
+- [Tuyên bố miễn trừ trách nhiệm](/disclaimer): Tuyên bố về độ chính xác của nội dung.
