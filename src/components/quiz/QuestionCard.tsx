@@ -333,7 +333,7 @@ export function QuestionCard({
           <div className="flex items-start gap-2">
             <Lightbulb className={cn("shrink-0 text-primary mt-0.5", isMain ? "h-5 w-5" : "h-4 w-4")} />
             <div className="flex-1">
-              {isMain && <p className="font-medium text-primary mb-1">Giải thích</p>}
+              {isMain && <p className="font-medium text-primary mb-1">Giải thích chi tiết</p>}
               <div 
                 className={cn("text-foreground/80 leading-relaxed select-none filter blur-sm", isMain ? "text-sm" : "text-xs")}
                 dangerouslySetInnerHTML={{ __html: explanation }}
