@@ -9,7 +9,6 @@ import { useQuestionCount, useListeningExams } from '@/hooks/useQuestions';
 import { useSEO, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
 import { SeoDescriptionBlock } from '@/components/ui/SeoDescriptionBlock';
 import { SmartAdSense } from '@/components/ads/SmartAdSense';
-import { useSEO, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
 
 /**
  * ExamsPage - Trang danh sách đề thi theo phần
