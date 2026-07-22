@@ -66,6 +66,13 @@ const SectionsPage = () => {
     return <Navigate to={`/subjects/${subjectSlug}`} replace />;
   }
 
+  const seoFallbackText = `${subject.name} ${level.name} là khu vực luyện thi được chia theo từng phần kiến thức để bạn dễ chọn đúng nội dung cần ôn tập. Thay vì làm bài ngẫu nhiên ngay từ đầu, bạn nên xem qua danh sách phần luyện tập, xác định kỹ năng còn yếu và luyện theo thứ tự phù hợp với mục tiêu thi của mình.
+
+Ở mỗi phần, người học có thể làm câu hỏi trắc nghiệm, xem kết quả sau khi nộp bài và đọc giải thích để hiểu rõ hơn về đáp án. Cách học này đặc biệt hữu ích với người Việt tại Nhật vì thời gian học thường bị chia nhỏ bởi công việc, học tập và sinh hoạt hằng ngày. Chỉ cần luyện đều đặn từng phần, bạn sẽ dễ nhận ra lỗi sai lặp lại và cải thiện tốc độ làm bài.
+
+Hãy bắt đầu với phần bạn chưa tự tin nhất, sau đó quay lại luyện các phần đã làm sai nhiều lần. Việc ôn luyện có hệ thống giúp bạn xây dựng nền tảng chắc hơn trước khi bước vào đề thi đầy đủ.`;
+  const adContentLength = [subject.name, level.name, level.description, seoFallbackText, sections.map((s) => `${s.name} ${s.description || ''}`).join(' ')].join(' ').length;
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container py-8">
@@ -99,7 +106,7 @@ const SectionsPage = () => {
         <SeoDescriptionBlock
           title={`Giới thiệu ${subject.name} ${level.name}`}
           content={level.description}
-          fallback={`${subject.name} ${level.name} là cấp độ luyện thi quan trọng. Lựa chọn phần bạn muốn luyện tập bên dưới để bắt đầu. Mỗi phần đều có nhiều câu hỏi trắc nghiệm chất lượng giúp bạn rèn luyện kỹ năng và làm quen với đề thi thật.`}
+          fallback={seoFallbackText}
         />
 
         {/* Section title */}
@@ -123,7 +130,7 @@ const SectionsPage = () => {
         </div>
 
         {/* Quảng cáo - chỉ khi có nội dung */}
-        <SmartAdSense slot="auto" hasContent={sections.length > 0} />
+        <SmartAdSense slot="auto" hasContent={sections.length > 0} minContentLength={1200} contentLength={adContentLength} />
 
         {/* Empty state */}
         {sections.length === 0 && (

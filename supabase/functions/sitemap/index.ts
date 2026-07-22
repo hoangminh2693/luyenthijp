@@ -201,18 +201,6 @@ Deno.serve(async (req) => {
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>${SITE_URL}/leaderboard</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>${SITE_URL}/statistics</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
     <loc>${SITE_URL}/privacy</loc>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>

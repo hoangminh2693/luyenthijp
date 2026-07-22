@@ -357,6 +357,7 @@ const StartQuizPage = () => {
     description: seoDesc,
     canonical: canonicalPath,
     jsonLd: seoJsonLd,
+    noindex: true,
   });
 
 

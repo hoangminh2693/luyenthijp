@@ -75,6 +75,12 @@ const ExamsPage = () => {
   const listeningQuestionCount = listeningExams.length > 0 
     ? Math.round(listeningExams.reduce((sum, e) => sum + e.questionCount, 0) / listeningExams.length)
     : 0;
+  const seoFallbackText = `Phần ${section.name} thuộc ${subject.name} ${level.name} được thiết kế để giúp bạn luyện tập đúng trọng tâm trước kỳ thi. Người học nên đọc kỹ yêu cầu từng câu, tự chọn đáp án trước khi xem kết quả và dành thời gian đọc giải thích sau khi nộp bài để hiểu nguyên nhân đúng sai.
+
+Nếu đây là phần nghe, hãy luyện trong môi trường yên tĩnh, nghe trọn đoạn audio trước khi chọn đáp án và ghi chú những từ khóa quan trọng. Nếu đây là phần từ vựng, ngữ pháp hoặc đọc hiểu, hãy chú ý ngữ cảnh câu, dấu hiệu ngữ pháp và mối quan hệ giữa các ý trong đoạn văn. Cách luyện này giúp bạn không chỉ ghi nhớ đáp án mà còn hiểu phương pháp xử lý dạng bài.
+
+Bạn có thể luyện số lượng câu nhỏ mỗi ngày, sau đó tăng dần khi đã quen tốc độ. Với các câu làm sai, hãy quay lại xem giải thích, ghi lại mẫu câu hoặc từ vựng chưa nắm chắc và luyện lại sau vài ngày. Việc ôn tập lặp lại có kiểm soát sẽ giúp cải thiện điểm số bền vững hơn so với chỉ làm thật nhiều đề trong thời gian ngắn.`;
+  const adContentLength = [section.name, subject.name, level.name, (section as any).description, seoFallbackText, exams.map((e) => `${e.name} ${e.description || ''}`).join(' ')].join(' ').length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -129,7 +135,7 @@ const ExamsPage = () => {
         <SeoDescriptionBlock
           title={`Giới thiệu ${section.name}`}
           content={(section as any).description}
-          fallback={`Phần ${section.name} thuộc ${subject.name} ${level.name}. Tại đây bạn có thể luyện tập với ${isListeningSection ? `${listeningExams.length} đề nghe` : `${totalQuestions} câu hỏi`} được biên soạn bám sát đề thi thật. Hãy luyện đều đặn mỗi ngày để cải thiện kỹ năng làm bài và tăng tốc độ phản xạ.`}
+          fallback={seoFallbackText}
         />
 
         {/* Section title */}
@@ -153,6 +159,8 @@ const ExamsPage = () => {
         <SmartAdSense
           slot="auto"
           hasContent={exams.length > 0 || (isListeningSection ? listeningExams.length > 0 : totalQuestions > 0)}
+          minContentLength={1200}
+          contentLength={adContentLength}
         />
 
         {/* Empty state */}

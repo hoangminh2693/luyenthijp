@@ -235,6 +235,12 @@ const DynamicCategoryPage = () => {
   const displayTitle = parentCategory?.name || subject.name;
   const displayDescription = parentCategory?.description || subject.description;
   const displayIcon = parentCategory?.icon || subject.icon || '📚';
+  const seoFallbackText = `Khám phá nội dung luyện thi ${displayTitle} trên Luyenthi.jp. Trang này giúp người học chọn đúng ${currentLayer?.name?.toLowerCase() || 'mục'} trước khi bắt đầu làm bài, tránh học lan man và dễ theo dõi tiến độ theo từng phần kiến thức.
+
+Với người Việt đang học tập và làm việc tại Nhật Bản, việc luyện đề theo từng cấp độ và kỹ năng là cách hiệu quả để làm quen cấu trúc câu hỏi, nhận biết dạng bài thường gặp và cải thiện tốc độ xử lý. Bạn có thể bắt đầu từ phần phù hợp với trình độ hiện tại, sau đó quay lại luyện những phần yếu hơn để củng cố nền tảng.
+
+Mỗi danh mục được sắp xếp theo hướng dễ hiểu: chọn môn học, chọn cấp độ hoặc nhóm kỹ năng, rồi chọn bài luyện tập tương ứng. Khi làm bài, hệ thống chấm điểm tự động và phần giải thích sau khi nộp bài sẽ giúp bạn hiểu vì sao đáp án đúng hoặc sai. Hãy luyện đều đặn, ghi lại lỗi sai thường gặp và ưu tiên ôn lại các câu chưa chắc để đạt kết quả tốt hơn trong kỳ thi thật.`;
+  const adContentLength = [displayTitle, displayDescription, seoFallbackText, categories.map((c) => `${c.name} ${c.description || ''}`).join(' ')].join(' ').length;
   
   const layerTitle = currentLayer 
     ? `Chọn ${currentLayer.name.toLowerCase()} (${categories.length} ${currentLayer.name.toLowerCase()})`
@@ -272,7 +278,7 @@ const DynamicCategoryPage = () => {
         <SeoDescriptionBlock
           title={`Giới thiệu ${displayTitle}`}
           content={displayDescription}
-          fallback={`Khám phá nội dung luyện thi ${displayTitle}. Chọn ${currentLayer?.name?.toLowerCase() || 'mục'} phù hợp để bắt đầu luyện tập. Tất cả nội dung được biên soạn nhằm giúp bạn ôn luyện hiệu quả, làm quen với cấu trúc đề thi và nâng cao kỹ năng làm bài.`}
+          fallback={seoFallbackText}
         />
 
         {/* Section title */}
@@ -296,7 +302,7 @@ const DynamicCategoryPage = () => {
         </div>
 
         {/* Quảng cáo - chỉ hiển thị khi có nội dung */}
-        <SmartAdSense slot="auto" hasContent={categories.length > 0} />
+        <SmartAdSense slot="auto" hasContent={categories.length > 0} minContentLength={1200} contentLength={adContentLength} />
 
         {/* Empty state */}
         {categories.length === 0 && (

@@ -17,6 +17,35 @@ import { cn } from '@/lib/utils';
  */
 
 const ADSENSE_CLIENT = 'ca-pub-4579926932411438';
+const ADSENSE_SCRIPT_ID = 'google-adsense-script';
+
+function loadAdSenseScript(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
+
+  const existing = document.getElementById(ADSENSE_SCRIPT_ID) as HTMLScriptElement | null;
+  if (existing) {
+    return existing.dataset.loaded === 'true'
+      ? Promise.resolve()
+      : new Promise((resolve, reject) => {
+          existing.addEventListener('load', () => resolve(), { once: true });
+          existing.addEventListener('error', () => reject(new Error('AdSense script failed to load')), { once: true });
+        });
+  }
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.id = ADSENSE_SCRIPT_ID;
+    script.async = true;
+    script.crossOrigin = 'anonymous';
+    script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`;
+    script.onload = () => {
+      script.dataset.loaded = 'true';
+      resolve();
+    };
+    script.onerror = () => reject(new Error('AdSense script failed to load'));
+    document.head.appendChild(script);
+  });
+}
 
 // Các tiền tố URL TUYỆT ĐỐI KHÔNG được phép hiển thị quảng cáo
 const BLACKLIST_PREFIXES: string[] = [
@@ -28,6 +57,9 @@ const BLACKLIST_PREFIXES: string[] = [
   '/profile',
   '/leaderboard',
   '/statistics',
+  '/quiz',
+  '/start',
+  '/exam',
   '/manage-',          // /manage-subjects, /manage-questions, /manage-blog, /manage-contact
   '/import',
   '/admin',
@@ -73,6 +105,7 @@ export function SmartAdSense({
   const location = useLocation();
   const insRef = useRef<HTMLModElement | null>(null);
   const pushedRef = useRef(false);
+  const isDisplaySlot = /^\d+$/.test(slot);
 
   // Tính toán điều kiện hiển thị
   const blocked = isAdBlacklistedPath(location.pathname);
@@ -86,18 +119,30 @@ export function SmartAdSense({
     if (!shouldRender || pushedRef.current) return;
     if (typeof window === 'undefined') return;
 
-    try {
-      // @ts-expect-error - adsbygoogle do script ngoài inject
-      (window.adsbygoogle = window.adsbygoogle || []).push({});
-      pushedRef.current = true;
-    } catch (err) {
-      // Không throw để tránh vỡ UI khi adblock hoặc script chưa load
-      // eslint-disable-next-line no-console
-      console.warn('[SmartAdSense] push failed:', err);
-    }
-  }, [shouldRender, location.pathname]);
+    loadAdSenseScript()
+      .then(() => {
+        if (!isDisplaySlot || pushedRef.current) return;
+        try {
+          // @ts-expect-error - adsbygoogle do script ngoài inject
+          (window.adsbygoogle = window.adsbygoogle || []).push({});
+          pushedRef.current = true;
+        } catch (err) {
+          // Không throw để tránh vỡ UI khi adblock hoặc script chưa load
+          // eslint-disable-next-line no-console
+          console.warn('[SmartAdSense] push failed:', err);
+        }
+      })
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.warn('[SmartAdSense] script load failed:', err);
+      });
+  }, [shouldRender, isDisplaySlot, location.pathname]);
 
   if (!shouldRender) return null;
+
+  // Slot "auto" chỉ dùng để nạp script Auto Ads trên trang đủ nội dung.
+  // Không render <ins> nếu chưa có data-ad-slot dạng số từ AdSense.
+  if (!isDisplaySlot) return null;
 
   return (
     <div className={cn('my-6 w-full text-center', className)} aria-label="Quảng cáo">

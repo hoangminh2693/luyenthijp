@@ -6,6 +6,7 @@ import { Breadcrumb } from '@/components/layout/Header';
 import { ActivityWidget } from '@/components/ui/ActivityWidget';
 import { supabase } from '@/integrations/supabase/client';
 import { useSEO, buildBreadcrumbSchema, SITE_URL } from '@/hooks/useSEO';
+import { SmartAdSense } from '@/components/ads/SmartAdSense';
 
 interface Subject {
   id: string;
@@ -120,6 +121,8 @@ const SubjectsPage = () => {
             đúng phần mình cần cải thiện.
           </p>
         </section>
+
+        <SmartAdSense slot="auto" hasContent={!loading && subjects.length > 0} minContentLength={1200} contentLength={1500} />
       </div>
     </div>
   );

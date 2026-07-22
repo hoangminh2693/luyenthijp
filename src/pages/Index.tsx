@@ -18,6 +18,7 @@ import { useSubjects, useLayersBySubject, useCategoriesByLayer } from "@/hooks/u
 import { Skeleton } from "@/components/ui/skeleton";
 import { ActivityWidget } from "@/components/ui/ActivityWidget";
 import { useSEO, buildWebsiteSchema, buildFAQSchema, buildOrganizationSchema, SITE_URL } from "@/hooks/useSEO";
+import { SmartAdSense } from "@/components/ads/SmartAdSense";
 
 /**
  * Index Page - Trang chủ của ứng dụng luyện đề thi
@@ -237,6 +238,10 @@ const Index = () => {
           </div>
         </div>
       </section>
+
+      <div className="container">
+        <SmartAdSense slot="auto" hasContent minContentLength={1800} contentLength={3200} />
+      </div>
 
       {/* CTA Section */}
       <section className="py-16">
