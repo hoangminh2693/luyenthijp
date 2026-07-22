@@ -80,7 +80,7 @@ const ExamsPage = () => {
 Nếu đây là phần nghe, hãy luyện trong môi trường yên tĩnh, nghe trọn đoạn audio trước khi chọn đáp án và ghi chú những từ khóa quan trọng. Nếu đây là phần từ vựng, ngữ pháp hoặc đọc hiểu, hãy chú ý ngữ cảnh câu, dấu hiệu ngữ pháp và mối quan hệ giữa các ý trong đoạn văn. Cách luyện này giúp bạn không chỉ ghi nhớ đáp án mà còn hiểu phương pháp xử lý dạng bài.
 
 Bạn có thể luyện số lượng câu nhỏ mỗi ngày, sau đó tăng dần khi đã quen tốc độ. Với các câu làm sai, hãy quay lại xem giải thích, ghi lại mẫu câu hoặc từ vựng chưa nắm chắc và luyện lại sau vài ngày. Việc ôn tập lặp lại có kiểm soát sẽ giúp cải thiện điểm số bền vững hơn so với chỉ làm thật nhiều đề trong thời gian ngắn.`;
-  const adContentLength = [section.name, subject.name, level.name, (section as any).description, seoFallbackText, exams.map((e) => `${e.title} ${e.description || ''}`).join(' ')].join(' ').length;
+  const adContentLength = [section.name, subject.name, level.name, (section as any).description, seoFallbackText, exams.map((e) => `${e.name} ${e.description || ''}`).join(' ')].join(' ').length;
 
   return (
     <div className="min-h-screen bg-background">
