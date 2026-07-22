@@ -30,7 +30,12 @@ export function SeoDescriptionBlock({
   fallback,
   className,
 }: SeoDescriptionBlockProps) {
-  const html = (content && content.trim().length > 0) ? content : fallback;
+  const normalizedContent = content?.trim() || '';
+  const normalizedFallback = fallback?.trim() || '';
+  const contentTextLength = normalizedContent.replace(/<[^>]*>/g, '').length;
+  const html = contentTextLength >= 240
+    ? normalizedContent
+    : [normalizedContent, normalizedFallback].filter(Boolean).join('\n\n');
   if (!html || html.trim().length === 0) return null;
 
   return (
