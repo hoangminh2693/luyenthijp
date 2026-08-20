@@ -42,7 +42,7 @@ export function Footer() {
           {/* Brand & Description */}
           <div className="lg:col-span-2">
             <Link to="/" className="flex items-center gap-2 mb-4">
-              <img src="/favicon.png" alt="Logo Luyện Đề Thi - Nền tảng luyện thi tại Nhật" loading="lazy" className="h-10 w-10 rounded-lg" />
+              <img src={import.meta.env.BASE_URL + "favicon.png"} alt="Logo Luyện Đề Thi - Nền tảng luyện thi tại Nhật" loading="lazy" className="h-10 w-10 rounded-lg" />
               <div>
                 <span className="text-lg font-bold text-foreground">Luyện Đề Thi</span>
                 <p className="text-xs text-muted-foreground">Nền tảng luyện thi tại Nhật</p>

@@ -86,7 +86,7 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 transition-opacity hover:opacity-80">
-          <img src="/favicon.png" alt="Luyện Đề Thi" className="h-9 w-9 rounded-lg" />
+          <img src={import.meta.env.BASE_URL + "favicon.png"} alt="Luyện Đề Thi" className="h-9 w-9 rounded-lg" />
           <div className="flex flex-col">
             <span className="text-lg font-bold text-foreground leading-tight">Luyện Đề Thi</span>
             <span className="text-[10px] text-muted-foreground leading-tight hidden sm:block">Nền tảng luyện thi tại Nhật</span>
@@ -176,7 +176,7 @@ export function Header() {
               <div className="flex flex-col gap-6 pt-6">
                 {/* Logo in mobile menu */}
                 <div className="flex items-center gap-2 px-2">
-                  <img src="/favicon.png" alt="Luyện Đề Thi" className="h-8 w-8 rounded-lg" />
+                  <img src={import.meta.env.BASE_URL + "favicon.png"} alt="Luyện Đề Thi" className="h-8 w-8 rounded-lg" />
                   <span className="font-bold text-foreground">Luyện Đề Thi</span>
                 </div>
 
