@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:pages": "vite build && node scripts/gh-pages-prepare.mjs",
+    "build:preview": "vite build && GH_PAGES_NO_CNAME=1 node scripts/gh-pages-prepare.mjs",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview"
