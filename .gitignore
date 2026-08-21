@@ -22,3 +22,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Env - never commit secrets (anon/service_role/DB password)
+.env
+.env.* 
+!.env.example
+# Backups - never commit DB dumps (contain auth hashes, PII)
+backup/
+*.backup
+*.dump
+storage-export/
