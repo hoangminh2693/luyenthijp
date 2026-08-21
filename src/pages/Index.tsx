@@ -155,11 +155,11 @@ const Index = () => {
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="flex flex-wrap justify-center gap-4">
             {loadingSubjects ? (
               // Skeleton loading
               Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="rounded-xl border border-border bg-card p-6">
+                <div key={i} className="w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(25%-0.75rem)] rounded-xl border border-border bg-card p-6">
                   <Skeleton className="h-6 w-20 mb-2" />
                   <Skeleton className="h-4 w-full mb-2" />
                   <Skeleton className="h-3 w-16" />
@@ -172,7 +172,7 @@ const Index = () => {
             )}
             {/* Placeholder nếu không có môn học */}
             {!loadingSubjects && subjects.length === 0 && (
-              <div className="col-span-full text-center py-8 text-muted-foreground">
+              <div className="w-full text-center py-8 text-muted-foreground">
                 Chưa có môn học nào. Vui lòng thêm môn học trong trang quản lý.
               </div>
             )}
@@ -344,7 +344,7 @@ function SubjectExamCard({ subject }: { subject: { id: string; name: string; slu
   return (
     <Link
       to={hasContent ? `/subjects/${subject.slug}` : "#"}
-      className={`group rounded-xl border border-border bg-card p-6 transition-all duration-200 ${
+      className={`group w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(25%-0.75rem)] rounded-xl border border-border bg-card p-6 transition-all duration-200 ${
         hasContent 
           ? "hover:border-primary/30 hover:shadow-md cursor-pointer" 
           : "opacity-70 cursor-default"
