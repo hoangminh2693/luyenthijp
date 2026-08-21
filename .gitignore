@@ -32,3 +32,5 @@ backup/
 *.backup
 *.dump
 storage-export/
+# Supabase temp
+supabase/.temp/
