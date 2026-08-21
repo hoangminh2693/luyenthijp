@@ -1,9 +1,10 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import Index from "./pages/Index";
@@ -19,6 +20,7 @@ import LeaderboardPage from "./pages/LeaderboardPage";
 import StatisticsPage from "./pages/StatisticsPage";
 import AuthPage from "./pages/AuthPage";
 import ProfilePage from "./pages/ProfilePage";
+import CompleteProfilePage from "./pages/CompleteProfilePage";
 import AboutPage from "./pages/AboutPage";
 import ContactPage from "./pages/ContactPage";
 import PrivacyPage from "./pages/PrivacyPage";
@@ -41,6 +43,23 @@ const queryClient = new QueryClient();
  * - /start/:subjectSlug/*   → StartQuizPage (cấu hình trước khi làm bài)
  * - /quiz/:subjectSlug/*    → QuizPage (làm bài)
  */
+function CompleteProfileGuard({ children }: { children: React.ReactNode }) {
+  const { user, profile, isLoading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (isLoading || !user || !profile) return;
+    const needsComplete = !profile.nickname;
+    const isExempt = ["/complete-profile", "/auth", "/privacy", "/terms", "/disclaimer"].includes(location.pathname);
+    if (needsComplete && !isExempt) {
+      navigate("/complete-profile", { replace: true });
+    }
+  }, [isLoading, user, profile, location.pathname, navigate]);
+
+  return <>{children}</>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -48,16 +67,18 @@ const App = () => (
       <Sonner />
       <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/+$/, "")}>
         <AuthProvider>
-          <div className="flex min-h-screen flex-col">
-            <Header />
-            <main className="flex-1">
-              <Routes>
-                {/* Trang chủ */}
-                <Route path="/" element={<Index />} />
-                
-                {/* Auth */}
-                <Route path="/auth" element={<AuthPage />} />
-                <Route path="/profile" element={<ProfilePage />} />
+          <CompleteProfileGuard>
+            <div className="flex min-h-screen flex-col">
+              <Header />
+              <main className="flex-1">
+                <Routes>
+                  {/* Trang chủ */}
+                  <Route path="/" element={<Index />} />
+                  
+                  {/* Auth */}
+                  <Route path="/auth" element={<AuthPage />} />
+                  <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/complete-profile" element={<CompleteProfilePage />} />
                 
                 {/* Danh sách môn học */}
                 <Route path="/subjects" element={<SubjectsPage />} />
@@ -107,9 +128,10 @@ const App = () => (
                 {/* Trang 404 */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </main>
-            <Footer />
-          </div>
+              </main>
+              <Footer />
+            </div>
+          </CompleteProfileGuard>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
